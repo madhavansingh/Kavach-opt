@@ -103,6 +103,7 @@ add_library(kavach_core
     src/numerics/model_converter.cpp
     src/numerics/lu_factorization.cpp
     src/numerics/scaling.cpp
+    src/presolve/presolve.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)
