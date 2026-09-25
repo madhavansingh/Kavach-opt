@@ -674,8 +674,8 @@ LPVerificationReport LPVerifier::verify(const model::CanonicalModel& model,
 
     // --- 10. Build summary ---
     std::ostringstream ss;
-    ss << "Verification summary for model '" << model.name() << "': "
-       << "reported=" << core::to_string(reported_status) << " "
+    ss << "Verification summary for model '" << model.name()
+       << "': " << "reported=" << core::to_string(reported_status) << " "
        << "certified=" << core::to_string(report.certified_status) << " "
        << "[primal=" << (report.primal_feasibility.passed ? "PASS" : "FAIL")
        << " bounds=" << (report.bound_feasibility.passed ? "PASS" : "FAIL")

@@ -620,8 +620,7 @@ KAVACH_TEST(dual_simplex_performance_knapsack_6item) {
     std::cout << "[INFO] 6-Item Knapsack: Cold = " << dur_cold << " ms ("
               << sol_cold.telemetry.cold_start_iterations << " cold iters), "
               << "Warm = " << dur_warm << " ms (" << sol_warm.telemetry.dual_simplex_iterations
-              << " dual iters), "
-              << "Warm Success Rate = " << (rate * 100.0) << "%\n";
+              << " dual iters), " << "Warm Success Rate = " << (rate * 100.0) << "%\n";
 }
 
 // ============================================================================
