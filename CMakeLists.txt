@@ -110,8 +110,10 @@ add_library(kavach_core
     src/algorithms/lp/dual_simplex.cpp
     src/algorithms/lp/simplex.cpp
     src/algorithms/milp/branch_and_bound.cpp
+    src/algorithms/qp/active_set.cpp
     src/verification/lp_verifier.cpp
     src/verification/milp_verifier.cpp
+    src/verification/qp_verifier.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)

@@ -15,6 +15,7 @@
 #include "model/model.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
+#include "verification/qp_verifier.hpp"
 
 namespace kavach::verification {
 
@@ -30,7 +31,7 @@ struct VerificationReport {
     double recomputed_dual_residual{0.0};
     double recomputed_complementary_slackness{0.0};
     double recomputed_integrality_violation{0.0};  ///< MILP extension
-    double recomputed_kkt_residual{0.0};           ///< QP extension (stub)
+    double recomputed_kkt_residual{0.0};           ///< QP extension
     double recomputed_objective{0.0};
     core::SolverStatus certified_status{core::SolverStatus::UNKNOWN};
     std::string summary;
@@ -64,6 +65,21 @@ struct VerificationReport {
         r.summary = milp_report.summary;
         return r;
     }
+
+    /** Construct from a QPVerificationReport. */
+    static VerificationReport from_qp(const QPVerificationReport& qp_report) {
+        VerificationReport r;
+        r.passed = qp_report.fully_verified();
+        r.recomputed_primal_residual = qp_report.aggregate_primal_residual;
+        r.recomputed_dual_residual = qp_report.aggregate_dual_residual;
+        r.recomputed_complementary_slackness = qp_report.aggregate_complementarity_residual;
+        r.recomputed_integrality_violation = 0.0;
+        r.recomputed_kkt_residual = qp_report.aggregate_stationarity_residual;
+        r.recomputed_objective = qp_report.recomputed_objective;
+        r.certified_status = qp_report.certified_status;
+        r.summary = qp_report.summary;
+        return r;
+    }
 };
 
 /**
@@ -71,7 +87,7 @@ struct VerificationReport {
  *
  * For production LP verification use LPVerifier directly.
  * For production MILP verification use MILPVerifier directly.
- * QP methods are stubs pending future solver implementation.
+ * For production QP verification use QPVerifier directly.
  */
 class IndependentVerifier {
 public:
@@ -102,18 +118,22 @@ public:
     }
 
     /**
-     * @brief QP verification stub (not yet implemented — solver does not exist).
-     * Returns UNKNOWN with appropriate diagnostic.
+     * @brief Independent verification of a QP solution.
      */
     [[nodiscard]] virtual VerificationReport verify_qp(
-        const model::CanonicalModel& /*original_model*/,
-        const std::vector<double>& /*primal_solution*/,
-        const std::vector<double>& /*dual_solution*/, double /*reported_objective*/,
-        const core::SolverTolerances& /*tolerances*/) const {
-        VerificationReport r;
-        r.certified_status = core::SolverStatus::UNKNOWN;
-        r.summary = "QP solver not yet implemented — verification unavailable.";
-        return r;
+        const model::CanonicalModel& original_model, const std::vector<double>& primal_solution,
+        const std::vector<double>& dual_solution, double reported_objective,
+        const core::SolverTolerances& tolerances) const {
+        if (primal_solution.empty()) {
+            VerificationReport r;
+            r.certified_status = core::SolverStatus::UNKNOWN;
+            r.summary = "QP verification unavailable: no primal solution provided.";
+            return r;
+        }
+        QPVerifier verifier(QPVerifierTolerances::from_solver_tolerances(tolerances));
+        auto rpt = verifier.verify(original_model, primal_solution, dual_solution,
+                                   reported_objective, core::SolverStatus::OPTIMAL);
+        return VerificationReport::from_qp(rpt);
     }
 };
 
