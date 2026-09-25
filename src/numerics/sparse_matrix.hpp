@@ -102,10 +102,12 @@ public:
     [[nodiscard]] std::vector<std::size_t>& col_idx() noexcept { return col_idx_; }
     [[nodiscard]] std::vector<double>& values() noexcept { return values_; }
 
-    // --- Row Slicing ---
+    // --- Row Slicing & Direct Access ---
     [[nodiscard]] std::size_t row_start(std::size_t r) const;
     [[nodiscard]] std::size_t row_end(std::size_t r) const;
     [[nodiscard]] std::size_t row_nnz(std::size_t r) const;
+    [[nodiscard]] const std::size_t* row_indices(std::size_t r) const;
+    [[nodiscard]] const double* row_values(std::size_t r) const;
 
     // --- Element Access ---
     [[nodiscard]] double get(std::size_t r, std::size_t c) const noexcept;
@@ -115,11 +117,17 @@ public:
     [[nodiscard]] bool is_valid(std::string* error_msg = nullptr) const noexcept;
     void validate() const;
 
-    // --- SpMV ---
+    // --- SpMV (y = A * x) ---
     void spmv(const double* x, double* y) const override;
     [[nodiscard]] std::vector<double> spmv(const std::vector<double>& x) const;
     void spmv(double alpha, const std::vector<double>& x, double beta,
               std::vector<double>& y) const;
+
+    // --- SpMV Transpose (y = A^T * x) ---
+    void spmv_transpose(const double* x, double* y) const;
+    [[nodiscard]] std::vector<double> spmv_transpose(const std::vector<double>& x) const;
+    void spmv_transpose(double alpha, const std::vector<double>& x, double beta,
+                        std::vector<double>& y) const;
 
     // --- Norms ---
     [[nodiscard]] double frobenius_norm() const noexcept override;
@@ -178,10 +186,12 @@ public:
     [[nodiscard]] std::vector<std::size_t>& row_idx() noexcept { return row_idx_; }
     [[nodiscard]] std::vector<double>& values() noexcept { return values_; }
 
-    // --- Column Slicing ---
+    // --- Column Slicing & Direct Access ---
     [[nodiscard]] std::size_t col_start(std::size_t c) const;
     [[nodiscard]] std::size_t col_end(std::size_t c) const;
     [[nodiscard]] std::size_t col_nnz(std::size_t c) const;
+    [[nodiscard]] const std::size_t* col_indices(std::size_t c) const;
+    [[nodiscard]] const double* col_values(std::size_t c) const;
 
     // --- Element Access ---
     [[nodiscard]] double get(std::size_t r, std::size_t c) const noexcept;
@@ -191,15 +201,17 @@ public:
     [[nodiscard]] bool is_valid(std::string* error_msg = nullptr) const noexcept;
     void validate() const;
 
-    // --- SpMV ---
+    // --- SpMV (y = A * x) ---
     void spmv(const double* x, double* y) const override;
     [[nodiscard]] std::vector<double> spmv(const std::vector<double>& x) const;
     void spmv(double alpha, const std::vector<double>& x, double beta,
               std::vector<double>& y) const;
 
-    // --- SpMV Transpose (y = A^T x) ---
+    // --- SpMV Transpose (y = A^T * x) ---
     void spmv_transpose(const double* x, double* y) const;
     [[nodiscard]] std::vector<double> spmv_transpose(const std::vector<double>& x) const;
+    void spmv_transpose(double alpha, const std::vector<double>& x, double beta,
+                        std::vector<double>& y) const;
 
     // --- Norms ---
     [[nodiscard]] double frobenius_norm() const noexcept override;

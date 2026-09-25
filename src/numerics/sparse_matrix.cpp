@@ -45,7 +45,12 @@ CsrMatrix CsrMatrix::from_triplets(std::size_t rows, std::size_t cols,
                                        ", " + std::to_string(t.col) + ") for size (" +
                                        std::to_string(rows) + ", " + std::to_string(cols) + ")");
         }
-        if (t.value != 0.0 && !std::isnan(t.value)) {
+        if (std::isnan(t.value) || std::isinf(t.value)) {
+            throw core::NumericalException("Non-finite value in triplet at (" +
+                                           std::to_string(t.row) + ", " + std::to_string(t.col) +
+                                           "): " + std::to_string(t.value));
+        }
+        if (t.value != 0.0) {
             ++row_counts[t.row];
         }
     }
@@ -62,7 +67,7 @@ CsrMatrix CsrMatrix::from_triplets(std::size_t rows, std::size_t cols,
     // 3. Populate entries
     std::vector<std::size_t> current_pos = mat.row_ptr_;
     for (const auto& t : triplets) {
-        if (t.value != 0.0 && !std::isnan(t.value)) {
+        if (t.value != 0.0) {
             std::size_t dest = current_pos[t.row]++;
             mat.col_idx_[dest] = t.col;
             mat.values_[dest] = t.value;
@@ -125,6 +130,20 @@ std::size_t CsrMatrix::row_nnz(std::size_t r) const {
         throw core::InputException("Row index out of range: " + std::to_string(r));
     }
     return row_ptr_[r + 1] - row_ptr_[r];
+}
+
+const std::size_t* CsrMatrix::row_indices(std::size_t r) const {
+    if (r >= rows_) {
+        throw core::InputException("Row index out of range: " + std::to_string(r));
+    }
+    return col_idx_.data() + row_ptr_[r];
+}
+
+const double* CsrMatrix::row_values(std::size_t r) const {
+    if (r >= rows_) {
+        throw core::InputException("Row index out of range: " + std::to_string(r));
+    }
+    return values_.data() + row_ptr_[r];
 }
 
 double CsrMatrix::get(std::size_t r, std::size_t c) const noexcept {
@@ -318,6 +337,65 @@ void CsrMatrix::spmv(double alpha, const std::vector<double>& x, double beta,
     }
 }
 
+void CsrMatrix::spmv_transpose(const double* x, double* y) const {
+    if (x == nullptr || y == nullptr) {
+        throw core::InputException("Null pointer passed to CsrMatrix::spmv_transpose");
+    }
+    std::fill_n(y, cols_, 0.0);
+    for (std::size_t r = 0; r < rows_; ++r) {
+        const double xr = x[r];
+        if (xr == 0.0) {
+            continue;
+        }
+        const std::size_t start = row_ptr_[r];
+        const std::size_t end = row_ptr_[r + 1];
+        for (std::size_t k = start; k < end; ++k) {
+            y[col_idx_[k]] += values_[k] * xr;
+        }
+    }
+}
+
+std::vector<double> CsrMatrix::spmv_transpose(const std::vector<double>& x) const {
+    if (x.size() != rows_) {
+        throw core::InputException("CsrMatrix::spmv_transpose dimension mismatch: x size (" +
+                                   std::to_string(x.size()) + ") != rows (" +
+                                   std::to_string(rows_) + ")");
+    }
+    std::vector<double> y(cols_, 0.0);
+    spmv_transpose(x.data(), y.data());
+    return y;
+}
+
+void CsrMatrix::spmv_transpose(double alpha, const std::vector<double>& x, double beta,
+                               std::vector<double>& y) const {
+    if (x.size() != rows_) {
+        throw core::InputException("CsrMatrix::spmv_transpose dimension mismatch: x size (" +
+                                   std::to_string(x.size()) + ") != rows (" +
+                                   std::to_string(rows_) + ")");
+    }
+    if (y.size() != cols_) {
+        throw core::InputException("CsrMatrix::spmv_transpose dimension mismatch: y size (" +
+                                   std::to_string(y.size()) + ") != cols (" +
+                                   std::to_string(cols_) + ")");
+    }
+    if (beta != 1.0) {
+        for (double& v : y) {
+            v *= beta;
+        }
+    }
+    for (std::size_t r = 0; r < rows_; ++r) {
+        const double axr = alpha * x[r];
+        if (axr == 0.0) {
+            continue;
+        }
+        const std::size_t start = row_ptr_[r];
+        const std::size_t end = row_ptr_[r + 1];
+        for (std::size_t k = start; k < end; ++k) {
+            y[col_idx_[k]] += values_[k] * axr;
+        }
+    }
+}
+
 double CsrMatrix::frobenius_norm() const noexcept {
     double sum_sq = 0.0;
     for (double v : values_) {
@@ -389,7 +467,12 @@ CscMatrix CscMatrix::from_triplets(std::size_t rows, std::size_t cols,
                                        ", " + std::to_string(t.col) + ") for size (" +
                                        std::to_string(rows) + ", " + std::to_string(cols) + ")");
         }
-        if (t.value != 0.0 && !std::isnan(t.value)) {
+        if (std::isnan(t.value) || std::isinf(t.value)) {
+            throw core::NumericalException("Non-finite value in triplet at (" +
+                                           std::to_string(t.row) + ", " + std::to_string(t.col) +
+                                           "): " + std::to_string(t.value));
+        }
+        if (t.value != 0.0) {
             ++col_counts[t.col];
         }
     }
@@ -404,7 +487,7 @@ CscMatrix CscMatrix::from_triplets(std::size_t rows, std::size_t cols,
 
     std::vector<std::size_t> current_pos = mat.col_ptr_;
     for (const auto& t : triplets) {
-        if (t.value != 0.0 && !std::isnan(t.value)) {
+        if (t.value != 0.0) {
             std::size_t dest = current_pos[t.col]++;
             mat.row_idx_[dest] = t.row;
             mat.values_[dest] = t.value;
@@ -466,6 +549,20 @@ std::size_t CscMatrix::col_nnz(std::size_t c) const {
         throw core::InputException("Column index out of range: " + std::to_string(c));
     }
     return col_ptr_[c + 1] - col_ptr_[c];
+}
+
+const std::size_t* CscMatrix::col_indices(std::size_t c) const {
+    if (c >= cols_) {
+        throw core::InputException("Column index out of range: " + std::to_string(c));
+    }
+    return row_idx_.data() + col_ptr_[c];
+}
+
+const double* CscMatrix::col_values(std::size_t c) const {
+    if (c >= cols_) {
+        throw core::InputException("Column index out of range: " + std::to_string(c));
+    }
+    return values_.data() + col_ptr_[c];
 }
 
 double CscMatrix::get(std::size_t r, std::size_t c) const noexcept {
@@ -685,6 +782,29 @@ std::vector<double> CscMatrix::spmv_transpose(const std::vector<double>& x) cons
     std::vector<double> y(cols_, 0.0);
     spmv_transpose(x.data(), y.data());
     return y;
+}
+
+void CscMatrix::spmv_transpose(double alpha, const std::vector<double>& x, double beta,
+                               std::vector<double>& y) const {
+    if (x.size() != rows_) {
+        throw core::InputException("CscMatrix::spmv_transpose dimension mismatch: x size (" +
+                                   std::to_string(x.size()) + ") != rows (" +
+                                   std::to_string(rows_) + ")");
+    }
+    if (y.size() != cols_) {
+        throw core::InputException("CscMatrix::spmv_transpose dimension mismatch: y size (" +
+                                   std::to_string(y.size()) + ") != cols (" +
+                                   std::to_string(cols_) + ")");
+    }
+    for (std::size_t c = 0; c < cols_; ++c) {
+        double sum = 0.0;
+        const std::size_t start = col_ptr_[c];
+        const std::size_t end = col_ptr_[c + 1];
+        for (std::size_t k = start; k < end; ++k) {
+            sum += values_[k] * x[row_idx_[k]];
+        }
+        y[c] = (alpha * sum) + (beta * y[c]);
+    }
 }
 
 double CscMatrix::frobenius_norm() const noexcept {
