@@ -104,6 +104,10 @@ add_library(kavach_core
     src/numerics/lu_factorization.cpp
     src/numerics/scaling.cpp
     src/presolve/presolve.cpp
+    src/algorithms/lp/standard_form.cpp
+    src/algorithms/lp/basis.cpp
+    src/algorithms/lp/revised_simplex.cpp
+    src/algorithms/lp/simplex.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)
