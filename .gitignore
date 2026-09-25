@@ -1,0 +1,47 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+bin/
+lib/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+compile_commands.json
+install_manifest.txt
+
+# Artifacts & test outputs
+Testing/
+*.log
+*.out
+*.profraw
+*.profdata
+*.gcov
+*.gcda
+*.gcno
+
+# OS and Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python cache (for test/benchmark scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

@@ -1,0 +1,102 @@
+name: Kavach-Opt CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }}, ${{ matrix.build_type }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Debug, Release]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Build Environment (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang clang-format clang-tidy
+
+      - name: Setup Build Environment (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja llvm
+
+      - name: Check Dependencies (Sovereignty Rule)
+        run: |
+          python3 tools/check_dependencies.py
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DKAVACH_ENABLE_WARNINGS_AS_ERRORS=ON \
+            -DKAVACH_BUILD_TESTS=ON \
+            -DKAVACH_BUILD_CLI=ON
+
+      - name: Build
+        run: |
+          cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Run Tests (CTest)
+        run: |
+          ctest --test-dir build --output-on-failure -C ${{ matrix.build_type }}
+
+  sanitizers:
+    name: Sanitizers (ASan + UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang
+
+      - name: Configure CMake with Sanitizers
+        run: |
+          cmake -B build-san -G Ninja \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DKAVACH_ENABLE_SANITIZERS=ON \
+            -DKAVACH_ENABLE_WARNINGS_AS_ERRORS=ON \
+            -DKAVACH_BUILD_TESTS=ON
+
+      - name: Build with Sanitizers
+        run: |
+          cmake --build build-san
+
+      - name: Run Sanitized Tests
+        run: |
+          ctest --test-dir build-san --output-on-failure
+
+  lint-and-format:
+    name: Lint & Code Style Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy ninja-build cmake
+
+      - name: Check Formatting (clang-format)
+        run: |
+          find src tests -name '*.cpp' -o -name '*.hpp' | xargs clang-format --dry-run --Werror
+
+      - name: Run Static Analysis (clang-tidy)
+        run: |
+          cmake -B build-lint -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          run-clang-tidy -p build-lint -header-filter='src/.*' 'src/.*'

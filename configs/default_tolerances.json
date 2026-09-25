@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "description": "Kavach-Opt default named numerical tolerances as specified in Blueprint v2 Section 11",
+  "tolerances": {
+    "primal_feasibility_tol": 1e-7,
+    "dual_feasibility_tol": 1e-7,
+    "integrality_tol": 1e-6,
+    "optimality_tol": 1e-7,
+    "pivot_tol": 1e-9,
+    "residual_tol": 1e-6
+  },
+  "watchdog": {
+    "cycling_pivot_threshold": 100,
+    "refactorization_interval": 50
+  }
+}
