@@ -1,29 +1,60 @@
 #pragma once
 
+/**
+ * @file verifier.hpp
+ * @brief Architecture interface for the Independent Verification Layer [Y].
+ *
+ * For LP verification, use verification::LPVerifier (lp_verifier.hpp) directly.
+ * The abstract base class here is retained for future MILP / QP extension points.
+ */
+
 #include <vector>
 
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
+#include "verification/lp_verifier.hpp"
 
 namespace kavach::verification {
 
+/**
+ * @brief Aggregated structured verification report (legacy / future MILP-QP bridge).
+ *
+ * Thin wrapper around LPVerificationReport for the abstract interface.
+ * Use LPVerificationReport directly for LP results.
+ */
 struct VerificationReport {
     bool passed{false};
     double recomputed_primal_residual{0.0};
     double recomputed_dual_residual{0.0};
     double recomputed_complementary_slackness{0.0};
-    double recomputed_integrality_violation{0.0};
-    double recomputed_kkt_residual{0.0};
+    double recomputed_integrality_violation{0.0};  ///< MILP extension (stub)
+    double recomputed_kkt_residual{0.0};           ///< QP extension (stub)
     double recomputed_objective{0.0};
     core::SolverStatus certified_status{core::SolverStatus::UNKNOWN};
+    std::string summary;
+
+    /** Construct from an LPVerificationReport. */
+    static VerificationReport from_lp(const LPVerificationReport& lp_report) {
+        VerificationReport r;
+        r.passed = lp_report.fully_verified();
+        r.recomputed_primal_residual = lp_report.aggregate_primal_residual;
+        r.recomputed_dual_residual = lp_report.aggregate_dual_residual;
+        r.recomputed_complementary_slackness = lp_report.complementary_slackness.max_violation;
+        r.recomputed_integrality_violation = 0.0;
+        r.recomputed_kkt_residual = 0.0;
+        r.recomputed_objective = lp_report.recomputed_objective;
+        r.certified_status = lp_report.certified_status;
+        r.summary = lp_report.summary;
+        return r;
+    }
 };
 
 /**
  * @brief Architecture interface scaffolding for [Y] Independent Verification Layer.
- * Full implementation scheduled for Phase 6 per Blueprint Section 4, 6, 12 & Section 32.
  *
- * Hard architectural invariant: Must share ZERO code/logic with solver core algorithms.
+ * For production LP verification use LPVerifier directly.
+ * MILP / QP methods are stubs pending future solver implementation.
  */
 class IndependentVerifier {
 public:
@@ -34,15 +65,56 @@ public:
         const std::vector<double>& dual_multipliers, double reported_objective,
         const core::SolverTolerances& tolerances) const = 0;
 
+    /**
+     * @brief MILP verification stub (not yet implemented — solver does not exist).
+     * Returns UNKNOWN with appropriate diagnostic.
+     */
     [[nodiscard]] virtual VerificationReport verify_milp(
-        const model::CanonicalModel& original_model, const std::vector<double>& incumbent_solution,
-        double best_bound, double reported_objective,
-        const core::SolverTolerances& tolerances) const = 0;
+        const model::CanonicalModel& /*original_model*/,
+        const std::vector<double>& /*incumbent_solution*/, double /*best_bound*/,
+        double /*reported_objective*/, const core::SolverTolerances& /*tolerances*/) const {
+        VerificationReport r;
+        r.certified_status = core::SolverStatus::UNKNOWN;
+        r.summary = "MILP solver not yet implemented — verification unavailable.";
+        return r;
+    }
 
+    /**
+     * @brief QP verification stub (not yet implemented — solver does not exist).
+     * Returns UNKNOWN with appropriate diagnostic.
+     */
     [[nodiscard]] virtual VerificationReport verify_qp(
+        const model::CanonicalModel& /*original_model*/,
+        const std::vector<double>& /*primal_solution*/,
+        const std::vector<double>& /*dual_solution*/, double /*reported_objective*/,
+        const core::SolverTolerances& /*tolerances*/) const {
+        VerificationReport r;
+        r.certified_status = core::SolverStatus::UNKNOWN;
+        r.summary = "QP solver not yet implemented — verification unavailable.";
+        return r;
+    }
+};
+
+/**
+ * @brief Concrete production LP verifier implementing the abstract interface.
+ */
+class KavachLPVerifier final : public IndependentVerifier {
+public:
+    explicit KavachLPVerifier(VerifierTolerances tols = {}) : lp_verifier_(std::move(tols)) {}
+
+    [[nodiscard]] VerificationReport verify_lp(
         const model::CanonicalModel& original_model, const std::vector<double>& primal_solution,
-        const std::vector<double>& dual_solution, double reported_objective,
-        const core::SolverTolerances& tolerances) const = 0;
+        const std::vector<double>& dual_multipliers, double reported_objective,
+        const core::SolverTolerances& tolerances) const override {
+        std::vector<double> empty_rc;
+        auto lp_report =
+            lp_verifier_.verify(original_model, primal_solution, dual_multipliers, empty_rc,
+                                reported_objective, core::SolverStatus::OPTIMAL, tolerances);
+        return VerificationReport::from_lp(lp_report);
+    }
+
+private:
+    LPVerifier lp_verifier_;
 };
 
 }  // namespace kavach::verification

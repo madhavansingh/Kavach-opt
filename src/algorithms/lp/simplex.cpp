@@ -10,6 +10,7 @@
 #include "core/logger.hpp"
 #include "numerics/scaling.hpp"
 #include "presolve/presolve.hpp"
+#include "verification/lp_verifier.hpp"
 
 namespace kavach::algorithms::lp {
 
@@ -138,12 +139,12 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     // 9. Reconstruct original model solution (through Presolve reconstruction map if present)
     if (reconstruction_map.has_value()) {
         solution.primal_solution = reconstruction_map->restore_solution(x_reduced);
-        solution.dual_multipliers = std::move(dual_reduced);
-        solution.reduced_costs = std::move(rc_reduced);
+        solution.dual_multipliers = dual_reduced;
+        solution.reduced_costs = rc_reduced;
     } else {
-        solution.primal_solution = std::move(x_reduced);
-        solution.dual_multipliers = std::move(dual_reduced);
-        solution.reduced_costs = std::move(rc_reduced);
+        solution.primal_solution = x_reduced;
+        solution.dual_multipliers = dual_reduced;
+        solution.reduced_costs = rc_reduced;
     }
 
     // 10. Compute true original objective value directly from original model and unscaled primal
@@ -154,6 +155,51 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
         }
     }
     solution.objective_value = obj;
+
+    // 11. Independent Verification [Y] — mandatory for OPTIMAL claim
+    // The verifier operates on the original (pre-presolve) model and the
+    // fully-reconstructed solution. It does NOT call any solver-internal
+    // feasibility or residual helpers.
+    {
+        verification::LPVerifier verifier(
+            verification::VerifierTolerances::from_solver_tolerances(options.tolerances));
+
+        if (working_model != &model) {
+            double obj_reduced = standard_lp.compute_original_objective(x_reduced);
+            auto vr_reduced = verifier.verify(*working_model, x_reduced, dual_reduced, rc_reduced,
+                                              obj_reduced, exec_res.status);
+
+            // Verify primal feasibility, bounds, nonfinite, and objective on the original model:
+            auto vr_orig = verifier.verify(model, solution.primal_solution, {}, {},
+                                           solution.objective_value, core::SolverStatus::FEASIBLE);
+
+            if (!vr_reduced.fully_verified() || !vr_orig.primal_feasibility.passed ||
+                !vr_orig.bound_feasibility.passed || !vr_orig.objective_consistency.passed ||
+                !vr_orig.nonfinite_check.passed) {
+                solution.status = vr_reduced.certified_status != core::SolverStatus::OPTIMAL
+                                      ? vr_reduced.certified_status
+                                      : core::SolverStatus::NUMERICAL_FAILURE;
+                solution.message = "Verifier rejected presolved solution: " + vr_orig.summary;
+            } else {
+                solution.status = core::SolverStatus::OPTIMAL;
+                solution.message = vr_orig.summary;
+            }
+        } else {
+            auto vr =
+                verifier.verify(model, solution.primal_solution, solution.dual_multipliers,
+                                solution.reduced_costs, solution.objective_value, solution.status);
+
+            if (vr.status_downgraded) {
+                solution.status = vr.certified_status;
+                solution.message = "Verifier downgraded status: " + vr.summary;
+            } else if (vr.certified_status == core::SolverStatus::OPTIMAL && vr.fully_verified()) {
+                // OPTIMAL confirmed — status unchanged
+            }
+            if (solution.message.empty()) {
+                solution.message = vr.summary;
+            }
+        }
+    }
 
     auto end_time = std::chrono::steady_clock::now();
     solution.telemetry.solve_time_seconds =

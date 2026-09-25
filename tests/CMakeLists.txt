@@ -6,6 +6,7 @@ add_executable(kavach_unit_tests
     unit/test_phase3_numerics.cpp
     unit/test_presolve.cpp
     unit/test_phase5_lp.cpp
+    unit/test_phase6_verification.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)
