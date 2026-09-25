@@ -274,8 +274,15 @@ public:
 
     [[nodiscard]] std::size_t num_variables() const noexcept { return variables_.size(); }
     [[nodiscard]] const Variable& variable(VarId var_id) const;
+    [[nodiscard]] Variable& variable(VarId var_id);
     [[nodiscard]] const std::vector<Variable>& variables() const noexcept { return variables_; }
+    [[nodiscard]] std::vector<Variable>& variables() noexcept { return variables_; }
     [[nodiscard]] std::optional<VarId> find_variable_id(std::string_view name) const;
+
+    void set_variable_bounds(VarId var_id, double lower_bound, double upper_bound);
+    void set_variable_lower_bound(VarId var_id, double lower_bound);
+    void set_variable_upper_bound(VarId var_id, double upper_bound);
+    void set_variable_type(VarId var_id, VariableType type);
 
     // --- Constraint Management ---
     ConstrId add_constraint(const std::string& name, SparseLinearExpression expr,
@@ -287,9 +294,11 @@ public:
 
     [[nodiscard]] std::size_t num_constraints() const noexcept { return constraints_.size(); }
     [[nodiscard]] const Constraint& constraint(ConstrId constr_id) const;
+    [[nodiscard]] Constraint& constraint(ConstrId constr_id);
     [[nodiscard]] const std::vector<Constraint>& constraints() const noexcept {
         return constraints_;
     }
+    [[nodiscard]] std::vector<Constraint>& constraints() noexcept { return constraints_; }
     [[nodiscard]] std::optional<ConstrId> find_constraint_id(std::string_view name) const;
 
     // --- Objective Management ---

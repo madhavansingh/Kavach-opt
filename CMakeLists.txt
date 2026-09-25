@@ -96,6 +96,9 @@ add_library(kavach_core
     src/core/logger.cpp
     src/core/random.cpp
     src/model/model.cpp
+    src/io/parser.cpp
+    src/io/mps_parser.cpp
+    src/io/lp_parser.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)

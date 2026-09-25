@@ -2,12 +2,13 @@ add_executable(kavach_unit_tests
     main.cpp
     unit/test_phase0_foundation.cpp
     unit/test_phase1_canonical_model.cpp
+    unit/test_phase2_parser.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)
 target_include_directories(kavach_unit_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_test(NAME phase0_unit_tests COMMAND kavach_unit_tests)
+add_test(NAME kavach_unit_tests COMMAND kavach_unit_tests)
 
 # Add dependency graph integrity check as a CTest test
 find_package(Python3 COMPONENTS Interpreter QUIET)

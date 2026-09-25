@@ -171,6 +171,42 @@ const Variable& CanonicalModel::variable(VarId var_id) const {
     return variables_[var_id];
 }
 
+Variable& CanonicalModel::variable(VarId var_id) {
+    if (var_id >= variables_.size()) {
+        throw core::InputException("Variable ID out of range: " + std::to_string(var_id));
+    }
+    return variables_[var_id];
+}
+
+void CanonicalModel::set_variable_bounds(VarId var_id, double lower_bound, double upper_bound) {
+    if (var_id >= variables_.size()) {
+        throw core::InputException("Variable ID out of range: " + std::to_string(var_id));
+    }
+    variables_[var_id].lower_bound = lower_bound;
+    variables_[var_id].upper_bound = upper_bound;
+}
+
+void CanonicalModel::set_variable_lower_bound(VarId var_id, double lower_bound) {
+    if (var_id >= variables_.size()) {
+        throw core::InputException("Variable ID out of range: " + std::to_string(var_id));
+    }
+    variables_[var_id].lower_bound = lower_bound;
+}
+
+void CanonicalModel::set_variable_upper_bound(VarId var_id, double upper_bound) {
+    if (var_id >= variables_.size()) {
+        throw core::InputException("Variable ID out of range: " + std::to_string(var_id));
+    }
+    variables_[var_id].upper_bound = upper_bound;
+}
+
+void CanonicalModel::set_variable_type(VarId var_id, VariableType type) {
+    if (var_id >= variables_.size()) {
+        throw core::InputException("Variable ID out of range: " + std::to_string(var_id));
+    }
+    variables_[var_id].type = type;
+}
+
 std::optional<VarId> CanonicalModel::find_variable_id(std::string_view name) const {
     auto iter = var_name_to_id_.find(std::string(name));
     if (iter != var_name_to_id_.end()) {
@@ -200,6 +236,13 @@ ConstrId CanonicalModel::add_constraint(const std::string& name, SparseLinearExp
 }
 
 const Constraint& CanonicalModel::constraint(ConstrId constr_id) const {
+    if (constr_id >= constraints_.size()) {
+        throw core::InputException("Constraint ID out of range: " + std::to_string(constr_id));
+    }
+    return constraints_[constr_id];
+}
+
+Constraint& CanonicalModel::constraint(ConstrId constr_id) {
     if (constr_id >= constraints_.size()) {
         throw core::InputException("Constraint ID out of range: " + std::to_string(constr_id));
     }
