@@ -3,6 +3,7 @@ add_executable(kavach_unit_tests
     unit/test_phase0_foundation.cpp
     unit/test_phase1_canonical_model.cpp
     unit/test_phase2_parser.cpp
+    unit/test_phase3_numerics.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)

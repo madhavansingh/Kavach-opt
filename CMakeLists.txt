@@ -99,6 +99,10 @@ add_library(kavach_core
     src/io/parser.cpp
     src/io/mps_parser.cpp
     src/io/lp_parser.cpp
+    src/numerics/sparse_matrix.cpp
+    src/numerics/model_converter.cpp
+    src/numerics/lu_factorization.cpp
+    src/numerics/scaling.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)

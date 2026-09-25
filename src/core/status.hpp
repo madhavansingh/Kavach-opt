@@ -49,4 +49,10 @@ enum class SolverStatus {
            status == SolverStatus::NUMERICAL_FAILURE;
 }
 
+template <typename CharT, typename Traits>
+std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os,
+                                              SolverStatus status) {
+    return os << to_string(status);
+}
+
 }  // namespace kavach::core

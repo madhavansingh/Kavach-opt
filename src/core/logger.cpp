@@ -35,8 +35,8 @@ void Logger::log(LogLevel level, const std::string& message) {
     localtime_r(&in_time_t, &time_info);
 #endif
 
-    std::cout << "[" << std::put_time(&time_info, "%Y-%m-%d %H:%M:%S") << "]"
-              << " [" << to_string(level) << "] " << message << '\n';
+    std::cout << "[" << std::put_time(&time_info, "%Y-%m-%d %H:%M:%S") << "]" << " ["
+              << to_string(level) << "] " << message << '\n';
 }
 
 void Logger::telemetry(const std::string& key, double value) {
