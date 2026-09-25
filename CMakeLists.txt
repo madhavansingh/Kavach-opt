@@ -114,6 +114,8 @@ add_library(kavach_core
     src/verification/lp_verifier.cpp
     src/verification/milp_verifier.cpp
     src/verification/qp_verifier.cpp
+    src/backend/cpu/thread_pool.cpp
+    src/backend/cpu/cpu_backend.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)

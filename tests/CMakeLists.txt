@@ -10,6 +10,7 @@ add_executable(kavach_unit_tests
     unit/test_phase7_milp.cpp
     unit/test_phase8_dual_simplex.cpp
     unit/test_phase9_qp.cpp
+    unit/test_phase10_cpu_parallel.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)
