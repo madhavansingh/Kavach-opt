@@ -1,0 +1,41 @@
+{
+  "suite": "miplib_subset",
+  "description": "Representative size-appropriate mixed integer linear programming benchmark suite",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "case_id": "miplib-knapsack",
+      "instance_name": "knapsack",
+      "instance_path": "benchmarks/miplib/knapsack.lp",
+      "problem_type": "MILP",
+      "source": "MIPLIB Subset",
+      "tags": ["small", "binary", "difficult MILP"],
+      "timeout_seconds": 60.0,
+      "reference_objective": 41.0,
+      "reference_status": "OPTIMAL",
+      "seed": 42
+    },
+    {
+      "case_id": "miplib-facility_loc",
+      "instance_name": "facility_loc",
+      "instance_path": "benchmarks/miplib/facility_loc.lp",
+      "problem_type": "MILP",
+      "source": "MIPLIB Subset",
+      "tags": ["medium", "mixed_integer"],
+      "timeout_seconds": 60.0,
+      "reference_status": "OPTIMAL",
+      "seed": 42
+    },
+    {
+      "case_id": "miplib-infeasible",
+      "instance_name": "infeasible_milp",
+      "instance_path": "benchmarks/miplib/infeasible_milp.lp",
+      "problem_type": "MILP",
+      "source": "MIPLIB Subset",
+      "tags": ["small", "infeasible"],
+      "timeout_seconds": 60.0,
+      "reference_status": "INFEASIBLE",
+      "seed": 42
+    }
+  ]
+}

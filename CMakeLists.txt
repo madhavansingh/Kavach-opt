@@ -118,6 +118,14 @@ add_library(kavach_core
     src/backend/cpu/cpu_backend.cpp
     src/backend/cuda/cuda_device.cpp
     src/backend/cuda/cuda_backend.cpp
+    src/benchmark/json.cpp
+    src/benchmark/benchmark_case.cpp
+    src/benchmark/benchmark_result.cpp
+    src/benchmark/reference/reference_adapter.cpp
+    src/benchmark/benchmark_manifest.cpp
+    src/benchmark/benchmark_io.cpp
+    src/benchmark/benchmark_runner.cpp
+    src/benchmark/benchmark_report.cpp
 )
 
 if(KAVACH_ENABLE_CUDA)

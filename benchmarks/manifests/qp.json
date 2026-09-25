@@ -1,0 +1,29 @@
+{
+  "suite": "qp",
+  "description": "Convex Quadratic Programming benchmark suite",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "case_id": "qp-portfolio",
+      "instance_name": "portfolio",
+      "instance_path": "benchmarks/qp/portfolio.lp",
+      "problem_type": "QP",
+      "source": "Synthetic Markowitz",
+      "tags": ["small", "convex QP"],
+      "timeout_seconds": 60.0,
+      "reference_status": "OPTIMAL",
+      "seed": 42
+    },
+    {
+      "case_id": "qp-constrained_ls",
+      "instance_name": "constrained_ls",
+      "instance_path": "benchmarks/qp/constrained_ls.lp",
+      "problem_type": "QP",
+      "source": "Constrained LS",
+      "tags": ["small", "convex QP"],
+      "timeout_seconds": 60.0,
+      "reference_status": "OPTIMAL",
+      "seed": 42
+    }
+  ]
+}

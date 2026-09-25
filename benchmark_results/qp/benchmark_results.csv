@@ -1,0 +1,3 @@
+case_id,instance,suite,problem_type,status,verified_status,objective,reference_objective,rel_error,total_time_s,solve_time_s,iterations,nodes,primal_residual,dual_residual,kkt_residual,ref_status,ref_objective,ref_time_s
+qp-portfolio,portfolio,qp,QP,OPTIMAL,VERIFIED_OPTIMAL,0.316412060302,,,0.000718,0.000116,5,,0.0000e+00,0.0000e+00,3.0487e-13,,,
+qp-constrained_ls,constrained_ls,qp,QP,OPTIMAL,VERIFIED_OPTIMAL,-5.33333333333,,,0.000087,0.000038,5,,0.0000e+00,0.0000e+00,6.6658e-13,,,

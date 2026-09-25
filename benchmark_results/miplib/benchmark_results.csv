@@ -1,0 +1,4 @@
+case_id,instance,suite,problem_type,status,verified_status,objective,reference_objective,rel_error,total_time_s,solve_time_s,iterations,nodes,primal_residual,dual_residual,kkt_residual,ref_status,ref_objective,ref_time_s
+miplib-knapsack,knapsack,miplib_subset,MILP,OPTIMAL,VERIFIED_OPTIMAL,41,41,0,0.001386,0.000414,,19,0.0000e+00,,,,,
+miplib-facility_loc,facility_loc,miplib_subset,MILP,OPTIMAL,VERIFIED_OPTIMAL,180,,,0.000493,0.000197,,3,0.0000e+00,,,,,
+miplib-infeasible,infeasible_milp,miplib_subset,MILP,INFEASIBLE,UNVERIFIED,,,,0.000630,0.000071,,3,,,,,,
