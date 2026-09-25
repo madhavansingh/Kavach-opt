@@ -578,8 +578,7 @@ KAVACH_TEST(test_lp_netlib_corpus) {
     std::cout << std::left << std::setw(14) << "Instance" << std::setw(8) << "Rows" << std::setw(8)
               << "Cols" << std::setw(8) << "NNZ" << std::setw(12) << "Status" << std::setw(18)
               << "Objective" << std::setw(18) << "Reference" << std::setw(8) << "Iters"
-              << std::setw(10) << "Time (s)"
-              << "\n";
+              << std::setw(10) << "Time (s)" << "\n";
     std::cout << "--------------------------------------------------------------------------------"
                  "-----------------\n";
 
