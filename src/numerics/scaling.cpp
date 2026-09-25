@@ -27,11 +27,11 @@ std::string to_string(ConditioningCategory category) {
 
 std::string ConditioningDiagnostics::to_string() const {
     std::ostringstream oss;
-    oss << "ConditioningDiagnostics {"
-        << " rows=" << rows << " cols=" << cols << " nnz=" << nnz << std::scientific
-        << std::setprecision(3) << " min_abs_val=" << min_abs_val << " max_abs_val=" << max_abs_val
-        << " dynamic_range_ratio=" << dynamic_range_ratio << " norm_1=" << norm_1
-        << " norm_inf=" << norm_inf << " category=" << numerics::to_string(category)
+    oss << "ConditioningDiagnostics {" << " rows=" << rows << " cols=" << cols << " nnz=" << nnz
+        << std::scientific << std::setprecision(3) << " min_abs_val=" << min_abs_val
+        << " max_abs_val=" << max_abs_val << " dynamic_range_ratio=" << dynamic_range_ratio
+        << " norm_1=" << norm_1 << " norm_inf=" << norm_inf
+        << " category=" << numerics::to_string(category)
         << " recommend_scaling=" << (recommend_scaling ? "true" : "false") << " }";
     return oss.str();
 }
