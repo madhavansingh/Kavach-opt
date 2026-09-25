@@ -116,7 +116,24 @@ add_library(kavach_core
     src/verification/qp_verifier.cpp
     src/backend/cpu/thread_pool.cpp
     src/backend/cpu/cpu_backend.cpp
+    src/backend/cuda/cuda_device.cpp
+    src/backend/cuda/cuda_backend.cpp
 )
+
+if(KAVACH_ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 20)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        target_compile_definitions(kavach_core PUBLIC KAVACH_USE_CUDA=1)
+        target_sources(kavach_core PRIVATE src/backend/cuda/cuda_spmv.cu)
+        message(STATUS "CUDA backend enabled and CUDA compiler found: ${CMAKE_CUDA_COMPILER}")
+    else()
+        message(STATUS "KAVACH_ENABLE_CUDA is ON but no CUDA compiler was found. Building CUDA backend in CPU-fallback mode.")
+    endif()
+endif()
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)
 
