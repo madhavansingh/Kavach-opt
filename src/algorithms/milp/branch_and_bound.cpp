@@ -49,11 +49,8 @@ struct BoundModification {
 struct BranchNode {
     std::uint64_t node_id{0};
     double lp_bound{0.0};  ///< LP relaxation objective at parent (used for queue priority)
-    std::vector<BoundModification> mods;  ///< Bound mods relative to base model
-
-    // Comparator: best-bound (min problem: lowest bound first; max: highest first).
-    // Stored as minimization bound (negated for MAX in the actual call site).
-    // Tie-break by node_id ascending (deterministic FIFO among equal bounds).
+    std::vector<BoundModification> mods;             ///< Bound mods relative to base model
+    std::optional<lp::BasisState> warm_start_basis;  ///< Inherited basis from parent solve
 };
 
 struct MinBestBound {
@@ -294,9 +291,46 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
     lp_opts.tolerances = tols;
     lp_opts.enable_presolve = opts.enable_presolve;
     lp_opts.enable_scaling = opts.enable_scaling;
+    lp_opts.preserve_bounds_structure = true;
     lp_opts.verbose = false;
 
     lp::RevisedSimplex lp_solver(lp_opts);
+
+    auto solve_node_lp =
+        [&](model::CanonicalModel& wm,
+            const std::optional<lp::BasisState>& inherited_basis) -> lp::LPSolution {
+        if (opts.enable_warm_starts && inherited_basis.has_value()) {
+            ++tel.warm_start_attempts;
+            auto ws_start = Clock::now();
+            lp::LPSolverOptions ws_opts = lp_opts;
+            ws_opts.enable_warm_start = true;
+            ws_opts.preserve_bounds_structure = true;
+            ws_opts.enable_presolve = false;
+
+            auto ws_sol = lp_solver.solve_warm_start(wm, *inherited_basis, ws_opts);
+            double ws_sec = std::chrono::duration<double>(Clock::now() - ws_start).count();
+            tel.warm_start_time_seconds += ws_sec;
+            tel.dual_simplex_iterations += ws_sol.telemetry.dual_simplex_iterations;
+
+            if (ws_sol.is_optimal() || ws_sol.is_infeasible()) {
+                ++tel.warm_start_successes;
+                return ws_sol;
+            }
+
+            // Fallback to cold start
+            ++tel.warm_start_fallbacks;
+            tel.warm_start_fallback_reasons.push_back(ws_sol.message);
+        }
+
+        auto cs_start = Clock::now();
+        lp::LPSolverOptions cs_opts = lp_opts;
+        cs_opts.preserve_bounds_structure = true;
+        auto cs_sol = lp_solver.solve(wm, cs_opts);
+        double cs_sec = std::chrono::duration<double>(Clock::now() - cs_start).count();
+        tel.cold_start_time_seconds += cs_sec;
+        tel.cold_start_iterations += cs_sol.iterations;
+        return cs_sol;
+    };
 
     // Incumbent tracking
     double incumbent_obj = worst_bound(sense);
@@ -415,6 +449,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             BranchNode root;
             root.node_id = 0;
             root.lp_bound = root_sol.objective_value;
+            root.warm_start_basis = root_sol.basis;
             pq.push(std::move(root));
 
             std::uint64_t next_id = 1;
@@ -448,7 +483,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                         model::VariableType::CONTINUOUS;
                 }
 
-                auto node_sol = lp_solver.solve(work_model, lp_opts);
+                auto node_sol = solve_node_lp(work_model, node.warm_start_basis);
 
                 // Restore types
                 for (std::size_t j = 0; j < work_model.num_variables(); ++j) {
@@ -542,7 +577,9 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                         left.mods.push_back(
                             {bv, false, left_ub, orig_model.variable(bv).upper_bound});
                     }
+                    left.warm_start_basis = node_sol.basis;
                     pq.push(std::move(left));
+                    ++tel.basis_transfer_count;
                 }
 
                 // RIGHT child: x_j >= ceil(x_j)
@@ -576,7 +613,9 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                         right.mods.push_back(
                             {bv, true, right_lb, orig_model.variable(bv).lower_bound});
                     }
+                    right.warm_start_basis = node_sol.basis;
                     pq.push(std::move(right));
+                    ++tel.basis_transfer_count;
                 }
             }  // end while
 
@@ -590,6 +629,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             BranchNode root;
             root.node_id = 0;
             root.lp_bound = root_sol.objective_value;
+            root.warm_start_basis = root_sol.basis;
             pq.push(std::move(root));
 
             std::uint64_t next_id = 1;
@@ -619,7 +659,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     work_model.variable(static_cast<model::VarId>(j)).type =
                         model::VariableType::CONTINUOUS;
                 }
-                auto node_sol = lp_solver.solve(work_model, lp_opts);
+                auto node_sol = solve_node_lp(work_model, node.warm_start_basis);
                 for (std::size_t j = 0; j < work_model.num_variables(); ++j) {
                     work_model.variable(static_cast<model::VarId>(j)).type =
                         orig_model.variable(static_cast<model::VarId>(j)).type;
@@ -699,7 +739,9 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                         left.mods.push_back(
                             {bv, false, left_ub, orig_model.variable(bv).upper_bound});
                     }
+                    left.warm_start_basis = node_sol.basis;
                     pq.push(std::move(left));
+                    ++tel.basis_transfer_count;
                 }
 
                 double right_lb = bv_ceil;
@@ -730,7 +772,9 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                         right.mods.push_back(
                             {bv, true, right_lb, orig_model.variable(bv).lower_bound});
                     }
+                    right.warm_start_basis = node_sol.basis;
                     pq.push(std::move(right));
+                    ++tel.basis_transfer_count;
                 }
             }  // end while
 

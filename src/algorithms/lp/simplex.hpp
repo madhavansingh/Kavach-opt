@@ -46,6 +46,10 @@ public:
 
     [[nodiscard]] LPSolution solve(const model::CanonicalModel& model);
 
+    [[nodiscard]] LPSolution solve_warm_start(const model::CanonicalModel& model,
+                                              const BasisState& warm_basis,
+                                              const LPSolverOptions& options);
+
     [[nodiscard]] const LPSolverOptions& options() const noexcept { return options_; }
     void set_options(LPSolverOptions options) noexcept { options_ = std::move(options); }
 

@@ -127,7 +127,8 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
 
     telemetry.condition_estimate = basis.condition_estimate();
     return {core::SolverStatus::OPTIMAL, std::move(z), std::move(y),
-            std::move(reduced_costs),    obj,          "Optimal"};
+            std::move(reduced_costs),    obj,          "Optimal",
+            basis.export_state()};
 }
 
 core::SolverStatus RevisedSimplexCore::run_phase1(

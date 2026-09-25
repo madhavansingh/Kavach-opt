@@ -20,6 +20,19 @@ struct SimplexExecutionResult {
     std::vector<double> reduced_costs;  ///< Standard-form reduced costs
     double objective_value{0.0};
     std::string message;
+    std::optional<BasisState> basis{std::nullopt};  ///< Optimal basis state if solved to optimality
+
+    SimplexExecutionResult() = default;
+    SimplexExecutionResult(core::SolverStatus s, std::vector<double> z_vec,
+                           std::vector<double> y_vec, std::vector<double> rc_vec, double obj,
+                           std::string msg, std::optional<BasisState> b = std::nullopt)
+        : status(s),
+          z(std::move(z_vec)),
+          y(std::move(y_vec)),
+          reduced_costs(std::move(rc_vec)),
+          objective_value(obj),
+          message(std::move(msg)),
+          basis(std::move(b)) {}
 };
 
 /**

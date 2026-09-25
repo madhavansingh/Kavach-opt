@@ -44,7 +44,8 @@ struct RowTransform {
  */
 class StandardFormLP {
 public:
-    StandardFormLP(const model::CanonicalModel& model, const core::SolverTolerances& tolerances);
+    StandardFormLP(const model::CanonicalModel& model, const core::SolverTolerances& tolerances,
+                   bool preserve_bounds_structure = false);
 
     // --- Accessors ---
     [[nodiscard]] std::size_t num_rows() const noexcept { return num_rows_; }

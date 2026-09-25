@@ -13,7 +13,8 @@ constexpr double INFINITY_THRESHOLD = 1e30;
 }
 
 StandardFormLP::StandardFormLP(const model::CanonicalModel& model,
-                               const core::SolverTolerances& tolerances)
+                               const core::SolverTolerances& tolerances,
+                               bool preserve_bounds_structure)
     : num_original_vars_(model.num_variables()),
       num_original_constrs_(model.num_constraints()),
       original_sense_(model.objective().sense),
@@ -39,21 +40,21 @@ StandardFormLP::StandardFormLP(const model::CanonicalModel& model,
         double lb = var.lower_bound;
         double ub = var.upper_bound;
 
-        if (std::abs(ub - lb) <= tolerances.primal_feasibility_tol) {
+        if (!preserve_bounds_structure && std::abs(ub - lb) <= tolerances.primal_feasibility_tol) {
             // Fixed variable
             var_transforms_[j].type = VariableTransformType::FIXED;
             var_transforms_[j].shift = lb;
+        } else if (lb > -INFINITY_THRESHOLD && ub < INFINITY_THRESHOLD) {
+            // Boxed (preserved even if ub == lb when preserve_bounds_structure is true)
+            var_transforms_[j].type = VariableTransformType::BOXED;
+            var_transforms_[j].shift = lb;
+            var_transforms_[j].z_index1 = next_z++;
+            ++num_boxed;
         } else if (lb > -INFINITY_THRESHOLD && ub >= INFINITY_THRESHOLD) {
             // Lower-bounded only
             var_transforms_[j].type = VariableTransformType::SHIFTED_LOWER;
             var_transforms_[j].shift = lb;
             var_transforms_[j].z_index1 = next_z++;
-        } else if (lb > -INFINITY_THRESHOLD && ub < INFINITY_THRESHOLD) {
-            // Boxed
-            var_transforms_[j].type = VariableTransformType::BOXED;
-            var_transforms_[j].shift = lb;
-            var_transforms_[j].z_index1 = next_z++;
-            ++num_boxed;
         } else if (lb <= -INFINITY_THRESHOLD && ub < INFINITY_THRESHOLD) {
             // Upper-bounded only
             var_transforms_[j].type = VariableTransformType::SHIFTED_UPPER;
@@ -144,9 +145,9 @@ StandardFormLP::StandardFormLP(const model::CanonicalModel& model,
         rtrans.original_row_id = i;
 
         if (constr.sense == model::ConstraintSense::LESS_EQUAL) {
-            if (eff_rhs >= -tolerances.primal_feasibility_tol) {
+            if (preserve_bounds_structure || eff_rhs >= -tolerances.primal_feasibility_tol) {
                 // a^T z + s = b  (s >= 0)
-                b_[i] = std::max(0.0, eff_rhs);
+                b_[i] = eff_rhs;
                 for (const auto& rt : row_terms) {
                     triplets.push_back({i, rt.col, rt.coeff});
                 }

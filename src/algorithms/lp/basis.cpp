@@ -126,4 +126,22 @@ void SimplexBasis::purge_nonbasic_variable(std::size_t var_idx) {
     }
 }
 
+BasisState SimplexBasis::export_state() const {
+    BasisState state;
+    state.basis_vars = basis_vars_;
+    state.is_basic = is_basic_;
+    state.nonbasic_vars = nonbasic_vars_;
+    state.num_rows = basis_vars_.size();
+    state.num_cols = is_basic_.size();
+    state.is_valid = !basis_vars_.empty();
+    return state;
+}
+
+void SimplexBasis::load_state(const BasisState& state) {
+    basis_vars_ = state.basis_vars;
+    is_basic_ = state.is_basic;
+    nonbasic_vars_ = state.nonbasic_vars;
+    updates_since_refactor_ = 0;
+}
+
 }  // namespace kavach::algorithms::lp

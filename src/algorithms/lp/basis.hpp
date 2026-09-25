@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "algorithms/lp/lp_types.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "numerics/lu_factorization.hpp"
@@ -81,6 +82,16 @@ public:
      * @brief Remove column from nonbasic set (e.g. purging artificial variables).
      */
     void purge_nonbasic_variable(std::size_t var_idx);
+
+    /**
+     * @brief Export current basis state for warm starting.
+     */
+    [[nodiscard]] BasisState export_state() const;
+
+    /**
+     * @brief Load basis state from an existing export.
+     */
+    void load_state(const BasisState& state);
 
 private:
     std::vector<std::size_t> basis_vars_;     ///< Basic variable column index for each row (size m)

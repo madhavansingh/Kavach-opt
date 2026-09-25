@@ -41,6 +41,7 @@ struct MILPSolverOptions {
     std::size_t rounding_interval{1};      ///< Apply rounding every N nodes
     bool enable_presolve{true};            ///< Pass through to LP sub-solver
     bool enable_scaling{true};             ///< Pass through to LP sub-solver
+    bool enable_warm_starts{true};         ///< Enable dual simplex warm starts on child nodes
     bool verbose{false};
 };
 
@@ -61,6 +62,17 @@ struct MILPSolverTelemetry {
     bool node_limit_reached{false};
     bool time_limit_reached{false};
     std::string message;
+
+    // Dual Simplex / Warm-Start Telemetry
+    std::size_t warm_start_attempts{0};
+    std::size_t warm_start_successes{0};
+    std::size_t warm_start_fallbacks{0};
+    std::vector<std::string> warm_start_fallback_reasons;
+    std::size_t dual_simplex_iterations{0};
+    std::size_t cold_start_iterations{0};
+    double warm_start_time_seconds{0.0};
+    double cold_start_time_seconds{0.0};
+    std::size_t basis_transfer_count{0};
 };
 
 // ============================================================================
