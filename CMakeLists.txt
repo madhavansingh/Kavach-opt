@@ -108,7 +108,9 @@ add_library(kavach_core
     src/algorithms/lp/basis.cpp
     src/algorithms/lp/revised_simplex.cpp
     src/algorithms/lp/simplex.cpp
+    src/algorithms/milp/branch_and_bound.cpp
     src/verification/lp_verifier.cpp
+    src/verification/milp_verifier.cpp
 )
 
 target_link_libraries(kavach_core PUBLIC kavach_compiler_flags)

@@ -14,6 +14,7 @@
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
 #include "verification/lp_verifier.hpp"
+#include "verification/milp_verifier.hpp"
 
 namespace kavach::verification {
 
@@ -28,7 +29,7 @@ struct VerificationReport {
     double recomputed_primal_residual{0.0};
     double recomputed_dual_residual{0.0};
     double recomputed_complementary_slackness{0.0};
-    double recomputed_integrality_violation{0.0};  ///< MILP extension (stub)
+    double recomputed_integrality_violation{0.0};  ///< MILP extension
     double recomputed_kkt_residual{0.0};           ///< QP extension (stub)
     double recomputed_objective{0.0};
     core::SolverStatus certified_status{core::SolverStatus::UNKNOWN};
@@ -48,13 +49,29 @@ struct VerificationReport {
         r.summary = lp_report.summary;
         return r;
     }
+
+    /** Construct from a MILPVerificationReport. */
+    static VerificationReport from_milp(const MILPVerificationReport& milp_report) {
+        VerificationReport r;
+        r.passed = milp_report.fully_verified();
+        r.recomputed_primal_residual = milp_report.aggregate_primal_residual;
+        r.recomputed_dual_residual = 0.0;
+        r.recomputed_complementary_slackness = 0.0;
+        r.recomputed_integrality_violation = milp_report.max_integrality_violation;
+        r.recomputed_kkt_residual = 0.0;
+        r.recomputed_objective = milp_report.recomputed_objective;
+        r.certified_status = milp_report.certified_status;
+        r.summary = milp_report.summary;
+        return r;
+    }
 };
 
 /**
  * @brief Architecture interface scaffolding for [Y] Independent Verification Layer.
  *
  * For production LP verification use LPVerifier directly.
- * MILP / QP methods are stubs pending future solver implementation.
+ * For production MILP verification use MILPVerifier directly.
+ * QP methods are stubs pending future solver implementation.
  */
 class IndependentVerifier {
 public:
@@ -66,17 +83,22 @@ public:
         const core::SolverTolerances& tolerances) const = 0;
 
     /**
-     * @brief MILP verification stub (not yet implemented — solver does not exist).
-     * Returns UNKNOWN with appropriate diagnostic.
+     * @brief Independent verification of a MILP solution.
      */
     [[nodiscard]] virtual VerificationReport verify_milp(
-        const model::CanonicalModel& /*original_model*/,
-        const std::vector<double>& /*incumbent_solution*/, double /*best_bound*/,
-        double /*reported_objective*/, const core::SolverTolerances& /*tolerances*/) const {
-        VerificationReport r;
-        r.certified_status = core::SolverStatus::UNKNOWN;
-        r.summary = "MILP solver not yet implemented — verification unavailable.";
-        return r;
+        const model::CanonicalModel& original_model, const std::vector<double>& incumbent_solution,
+        double best_bound, double reported_objective,
+        const core::SolverTolerances& tolerances) const {
+        if (incumbent_solution.empty()) {
+            VerificationReport r;
+            r.certified_status = core::SolverStatus::UNKNOWN;
+            r.summary = "MILP verification unavailable: no incumbent solution provided.";
+            return r;
+        }
+        MILPVerifier verifier(MILPVerifierTolerances::from_solver_tolerances(tolerances));
+        auto rpt = verifier.verify(original_model, incumbent_solution, best_bound,
+                                   reported_objective, core::SolverStatus::OPTIMAL);
+        return VerificationReport::from_milp(rpt);
     }
 
     /**
