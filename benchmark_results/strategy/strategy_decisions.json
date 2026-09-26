@@ -1,0 +1,824 @@
+{
+  "benchmark_suite": "Kavach-Opt Solver Strategy Corpus",
+  "version": "1.0.0",
+  "description": "Exhaustive deterministic solver strategy decisions across standard corpora",
+  "total_instances": 19,
+  "decisions": [
+    {
+      "instance_name": "afiro",
+      "instance_path": "benchmarks/netlib/afiro.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -464.75314285714285,
+        "iterations": 16,
+        "nodes": 0,
+        "solve_time_seconds": 0.000737166,
+        "verified": false
+      },
+      "strategy_time_ms": 0.062875
+    },
+    {
+      "instance_name": "adlittle",
+      "instance_path": "benchmarks/netlib/adlittle.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 2.8e+06. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 225494.96316238047,
+        "iterations": 92,
+        "nodes": 0,
+        "solve_time_seconds": 0.008025,
+        "verified": false
+      },
+      "strategy_time_ms": 0.014041999999999999
+    },
+    {
+      "instance_name": "blend",
+      "instance_path": "benchmarks/netlib/blend.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 2.2e+04. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -30.81214984582889,
+        "iterations": 272,
+        "nodes": 0,
+        "solve_time_seconds": 0.045917167,
+        "verified": false
+      },
+      "strategy_time_ms": 0.012083
+    },
+    {
+      "instance_name": "sc50a",
+      "instance_path": "benchmarks/netlib/sc50a.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -64.57507705856447,
+        "iterations": 51,
+        "nodes": 0,
+        "solve_time_seconds": 0.002024,
+        "verified": false
+      },
+      "strategy_time_ms": 0.00925
+    },
+    {
+      "instance_name": "sc50b",
+      "instance_path": "benchmarks/netlib/sc50b.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -70,
+        "iterations": 53,
+        "nodes": 0,
+        "solve_time_seconds": 0.001860333,
+        "verified": false
+      },
+      "strategy_time_ms": 0.0075829999999999995
+    },
+    {
+      "instance_name": "kb2",
+      "instance_path": "benchmarks/netlib/kb2.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -1749.9001299062077,
+        "iterations": 127,
+        "nodes": 0,
+        "solve_time_seconds": 0.005195417,
+        "verified": false
+      },
+      "strategy_time_ms": 0.008458
+    },
+    {
+      "instance_name": "share2b",
+      "instance_path": "benchmarks/netlib/share2b.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 1.0e+04. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -415.7322407414182,
+        "iterations": 149,
+        "nodes": 0,
+        "solve_time_seconds": 0.011131916,
+        "verified": false
+      },
+      "strategy_time_ms": 0.01375
+    },
+    {
+      "instance_name": "sc105",
+      "instance_path": "benchmarks/netlib/sc105.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -52.202061211707395,
+        "iterations": 110,
+        "nodes": 0,
+        "solve_time_seconds": 0.010881042,
+        "verified": false
+      },
+      "strategy_time_ms": 0.009542
+    },
+    {
+      "instance_name": "stocfor1",
+      "instance_path": "benchmarks/netlib/stocfor1.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R007",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -41131.976219436336,
+        "iterations": 138,
+        "nodes": 0,
+        "solve_time_seconds": 0.01083775,
+        "verified": false
+      },
+      "strategy_time_ms": 0.010249999999999999
+    },
+    {
+      "instance_name": "share1b",
+      "instance_path": "benchmarks/netlib/share1b.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 6.0e+05. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -76589.31857918583,
+        "iterations": 289,
+        "nodes": 0,
+        "solve_time_seconds": 0.03402175,
+        "verified": false
+      },
+      "strategy_time_ms": 0.014417
+    },
+    {
+      "instance_name": "lotfi",
+      "instance_path": "benchmarks/netlib/lotfi.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 5.2e+04. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -25.264706061880005,
+        "iterations": 319,
+        "nodes": 0,
+        "solve_time_seconds": 0.059575459,
+        "verified": false
+      },
+      "strategy_time_ms": 0.0155
+    },
+    {
+      "instance_name": "beaconfd",
+      "instance_path": "benchmarks/netlib/beaconfd.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 4.2e+05. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 33592.4858072001,
+        "iterations": 246,
+        "nodes": 0,
+        "solve_time_seconds": 0.038956375,
+        "verified": false
+      },
+      "strategy_time_ms": 0.028918
+    },
+    {
+      "instance_name": "boeing2",
+      "instance_path": "benchmarks/netlib/boeing2.mps",
+      "strategy_version": "1.0.0",
+      "problem_class": "LP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "ELEVATED",
+        "lp_refactorization_interval": 20,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_MULTICORE",
+        "recommended_cpu_threads": 8,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R003",
+        "R004",
+        "R006",
+        "R008",
+        "R012",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Continuous LP model detected; targeted Two-Phase Revised Simplex LP Solver.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Coefficient dynamic range ratio >= 1e4; geometric-mean scaling recommended (AUTO).",
+        "Elevated numerical risk: dynamic range in [1e4, 1e8). Refactorization interval tightened to 20 iterations.",
+        "Multicore CPU selected: workload exceeds parallel threshold for batched SpMV.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as continuous LP. Routed to Revised Simplex. Scaling enabled for dynamic range 3.0e+05. Numerical risk ELEVATED: refactorization interval set to 20. Recommended backend: CPU_MULTICORE with 8 threads. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -315.0187280152029,
+        "iterations": 417,
+        "nodes": 0,
+        "solve_time_seconds": 0.130214834,
+        "verified": false
+      },
+      "strategy_time_ms": 0.015749
+    },
+    {
+      "instance_name": "knapsack",
+      "instance_path": "benchmarks/miplib/knapsack.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "MILP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R002",
+        "R004",
+        "R007",
+        "R010",
+        "R011",
+        "R014"
+      ],
+      "rule_explanations": [
+        "MILP model detected; targeted Branch-and-Bound with most-fractional branching, best-bound node selection, and dual-simplex warm starts.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled.",
+        "High integrality ratio detected (>= 50%); aggressive rounding heuristic enabled."
+      ],
+      "human_readable_rationale": "Classified as MILP (0 integer, 6 binary). Routed to Branch-and-Bound with dual warm-start. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 41,
+        "iterations": 36,
+        "nodes": 19,
+        "solve_time_seconds": 0.000975917,
+        "verified": true
+      },
+      "strategy_time_ms": 0.010166999999999999
+    },
+    {
+      "instance_name": "facility_loc",
+      "instance_path": "benchmarks/miplib/facility_loc.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "MILP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R002",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "MILP model detected; targeted Branch-and-Bound with most-fractional branching, best-bound node selection, and dual-simplex warm starts.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as MILP (0 integer, 3 binary). Routed to Branch-and-Bound with dual warm-start. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 180,
+        "iterations": 15,
+        "nodes": 3,
+        "solve_time_seconds": 0.00028275,
+        "verified": true
+      },
+      "strategy_time_ms": 0.012334000000000001
+    },
+    {
+      "instance_name": "infeasible_milp",
+      "instance_path": "benchmarks/miplib/infeasible_milp.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "MILP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R002",
+        "R004",
+        "R007",
+        "R010",
+        "R011",
+        "R014"
+      ],
+      "rule_explanations": [
+        "MILP model detected; targeted Branch-and-Bound with most-fractional branching, best-bound node selection, and dual-simplex warm starts.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled.",
+        "High integrality ratio detected (>= 50%); aggressive rounding heuristic enabled."
+      ],
+      "human_readable_rationale": "Classified as MILP (2 integer, 0 binary). Routed to Branch-and-Bound with dual warm-start. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "INFEASIBLE",
+        "objective": 0,
+        "iterations": 2,
+        "nodes": 3,
+        "solve_time_seconds": 0.000118167,
+        "verified": false
+      },
+      "strategy_time_ms": 0.007457999999999999
+    },
+    {
+      "instance_name": "portfolio",
+      "instance_path": "benchmarks/qp/portfolio.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "CONVEX_QP",
+      "decision": {
+        "presolve_policy": "NONE",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R001",
+        "R005",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Convex QP model detected; targeted Primal Active-Set QP Solver.",
+        "Presolve skipped for QP: not supported for quadratic objectives.",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as Convex QP. Routed to Primal Active-Set Solver. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 0.3164120603015075,
+        "iterations": 5,
+        "nodes": 0,
+        "solve_time_seconds": 0.000128666,
+        "verified": true
+      },
+      "strategy_time_ms": 0.006834
+    },
+    {
+      "instance_name": "constrained_ls",
+      "instance_path": "benchmarks/qp/constrained_ls.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "CONVEX_QP",
+      "decision": {
+        "presolve_policy": "NONE",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R001",
+        "R005",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "Convex QP model detected; targeted Primal Active-Set QP Solver.",
+        "Presolve skipped for QP: not supported for quadratic objectives.",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as Convex QP. Routed to Primal Active-Set Solver. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": -5.333333333333333,
+        "iterations": 5,
+        "nodes": 0,
+        "solve_time_seconds": 5.2542e-05,
+        "verified": true
+      },
+      "strategy_time_ms": 0.006417
+    },
+    {
+      "instance_name": "mrpl_blending_capacity",
+      "instance_path": "examples/mrpl/mrpl_blending_capacity.lp",
+      "strategy_version": "1.0.0",
+      "problem_class": "MILP",
+      "decision": {
+        "presolve_policy": "FULL",
+        "scaling_enabled": true,
+        "scaling_policy": "AUTO",
+        "numerical_risk_profile": "NORMAL",
+        "lp_refactorization_interval": 50,
+        "lp_force_bland_rule": false,
+        "recommended_backend": "CPU_SEQUENTIAL",
+        "recommended_cpu_threads": 1,
+        "gpu_eligible_for_batched_spmv": false,
+        "gpu_routing_reason": "--no-gpu requested by user"
+      },
+      "rules_fired": [
+        "R002",
+        "R004",
+        "R007",
+        "R010",
+        "R011"
+      ],
+      "rule_explanations": [
+        "MILP model detected; targeted Branch-and-Bound with most-fractional branching, best-bound node selection, and dual-simplex warm starts.",
+        "Standard full presolve suite enabled (fixed variables, empty rows/cols, bound tightening, redundant rows).",
+        "Normal numerical profile: well-conditioned matrix. Standard refactorization interval (50) applied.",
+        "CPU sequential selected: small problem / single-batch workload.",
+        "CPU forced when --no-gpu specified; GPU execution disabled."
+      ],
+      "human_readable_rationale": "Classified as MILP (0 integer, 3 binary). Routed to Branch-and-Bound with dual warm-start. Recommended backend: CPU_SEQUENTIAL. ",
+      "solve_summary": {
+        "status": "OPTIMAL",
+        "objective": 5445.909090909091,
+        "iterations": 89,
+        "nodes": 5,
+        "solve_time_seconds": 0.001870792,
+        "verified": true
+      },
+      "strategy_time_ms": 0.009167000000000002
+    }
+  ]
+}

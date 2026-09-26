@@ -14,6 +14,7 @@ add_executable(kavach_unit_tests
     unit/test_phase11_cuda.cpp
     unit/test_phase12_benchmark.cpp
     unit/test_phase13_mrpl.cpp
+    unit/test_phase14_strategy.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -10,6 +11,7 @@
 #include "algorithms/lp/simplex.hpp"
 #include "algorithms/milp/branch_and_bound.hpp"
 #include "algorithms/qp/active_set.hpp"
+#include "api/solver.hpp"
 #include "benchmark/benchmark_io.hpp"
 #include "benchmark/benchmark_manifest.hpp"
 #include "benchmark/benchmark_report.hpp"
@@ -19,6 +21,7 @@
 #include "core/random.hpp"
 #include "core/version.hpp"
 #include "io/parser.hpp"
+#include "strategy/strategy.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
 
@@ -44,6 +47,16 @@ void print_help() {
         << "  kavach-opt presolve <model.mps> --report\n"
         << "  kavach-opt --version\n"
         << "  kavach-opt --help\n\n"
+        << "Solve Options:\n"
+        << "  --strategy <auto|explicit>         Strategy decision mode (default: auto)\n"
+        << "  --show-strategy                    Display concise strategy decision\n"
+        << "  --explain-strategy                 Display comprehensive strategy explanation\n"
+        << "  --presolve <full|none>             Explicit presolve override\n"
+        << "  --scaling <on|off>                 Explicit scaling override\n"
+        << "  --backend <cpu|multicore|cuda>     Explicit execution backend override\n"
+        << "  --no-gpu                           Disable CUDA GPU execution\n"
+        << "  --time-limit <seconds>             Wall-clock time limit in seconds\n"
+        << "  --json                             Output strategy and solve result as JSON\n\n"
         << "MRPL Case Study Options:\n"
         << "  --output <dir>                     Directory for output artifacts (default: "
            "examples/mrpl/results)\n"
@@ -295,8 +308,72 @@ int handle_solve(const std::vector<std::string_view>& args) {
         return 1;
     }
     std::string file_path = std::string(args[1]);
+    bool show_strategy = false;
+    bool explain_strategy = false;
+    bool json_output = false;
+    double time_limit_sec = 0.0;
+    kavach::strategy::StrategyConfig config;
+
+    for (std::size_t i = 2; i < args.size(); ++i) {
+        if (args[i] == "--show-strategy") {
+            show_strategy = true;
+        } else if (args[i] == "--explain-strategy") {
+            explain_strategy = true;
+        } else if (args[i] == "--json") {
+            json_output = true;
+        } else if (args[i] == "--no-gpu") {
+            config.force_no_gpu = true;
+        } else if (args[i] == "--strategy" && i + 1 < args.size()) {
+            std::string_view strat_arg = args[++i];
+            if (strat_arg == "auto") {
+                config.mode = kavach::strategy::StrategyMode::AUTO;
+            } else if (strat_arg == "conservative") {
+                config.elevated_coeff_range_threshold = 1e3;
+                config.high_risk_coeff_range_threshold = 1e6;
+                config.normal_refactorization_interval = 20;
+                config.elevated_refactorization_interval = 10;
+                config.high_risk_refactorization_interval = 5;
+            } else if (strat_arg == "fast") {
+                config.normal_refactorization_interval = 100;
+            } else {
+                std::cerr << "Warning: Unknown strategy mode '" << strat_arg << "', using auto\n";
+            }
+        } else if (args[i] == "--presolve" && i + 1 < args.size()) {
+            std::string_view p_arg = args[++i];
+            if (p_arg == "auto") {
+                config.override_presolve = std::nullopt;
+            } else if (p_arg == "enabled") {
+                config.override_presolve = true;
+            } else if (p_arg == "disabled") {
+                config.override_presolve = false;
+            }
+        } else if (args[i] == "--scaling" && i + 1 < args.size()) {
+            std::string_view s_arg = args[++i];
+            if (s_arg == "auto") {
+                config.override_scaling = std::nullopt;
+            } else if (s_arg == "enabled") {
+                config.override_scaling = true;
+            } else if (s_arg == "disabled") {
+                config.override_scaling = false;
+            }
+        } else if (args[i] == "--backend" && i + 1 < args.size()) {
+            std::string_view b_arg = args[++i];
+            if (b_arg == "auto") {
+                config.override_backend = std::nullopt;
+            } else if (b_arg == "cpu") {
+                config.override_backend = kavach::backend::BackendType::CPU_SEQUENTIAL;
+            } else if (b_arg == "multicore") {
+                config.override_backend = kavach::backend::BackendType::CPU_MULTICORE;
+            } else if (b_arg == "gpu") {
+                config.override_backend = kavach::backend::BackendType::CUDA_GPU;
+            }
+        } else if (args[i] == "--time-limit" && i + 1 < args.size()) {
+            time_limit_sec = std::stod(std::string(args[++i]));
+        }
+    }
+
     try {
-        if (file_path.find("mrpl") != std::string::npos) {
+        if (!json_output && file_path.find("mrpl") != std::string::npos) {
             std::cout << "========================================================================="
                          "=====\n"
                       << "MRPL-STYLE REFINERY OPTIMIZATION INDUSTRIAL CASE STUDY\n"
@@ -308,76 +385,108 @@ int handle_solve(const std::vector<std::string_view>& args) {
         }
 
         auto model = kavach::io::parse_model(file_path);
-        std::cout << "Loaded model '" << model->name() << "': " << model->num_variables()
-                  << " vars, " << model->num_constraints() << " constrs, " << model->num_nonzeros()
-                  << " nonzeros\n";
+        if (!json_output) {
+            std::cout << "Loaded model '" << model->name() << "': " << model->num_variables()
+                      << " vars, " << model->num_constraints() << " constrs, "
+                      << model->num_nonzeros() << " nonzeros\n";
+        }
+
+        kavach::api::KavachSolver solver(config);
+        kavach::api::SolverOptions opts;
+        opts.strategy_config = config;
+        if (time_limit_sec > 0.0) {
+            opts.time_limit =
+                std::chrono::milliseconds(static_cast<int64_t>(time_limit_sec * 1000.0));
+        }
+
+        auto decision = solver.plan(*model, opts);
+
+        if (show_strategy && !json_output) {
+            std::cout << decision.to_string() << "\n";
+        }
+        if (explain_strategy && !json_output) {
+            std::cout << decision.explain() << "\n";
+        }
+
+        auto result = solver.solve(*model, decision, opts);
+
+        if (json_output) {
+            kavach::benchmark::JsonValue::Object root;
+            root["strategy"] = decision.to_json();
+            kavach::benchmark::JsonValue::Object res;
+            res["status"] = kavach::core::to_string(result.status);
+            res["objective"] = result.objective_value;
+            res["iterations"] = static_cast<double>(result.iterations);
+            res["nodes"] = static_cast<double>(result.nodes);
+            res["solve_time_seconds"] = result.solve_time_seconds;
+            res["backend_used"] = kavach::backend::to_string(result.backend_used);
+            res["verified"] = result.verification_report.passed;
+            root["result"] = std::move(res);
+            std::cout << kavach::benchmark::JsonValue(std::move(root)).dump() << "\n";
+            return 0;
+        }
 
         if (model->is_qp()) {
-            std::cout << "Solving Convex QP...\n";
-            kavach::algorithms::qp::PrimalActiveSetQPSolver solver;
-            auto sol = solver.solve(*model);
-            std::cout << "Status: " << kavach::core::to_string(sol.status) << "\n"
-                      << "Objective: " << sol.objective_value << "\n"
-                      << "Iterations: " << sol.iterations << "\n"
-                      << "KKT Residual: " << sol.kkt_residual << "\n";
+            std::cout << "Solving Convex QP...\n"
+                      << "Status: " << kavach::core::to_string(result.status) << "\n"
+                      << "Objective: " << result.objective_value << "\n"
+                      << "Iterations: " << result.iterations << "\n"
+                      << "Verification: "
+                      << (result.verification_report.passed ? "VERIFIED_OPTIMAL (Certified)"
+                                                            : "UNVERIFIED")
+                      << "\n";
         } else if (model->is_milp()) {
-            std::cout << "Solving MILP with Branch-and-Bound...\n";
-            kavach::algorithms::milp::BranchAndBound solver;
-            auto sol = solver.solve(*model);
-            std::cout << "Status: " << kavach::core::to_string(sol.status) << "\n"
-                      << "Best Objective: " << sol.best_objective << "\n"
-                      << "Best Bound: " << sol.best_bound << "\n"
-                      << "Optimality Gap: " << sol.optimality_gap << "\n"
-                      << "Nodes Explored: " << sol.telemetry.nodes_explored << "\n";
+            std::cout << "Solving MILP with Branch-and-Bound...\n"
+                      << "Status: " << kavach::core::to_string(result.status) << "\n"
+                      << "Best Objective: " << result.objective_value << "\n"
+                      << "Optimality Gap: " << result.optimality_gap << "\n"
+                      << "Nodes Explored: " << result.nodes << "\n"
+                      << "Verification: "
+                      << (result.verification_report.passed
+                              ? "VERIFIED_OPTIMAL (Certified by MILPVerifier)"
+                              : "UNVERIFIED")
+                      << "\n";
 
-            if (sol.is_optimal() && !sol.incumbent_solution.empty()) {
-                kavach::verification::MILPVerifier verifier;
-                auto vrep = verifier.verify(*model, sol.incumbent_solution, sol.best_bound,
-                                            sol.best_objective, sol.status,
-                                            kavach::core::SolverTolerances(), sol.optimality_gap);
-                std::cout << "Verification: "
-                          << (vrep.fully_verified() ? "VERIFIED_OPTIMAL (Certified by MILPVerifier)"
-                                                    : "UNVERIFIED")
-                          << "\n";
-
-                if (file_path.find("mrpl") != std::string::npos) {
-                    kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
-                    auto breakdown = runner.solve_and_analyze(
-                        kavach::case_study::mrpl::MRPLParameters::default_parameters(), "baseline",
-                        false);
-                    std::cout << "\nOperational Decisions:\n";
-                    for (const auto& u : breakdown.unit_decisions) {
-                        std::cout << "  - " << u.operational_summary << "\n";
-                    }
-                    std::cout << "\nFinished Products:\n";
-                    for (const auto& q : breakdown.product_qualities) {
-                        std::cout << "  - " << q.product_name << ": " << std::fixed
-                                  << std::setprecision(1) << q.production_kbpd
-                                  << " kbpd (Sulfur: " << std::setprecision(2)
-                                  << q.calculated_sulfur_wt_pct
-                                  << " wt%, Density: " << std::setprecision(1)
-                                  << q.calculated_density_kg_m3 << " kg/m3)\n";
-                    }
-                    std::cout << "\nEconomic Summary:\n"
-                              << "  - Gross Revenue:  $" << std::fixed << std::setprecision(2)
-                              << breakdown.economics.gross_revenue_k_usd << " k/day\n"
-                              << "  - Feedstock Cost: -$"
-                              << breakdown.economics.crude_purchase_cost_k_usd << " k/day\n"
-                              << "  - Unit Op Cost:   -$"
-                              << (breakdown.economics.unit_variable_cost_k_usd +
-                                  breakdown.economics.unit_fixed_cost_k_usd)
-                              << " k/day\n"
-                              << "  - Net Profit:     $" << breakdown.economics.net_profit_k_usd
-                              << " k/day\n";
+            if (result.verification_report.passed && file_path.find("mrpl") != std::string::npos) {
+                kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
+                auto breakdown = runner.solve_and_analyze(
+                    kavach::case_study::mrpl::MRPLParameters::default_parameters(), "baseline",
+                    false);
+                std::cout << "\nOperational Decisions:\n";
+                for (const auto& u : breakdown.unit_decisions) {
+                    std::cout << "  - " << u.operational_summary << "\n";
                 }
+                std::cout << "\nFinished Products:\n";
+                for (const auto& q : breakdown.product_qualities) {
+                    std::cout << "  - " << q.product_name << ": " << std::fixed
+                              << std::setprecision(1) << q.production_kbpd
+                              << " kbpd (Sulfur: " << std::setprecision(2)
+                              << q.calculated_sulfur_wt_pct
+                              << " wt%, Density: " << std::setprecision(1)
+                              << q.calculated_density_kg_m3 << " kg/m3)\n";
+                }
+                std::cout << "\nEconomic Summary:\n"
+                          << "  - Gross Revenue:  $" << std::fixed << std::setprecision(2)
+                          << breakdown.economics.gross_revenue_k_usd << " k/day\n"
+                          << "  - Feedstock Cost: -$"
+                          << breakdown.economics.crude_purchase_cost_k_usd << " k/day\n"
+                          << "  - Unit Op Cost:   -$"
+                          << (breakdown.economics.unit_variable_cost_k_usd +
+                              breakdown.economics.unit_fixed_cost_k_usd)
+                          << " k/day\n"
+                          << "  - Net Profit:     $" << breakdown.economics.net_profit_k_usd
+                          << " k/day\n";
             }
         } else {
-            std::cout << "Solving LP with Revised Simplex...\n";
-            kavach::algorithms::lp::RevisedSimplex solver;
-            auto sol = solver.solve(*model);
-            std::cout << "Status: " << kavach::core::to_string(sol.status) << "\n"
-                      << "Objective: " << sol.objective_value << "\n"
-                      << "Iterations: " << sol.iterations << "\n";
+            std::cout << "Solving LP with Revised Simplex...\n"
+                      << "Status: " << kavach::core::to_string(result.status) << "\n"
+                      << "Objective: " << result.objective_value << "\n"
+                      << "Iterations: " << result.iterations << "\n"
+                      << "Verification: "
+                      << (result.verification_report.passed
+                              ? "VERIFIED_OPTIMAL (Certified by LPVerifier)"
+                              : "UNVERIFIED")
+                      << "\n";
         }
         return 0;
     } catch (const std::exception& e) {

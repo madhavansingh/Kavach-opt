@@ -10,6 +10,7 @@
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
+#include "strategy/strategy.hpp"
 #include "verification/verifier.hpp"
 
 namespace kavach::api {
@@ -26,6 +27,7 @@ struct SolverOptions {
     bool use_gpu{false};
     bool deterministic{true};
     bool run_presolve{true};
+    strategy::StrategyConfig strategy_config;
 };
 
 struct SolverResult {
@@ -40,11 +42,11 @@ struct SolverResult {
     double solve_time_seconds{0.0};
     verification::VerificationReport verification_report;
     backend::BackendType backend_used{backend::BackendType::CPU_SEQUENTIAL};
+    strategy::StrategyDecision strategy_decision;
 };
 
 /**
- * @brief Architecture interface scaffolding for [V] Solver API.
- * Full implementation scheduled for Phase 15 per Blueprint Section 4, 17 & Section 32.
+ * @brief Abstract solver interface.
  */
 class Solver {
 public:
@@ -52,6 +54,39 @@ public:
 
     [[nodiscard]] virtual SolverResult solve(const model::CanonicalModel& model,
                                              const SolverOptions& options) = 0;
+};
+
+/**
+ * @brief Production programmatic solver implementation for Kavach-Opt.
+ * Integrates strategy selection, core numerical algorithms, independent
+ * verification, and telemetry.
+ */
+class KavachSolver : public Solver {
+public:
+    KavachSolver() = default;
+    explicit KavachSolver(strategy::StrategyConfig config);
+
+    [[nodiscard]] SolverResult solve(const model::CanonicalModel& model,
+                                     const SolverOptions& options) override;
+
+    [[nodiscard]] SolverResult solve(const model::CanonicalModel& model);
+
+    [[nodiscard]] SolverResult solve(const model::CanonicalModel& model,
+                                     const strategy::StrategyDecision& decision,
+                                     const SolverOptions& options = SolverOptions{});
+
+    [[nodiscard]] strategy::StrategyDecision plan(const model::CanonicalModel& model,
+                                                  const SolverOptions& options = SolverOptions{});
+
+    [[nodiscard]] std::string explain_plan(const model::CanonicalModel& model,
+                                           const SolverOptions& options = SolverOptions{});
+
+    [[nodiscard]] const strategy::StrategyEngine& engine() const noexcept { return engine_; }
+    [[nodiscard]] strategy::StrategyEngine& engine() noexcept { return engine_; }
+
+private:
+    strategy::StrategyEngine engine_;
+    strategy::StrategyConfig default_config_;
 };
 
 }  // namespace kavach::api
