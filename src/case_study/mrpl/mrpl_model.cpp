@@ -743,6 +743,7 @@ benchmark::JsonValue MRPLSolutionBreakdown::to_json() const {
 
         // Units
         benchmark::JsonValue::Array uarr;
+        uarr.reserve(unit_decisions.size());
         for (const auto& u : unit_decisions) {
             benchmark::JsonValue::Object uobj;
             uobj["unit"] = u.unit_name;
@@ -751,12 +752,13 @@ benchmark::JsonValue MRPLSolutionBreakdown::to_json() const {
             uobj["throughput_kbpd"] = u.throughput_kbpd;
             uobj["utilization_pct"] = u.utilization_pct;
             uobj["summary"] = u.operational_summary;
-            uarr.push_back(std::move(uobj));
+            uarr.emplace_back(std::move(uobj));
         }
         obj["unit_decisions"] = std::move(uarr);
 
         // Qualities
         benchmark::JsonValue::Array qarr;
+        qarr.reserve(product_qualities.size());
         for (const auto& q : product_qualities) {
             benchmark::JsonValue::Object qobj;
             qobj["product"] = q.product_name;
@@ -768,7 +770,7 @@ benchmark::JsonValue MRPLSolutionBreakdown::to_json() const {
             qobj["density_limit_kg_m3"] = q.density_limit_kg_m3;
             qobj["density_margin_kg_m3"] = q.density_margin_kg_m3;
             qobj["quality_satisfied"] = q.quality_satisfied;
-            qarr.push_back(std::move(qobj));
+            qarr.emplace_back(std::move(qobj));
         }
         obj["product_qualities"] = std::move(qarr);
     }
@@ -807,6 +809,7 @@ void MRPLCaseStudyRunner::export_all_artifacts(const std::string& results_dir,
     // 2. Export scenarios.json
     {
         benchmark::JsonValue::Array s_arr;
+        s_arr.reserve(scenarios.size());
         for (const auto& s : scenarios) {
             s_arr.push_back(s.to_json());
         }
@@ -821,6 +824,7 @@ void MRPLCaseStudyRunner::export_all_artifacts(const std::string& results_dir,
         benchmark::JsonValue::Object comp;
         comp["note"] = "Kavach-Opt vs Reference Solver Side-by-Side Comparison";
         benchmark::JsonValue::Array runs;
+        runs.reserve(scenarios.size());
         for (const auto& s : scenarios) {
             benchmark::JsonValue::Object r;
             r["scenario"] = s.scenario_name;
@@ -828,13 +832,13 @@ void MRPLCaseStudyRunner::export_all_artifacts(const std::string& results_dir,
             r["kavach_objective"] = s.objective;
             r["kavach_runtime_sec"] = s.solve_time_seconds;
             r["highs_status"] = benchmark::to_string(s.highs_result.status);
-            if (s.highs_result.objective) {
+            if (s.highs_result.objective.has_value()) {
                 r["highs_objective"] = *s.highs_result.objective;
             }
-            if (s.highs_result.runtime_seconds) {
+            if (s.highs_result.runtime_seconds.has_value()) {
                 r["highs_runtime_sec"] = *s.highs_result.runtime_seconds;
             }
-            runs.push_back(std::move(r));
+            runs.emplace_back(std::move(r));
         }
         comp["runs"] = std::move(runs);
         std::ofstream ofs(results_dir + "/comparison.json");

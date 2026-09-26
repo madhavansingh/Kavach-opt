@@ -70,7 +70,7 @@ const JsonValue::Array& JsonValue::as_array() const {
 
 JsonValue::Array& JsonValue::as_array() {
     if (!std::holds_alternative<Array>(data_)) {
-        data_ = Array{};
+        data_.emplace<Array>();
     }
     return std::get<Array>(data_);
 }
@@ -84,7 +84,7 @@ const JsonValue::Object& JsonValue::as_object() const {
 
 JsonValue::Object& JsonValue::as_object() {
     if (!std::holds_alternative<Object>(data_)) {
-        data_ = Object{};
+        data_.emplace<Object>();
     }
     return std::get<Object>(data_);
 }
@@ -108,7 +108,7 @@ const JsonValue& JsonValue::operator[](const std::string& key) const {
 
 JsonValue& JsonValue::operator[](const std::string& key) {
     if (!std::holds_alternative<Object>(data_)) {
-        data_ = Object{};
+        data_.emplace<Object>();
     }
     return std::get<Object>(data_)[key];
 }
@@ -124,7 +124,7 @@ const JsonValue& JsonValue::operator[](std::size_t idx) const {
 
 JsonValue& JsonValue::operator[](std::size_t idx) {
     if (!std::holds_alternative<Array>(data_)) {
-        data_ = Array{};
+        data_.emplace<Array>();
     }
     auto& arr = std::get<Array>(data_);
     if (idx >= arr.size()) {

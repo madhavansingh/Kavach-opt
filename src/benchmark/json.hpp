@@ -18,18 +18,29 @@ public:
     using Array = std::vector<JsonValue>;
     using Object = std::map<std::string, JsonValue>;
 
-    JsonValue() : data_(std::monostate{}) {}
-    JsonValue(std::nullptr_t) : data_(std::monostate{}) {}
-    JsonValue(bool b) : data_(b) {}
-    JsonValue(int num) : data_(static_cast<double>(num)) {}
-    JsonValue(int64_t num) : data_(static_cast<double>(num)) {}
-    JsonValue(uint64_t num) : data_(static_cast<double>(num)) {}
-    JsonValue(double num) : data_(num) {}
-    JsonValue(const char* s) : data_(std::string(s)) {}
-    JsonValue(std::string s) : data_(std::move(s)) {}
-    JsonValue(std::string_view s) : data_(std::string(s)) {}
-    JsonValue(Array arr) : data_(std::move(arr)) {}
-    JsonValue(Object obj) : data_(std::move(obj)) {}
+    JsonValue() noexcept : data_(std::in_place_type<std::monostate>) {}
+    JsonValue(std::nullptr_t) noexcept : data_(std::in_place_type<std::monostate>) {}
+    JsonValue(bool b) noexcept : data_(std::in_place_type<bool>, b) {}
+    JsonValue(int num) noexcept : data_(std::in_place_type<double>, static_cast<double>(num)) {}
+    JsonValue(int64_t num) noexcept : data_(std::in_place_type<double>, static_cast<double>(num)) {}
+    JsonValue(uint64_t num) noexcept
+        : data_(std::in_place_type<double>, static_cast<double>(num)) {}
+    JsonValue(double num) noexcept : data_(std::in_place_type<double>, num) {}
+    JsonValue(const char* s)
+        : data_(std::in_place_type<std::string>, s ? std::string(s) : std::string{}) {}
+    JsonValue(const std::string& s) : data_(std::in_place_type<std::string>, s) {}
+    JsonValue(std::string&& s) noexcept : data_(std::in_place_type<std::string>, std::move(s)) {}
+    JsonValue(std::string_view s) : data_(std::in_place_type<std::string>, std::string(s)) {}
+    JsonValue(const Array& arr) : data_(std::in_place_type<Array>, arr) {}
+    JsonValue(Array&& arr) noexcept : data_(std::in_place_type<Array>, std::move(arr)) {}
+    JsonValue(const Object& obj) : data_(std::in_place_type<Object>, obj) {}
+    JsonValue(Object&& obj) noexcept : data_(std::in_place_type<Object>, std::move(obj)) {}
+
+    JsonValue(const JsonValue&) = default;
+    JsonValue(JsonValue&&) noexcept = default;
+    JsonValue& operator=(const JsonValue&) = default;
+    JsonValue& operator=(JsonValue&&) noexcept = default;
+    ~JsonValue() = default;
 
     [[nodiscard]] JsonType type() const noexcept;
     [[nodiscard]] bool is_null() const noexcept { return type() == JsonType::Null; }
@@ -58,7 +69,8 @@ public:
     static JsonValue parse(std::string_view json_str);
 
 private:
-    std::variant<std::monostate, bool, double, std::string, Array, Object> data_;
+    std::variant<std::monostate, bool, double, std::string, Array, Object> data_{
+        std::in_place_type<std::monostate>};
     static const JsonValue null_instance;
     static const std::string empty_string;
     static const Array empty_array;
