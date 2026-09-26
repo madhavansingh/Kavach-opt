@@ -384,9 +384,9 @@ flowchart TD
 To minimize fill-in (new nonzeros introduced in $L$ and $U$), pivots are selected by minimizing the Markowitz product subject to numerical stability threshold $\mu$:
 
 $$
-(i^*, j^*) = \arg\min_{(i,j) \in \mathcal{C}} (r_i - 1)(c_j - 1),
+(i^\star, j^\star) = \arg\min_{(i,j) \in \mathcal{C}} (r_i - 1)(c_j - 1),
 \qquad
-\text{where } |a_{ij}| \ge \mu \max_k |a_{kj}|,
+\text{where } |a_{ij}| \ge \mu \max_{k} |a_{kj}|,
 \quad \mu \in (0,1]
 $$
 
@@ -417,7 +417,8 @@ flowchart TD
     F --> G["Track Maximum Element Growth: g = max |a_ij^(k)| / max |a_ij^(0)|"]
 ```
 
-**Theorem (Growth Factor Upper Bound):** *Let $B \in \mathbb{R}^{m \times m}$ be factored with threshold parameter $\mu \in (0, 1]$. The growth factor $g$ of element magnitudes in the trailing Schur complement is bounded by:*
+**Theorem (Growth Factor Upper Bound):** *Let $B \in \mathbb{R}^{m \times m}$ be factored with threshold parameter $\mu \in (0,1]$. The growth factor $g$ of element magnitudes in the trailing Schur complement is bounded by:*
+
 $$
 g \le \left(1 + \frac{1}{\mu}\right)^{m-1}
 $$
@@ -425,13 +426,23 @@ $$
 For $\mu = 0.10$, this bound guarantees that element explosion is constrained while retaining sufficient freedom to pick pivots with $M_{ij} = 0$ or $1$, resulting in extremely sparse $L$ and $U$ factors.
 
 ### 8.4 Iterative Refinement Convergence Criteria
-When solving $B x = b$, residual error accumulates from floating-point roundoff. Iterative refinement executes:
+
+When solving $Bx = b$, residual error accumulates from floating-point roundoff. Iterative refinement executes:
+
 $$
-r^{(k)} = b - B x^{(k)}, \qquad B \delta^{(k)} = r^{(k)}, \qquad x^{(k+1)} = x^{(k)} + \delta^{(k)}
+r^{(k)} = b - Bx^{(k)}, \qquad
+B\delta^{(k)} = r^{(k)}, \qquad
+x^{(k+1)} = x^{(k)} + \delta^{(k)}
 $$
+
 The loop terminates when:
+
 $$
-\|r^{(k)}\|_\infty \le \epsilon_{\text{refine}} = 10^{-12} \quad \vee \quad \|\delta^{(k)}\|_\infty \le 10^{-13} \quad \vee \quad k \ge 5
+\lVert r^{(k)} \rVert_\infty \le \epsilon_{\text{refine}} = 10^{-12}
+\quad \vee \quad
+\lVert \delta^{(k)} \rVert_\infty \le 10^{-13}
+\quad \vee \quad
+k \ge 5
 $$
 
 ---
@@ -474,11 +485,12 @@ flowchart TD
 ```
 
 ### 10.1 Postsolve Unwinding Invariant
-Every presolve modification logs an inverse action onto a LIFO postsolve stack. Once the solver returns a solution on the reduced model, the postsolve engine unwinds the stack to reconstruct the full-dimensional original coordinates $(x^*, y^*)$.
+
+Every presolve modification logs an inverse action onto a LIFO postsolve stack. Once the solver returns a solution on the reduced model, the postsolve engine unwinds the stack to reconstruct the full-dimensional original coordinates $(x^\star, y^\star)$.
 
 > **Verification Rule**
-> The independent verifier validates $(x^*, y^*)$ against the **unpresolved**, unscaled original model. Any bug in postsolve variable reconstruction immediately causes a verification failure.
-
+>
+> The independent verifier validates $(x^\star, y^\star)$ against the **unpresolved**, unscaled original model. Any bug in postsolve variable reconstruction immediately causes a verification failure.
 ---
 
 ## 11. Two-Phase Revised Simplex Algorithm (LP)
@@ -535,13 +547,17 @@ stateDiagram-v2
 ```
 
 **Bland's Rule (1977):**
+
 1. **Entering Variable:** Choose nonbasic variable with negative reduced cost having the smallest index:
+
 $$
-q = \min \left\{ j \in \mathcal{N} \;\middle|\; \bar{c}_j < -\epsilon_{\text{opt}} \right\}
+q = \min_{\substack{j \in \mathcal{N} \\ \bar{c}_j < -\epsilon_{\text{opt}}}} j
 $$
+
 2. **Leaving Variable:** Among basic variables tying for the minimum ratio $\theta^*$, choose the one with the smallest index:
+
 $$
-p = \min \left\{ B_i \;\middle|\; i \in \mathcal{B}, \; d_i > 0, \; \frac{x_{B_i}}{d_i} = \theta^* \right\}
+p = \min_{\substack{i \in \mathcal{B} \\ d_i > 0 \\ \frac{x_{B_i}}{d_i} = \theta^*}} B_i
 $$
 
 **Theorem (Bland):** *The Two-Phase Revised Simplex method with Bland's smallest-subscript rule is strictly immune to cycling and terminates in a finite number of iterations.*
@@ -619,15 +635,22 @@ flowchart TD
 ```
 
 #### Achterberg Product Score Formulation
-For a fractional variable $x_j^*$ with fractionality $f_j = x_j^* - \lfloor x_j^* \rfloor$, expected down and up objective degradations are:
+
+For a fractional variable $x_j^\star$ with fractionality $f_j = x_j^\star - \lfloor x_j^\star \rfloor$, expected down and up objective degradations are:
+
 $$
-q_j^- = \Psi_j^- \cdot f_j, \qquad q_j^+ = \Psi_j^+ \cdot (1 - f_j)
+q_j^- = \Psi_j^- \cdot f_j,
+\qquad
+q_j^+ = \Psi_j^+ \cdot (1 - f_j)
 $$
+
 The Achterberg score balances progress across both branches:
+
 $$
-\text{score}_j = \max\left(q_j^-, \; 10^{-6}\right) \cdot \max\left(q_j^+, \; 10^{-6}\right)
+\mathrm{score}_j = \max(q_j^-, 10^{-6}) \cdot \max(q_j^+, 10^{-6})
 $$
-Variable $j^* = \arg\max_{j \in I_{\text{frac}}} \text{score}_j$ is chosen for branching.
+
+Variable $j^\star = \arg\max_{j \in I_{\text{frac}}} \mathrm{score}_j$ is chosen for branching.
 
 ---
 
@@ -647,27 +670,55 @@ Cutting planes tighten continuous relaxations without eliminating integer-feasib
 ### 14.2 Polyhedral Derivations: GMI and MIR Cut Formulations
 
 #### 1. Gomory Mixed-Integer (GMI) Cut Derivation
+
 Let an optimal simplex tableau row for basic integer variable $x_i$ be:
+
 $$
-x_i + \sum_{j \in \mathcal{N}} \bar{a}_{ij} x_j = \bar{b}_i, \qquad \bar{b}_i \notin \mathbb{Z}
+x_i + \sum_{j \in \mathcal{N}} \bar{a}_{ij} x_j = \bar{b}_i,
+\qquad
+\bar{b}_i \notin \mathbb{Z}
 $$
-Let $f_0 = \bar{b}_i - \lfloor \bar{b}_i \rfloor \in (0, 1)$ and $f_j = \bar{a}_{ij} - \lfloor \bar{a}_{ij} \rfloor$. The valid Chvátal-Gomory mixed-integer cut is:
+
+Let $f_0 = \bar{b}_i - \lfloor \bar{b}_i \rfloor \in (0,1)$ and $f_j = \bar{a}_{ij} - \lfloor \bar{a}_{ij} \rfloor$. The valid Chvátal-Gomory mixed-integer cut is:
+
 $$
-\sum_{j \in \mathcal{N}, f_j \le f_0} \frac{f_j}{f_0} x_j + \sum_{j \in \mathcal{N}, f_j > f_0} \frac{1 - f_j}{1 - f_0} x_j \ge 1
+\sum_{j \in \mathcal{N},\, f_j \le f_0}
+\frac{f_j}{f_0} x_j
++
+\sum_{j \in \mathcal{N},\, f_j > f_0}
+\frac{1-f_j}{1-f_0} x_j
+\ge 1
 $$
+
 For continuous nonbasic variables, coefficients are:
+
 $$
-\alpha_j = \begin{cases}
-\dfrac{\bar{a}_{ij}}{f_0} & \text{if } \bar{a}_{ij} \ge 0 \\[8pt]
--\dfrac{\bar{a}_{ij}}{1 - f_0} & \text{if } \bar{a}_{ij} < 0
+\alpha_j =
+\begin{cases}
+\dfrac{\bar{a}_{ij}}{f_0} & \text{if } \bar{a}_{ij} \ge 0 \\
+-\dfrac{\bar{a}_{ij}}{1-f_0} & \text{if } \bar{a}_{ij} < 0
 \end{cases}
 $$
+
 This cut strictly eliminates the current fractional LP vertex without removing any integer-feasible points.
 
 #### 2. Mixed-Integer Rounding (MIR) Cut
-From a base inequality $\sum_{j \in I} a_j x_j + \sum_{k \in C} g_k y_k \le b$, the subadditive function $F_\beta(\alpha) = \lfloor \alpha \rfloor + \frac{\max(0, \alpha - \lfloor \alpha \rfloor - (1 - \beta))}{\beta}$ yields:
+
+From a base inequality $\sum_{j \in I} a_j x_j + \sum_{k \in C} g_k y_k \le b$, the subadditive function is:
+
+$F_\beta(\alpha) = \lfloor \alpha \rfloor + \frac{\max(0,\alpha-\lfloor \alpha \rfloor-(1-\beta))}{\beta}$
+
+This yields:
+
 $$
-\sum_{j \in I} F_\beta(a_j) x_j + \frac{1}{1 - \beta} \sum_{k \in C, g_k < 0} g_k y_k \le \lfloor b \rfloor, \qquad \beta = b - \lfloor b \rfloor
+\sum_{j \in I} F_\beta(a_j) x_j
++
+\frac{1}{1-\beta}
+\sum_{k \in C,\,g_k < 0} g_k y_k
+\le
+\lfloor b \rfloor,
+\qquad
+\beta = b - \lfloor b \rfloor
 $$
 
 ---
@@ -702,7 +753,7 @@ Proposed additions to the active set $\mathcal{W}$ are filtered using Modified G
 
 Convex MIQP models are solved using Continuous Active-Set Branch-and-Bound (`src/algorithms/qp/convex_miqp.cpp`):
 1. **Root Continuous QP Relaxation:** Solved to high KKT precision ($10^{-7}$) via the active-set engine.
-2. **Quadratic Bound Monotonicity:** Continuous QP relaxations establish a rigorous lower bound: $z_{\text{QP}}^*(S) \le z_{\text{MIQP}}^*(S)$.
+2. **Quadratic Bound Monotonicity:** Continuous QP relaxations establish a rigorous lower bound: $z_{\text{QP}}^\star(S) \le z_{\text{MIQP}}^\star(S)$.
 3. **Active-Set Warm-Starting:** Child QP subproblems inherit the parent's optimal active set, reducing solve iterations by up to $80\%$.
 4. **Subproblem KKT Certification:** Fixing integer variables produces a continuous subproblem whose KKT residual must satisfy $\|Q x^* + c + A^T\lambda^* - \mu^*\|_\infty \le 10^{-6}$.
 
@@ -714,19 +765,33 @@ Kavach-Opt incorporates an independent, air-gapped mathematical verification sub
 
 ```mermaid
 flowchart TD
+
     subgraph "Zero-Trust Verification Pipeline"
+
         A["Original CanonicalModel"] --> V["Independent Verifier"]
+
         B["Reported Solution x*, y*"] --> V
+
         V --> C1["1. Non-Finite Sanity (NaN / Inf Check)"]
+
         C1 --> C2["2. Primal Bound Feasibility (l <= x <= u)"]
+
         C2 --> C3["3. Primal Constraint Feasibility (||Ax - b|| <= 1e-7)"]
+
         C3 --> C4["4. Integrality Verification (|x_j - round(x_j)| <= 1e-6)"]
+
         C4 --> C5["5. Dual Multiplier Stationarity & Signs"]
+
         C5 --> C6["6. Complementary Slackness (|y_i * slack_i| <= 1e-7)"]
+
         C6 --> C7["7. Objective Recalculation Consistency"]
+
     end
+
     C7 --> VERDICT{"All 7 Checks Passed?"}
+
     VERDICT -- "Yes" --> OK["Emit VERIFIED_OPTIMAL Certificate"]
+
     VERDICT -- "No" --> FAIL["Emit VERIFICATION_FAILURE Alarm"]
 ```
 
@@ -744,53 +809,90 @@ flowchart TD
 ### 17.2 Detailed Mathematical Formulation of the 7 Verification Checks
 
 #### Check 1: Non-Finite Numerical Sanity
-Scans all elements of the candidate primal solution vector $x^* \in \mathbb{R}^n$ and dual vector $y^* \in \mathbb{R}^m$:
+
+Scans all elements of the candidate primal solution vector $x^\star \in \mathbb{R}^n$ and dual vector $y^\star \in \mathbb{R}^m$:
+
 $$
-\forall j \in \{1, \dots, n\}, \; \text{std::isfinite}(x_j^*) == \text{true}, \qquad \forall i \in \{1, \dots, m\}, \; \text{std::isfinite}(y_i^*) == \text{true}
+\forall j \in \{1,\dots,n\},\quad \text{std::isfinite}(x_j^\star) = \text{true},
+\qquad
+\forall i \in \{1,\dots,m\},\quad \text{std::isfinite}(y_i^\star) = \text{true}
 $$
+
 If any `NaN`, `+Inf`, or `-Inf` is detected, status is immediately downgraded to `NUMERICAL_FAILURE`.
 
 #### Check 2: Primal Variable Bound Feasibility
+
 Validates that decision variables satisfy their boxed physical domains:
+
 $$
-R_{\text{bound}} = \max_{1 \le j \le n} \max\left(0, \; l_j - x_j^*, \; x_j^* - u_j\right) \le \epsilon_{\text{primal}} = 10^{-7}
+R_{\text{bound}} = \max_{1 \le j \le n} \max(0,\; l_j - x_j^\star,\; x_j^\star - u_j)
+\le \epsilon_{\text{primal}} = 10^{-7}
 $$
 
 #### Check 3: Primal Linear Constraint Feasibility
-Recomputes row activities $\alpha_i = \sum_{j=1}^n a_{ij} x_j^*$ directly from the unscaled model matrix:
+
+Recomputes row activities $\alpha_i = \sum_{j=1}^{n} a_{ij} x_j^\star$ directly from the unscaled model matrix:
+
 $$
-R_{\text{primal}} = \max_{1 \le i \le m} \begin{cases}
-\max(0, \; \alpha_i - b_i) & \text{if constraint sense is } \le \\[4pt]
-|\alpha_i - b_i| & \text{if constraint sense is } = \\[4pt]
-\max(0, \; b_i - \alpha_i) & \text{if constraint sense is } \ge
-\end{cases} \le \epsilon_{\text{primal}} = 10^{-7}
+R_{\text{primal}} =
+\max_{1 \le i \le m}
+\begin{cases}
+\max(0,\; \alpha_i - b_i) & \text{if constraint sense is } \le \\
+|\alpha_i - b_i| & \text{if constraint sense is } = \\
+\max(0,\; b_i - \alpha_i) & \text{if constraint sense is } \ge
+\end{cases}
+\le \epsilon_{\text{primal}} = 10^{-7}
 $$
 
 #### Check 4: Integrality Verification (MILP & MIQP)
+
 For all variables constrained to discrete values ($j \in I$):
+
 $$
-R_{\text{int}} = \max_{j \in I} \left| x_j^* - \left\lfloor x_j^* + 0.5 \right\rfloor \right| \le \epsilon_{\text{int}} = 10^{-6}
+R_{\text{int}} =
+\max_{j \in I}
+\left|
+x_j^\star - \left\lfloor x_j^\star + 0.5 \right\rfloor
+\right|
+\le \epsilon_{\text{int}} = 10^{-6}
 $$
-For binary variables ($j \in I_{\text{bin}}$), asserts $x_j^* \in [-\epsilon, \epsilon] \cup [1-\epsilon, 1+\epsilon]$.
+
+For binary variables ($j \in I_{\text{bin}}$), asserts $x_j^\star \in [-\epsilon,\epsilon] \cup [1-\epsilon,1+\epsilon]$.
 
 #### Check 5: Dual Multiplier Stationarity & Signs (LP & QP)
+
 Validates that dual multipliers possess correct signs and satisfy reduced-cost bounds:
-- For inequality rows: $y_i^* \ge -10^{-7}$ (for $\le$), $y_i^* \le 10^{-7}$ (for $\ge$).
-- Gradient stationarity on free variables: $|c_j - \sum_i a_{ij} y_i^*| \le 10^{-7}$.
+
+- For inequality rows: $y_i^\star \ge -10^{-7}$ (for $\le$), $y_i^\star \le 10^{-7}$ (for $\ge$).
+
+- Gradient stationarity on free variables: $|c_j - \sum_{i=1}^{m} a_{ij} y_i^\star| \le 10^{-7}$.
 
 #### Check 6: Complementary Slackness
+
 Ensures that inactive constraints carry zero shadow price:
+
 $$
-R_{\text{comp}} = \max_{1 \le i \le m} \left| y_i^* \cdot \left( b_i - \sum_{j=1}^n a_{ij} x_j^* \right) \right| \le \epsilon_{\text{comp}} = 10^{-7}
+R_{\text{comp}} =
+\max_{1 \le i \le m}
+\left|
+y_i^\star \cdot \left(b_i - \sum_{j=1}^{n} a_{ij} x_j^\star\right)
+\right|
+\le \epsilon_{\text{comp}} = 10^{-7}
 $$
 
 #### Check 7: Objective Consistency Recalculation
+
 Re-evaluates the full objective functional from scratch:
+
 $$
-z_{\text{eval}} = \frac{1}{2} (x^*)^T Q x^* + c^T x^* + c_0
+z_{\text{eval}} =
+\frac{1}{2} (x^\star)^T Q x^\star + c^T x^\star + c_0
 $$
+
 $$
-\frac{|z_{\text{eval}} - z_{\text{reported}}|}{\max(1.0, |z_{\text{eval}}|)} \le 10^{-8}
+\frac{|z_{\text{eval}} - z_{\text{reported}}|}
+{\max(1.0,\; |z_{\text{eval}}|)}
+\le 10^{-8}
 $$
 
 ---
@@ -946,13 +1048,23 @@ Computes Euclidean norms $n_k = \sqrt{\sum_i X_{ki}^2}$ using numerically stable
 Computes infinity norms $m_k = \max_i |X_{ki}|$ using warp-level max reductions.
 
 ### 20.2 Operational Roofline Analysis & Arithmetic Intensity
+
 Sparse matrix-vector multiplication is memory-bandwidth bound. For batch size $B$ and matrix with $\text{nnz}$ nonzeros:
+
 $$
-\text{FLOPs} = 2 B \cdot \text{nnz}, \qquad \text{Memory Bytes} = 12 \cdot \text{nnz} + 4(m+1) + 8 B(m + n)
+\text{FLOPs} = 2B \cdot \text{nnz},
+\qquad
+\text{Memory Bytes} = 12 \cdot \text{nnz} + 4(m+1) + 8B(m+n)
 $$
+
 $$
-I(B) = \frac{2 B \cdot \text{nnz}}{12 \cdot \text{nnz} + 4(m+1) + 8 B(m + n)} \quad \left[ \frac{\text{FLOP}}{\text{Byte}} \right]
+I(B) =
+\frac{2B \cdot \text{nnz}}
+{12 \cdot \text{nnz} + 4(m+1) + 8B(m+n)}
+\quad
+\left[\frac{\text{FLOP}}{\text{Byte}}\right]
 $$
+
 For single vectors ($B=1$), $I(1) \approx 0.12$ FLOP/Byte. For large batches ($B=128$), matrix loads are amortized over 128 vectors, boosting arithmetic intensity to $0.25$ FLOP/Byte and overcoming PCIe transfer latency.
 
 ---
@@ -1155,24 +1267,33 @@ flowchart TD
 ```
 
 #### Exact Mathematical Balance Equations
+
 1. **Crude Fraction Split Constraints:**
+
 $$
 \text{Naphtha} = 0.18 \cdot \text{Crude}_{\text{Light}} + 0.11 \cdot \text{Crude}_{\text{Heavy}} + 0.15 \cdot \text{Crude}_{\text{Kuwait}}
 $$
+
 $$
 \text{GasOil} = 0.32 \cdot \text{Crude}_{\text{Light}} + 0.24 \cdot \text{Crude}_{\text{Heavy}} + 0.28 \cdot \text{Crude}_{\text{Kuwait}}
 $$
+
 $$
 \text{Residue} = 0.22 \cdot \text{Crude}_{\text{Light}} + 0.42 \cdot \text{Crude}_{\text{Heavy}} + 0.30 \cdot \text{Crude}_{\text{Kuwait}}
 $$
+
 2. **Reforming Octane Upgrade:**
+
 $$
 \text{ReformateRON} = 98.0, \qquad \text{FCCGasolineRON} = 92.5, \qquad \text{StraightRunRON} = 68.0
 $$
+
 $$
-98.0 \cdot x_{\text{Reformate}} + 92.5 \cdot x_{\text{FCC}} + 68.0 \cdot x_{\text{SR}} \ge 91.0 \cdot (x_{\text{Reformate}} + x_{\text{FCC}} + x_{\text{SR}})
+98.0 \cdot x_{\text{Reformate}} + 92.5 \cdot x_{\text{FCC}} + 68.0 \cdot x_{\text{SR}} \ge 91.0 \cdot \left(x_{\text{Reformate}} + x_{\text{FCC}} + x_{\text{SR}}\right)
 $$
+
 3. **Hydrotreating Desulfurization Balance:**
+
 $$
 S_{\text{diesel}} = \frac{S_{\text{feed}} \cdot (1 - 0.985) \cdot \text{Feed}}{\text{DieselVolume}} \le 10 \text{ ppm}
 $$

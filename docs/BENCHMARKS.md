@@ -573,7 +573,7 @@ flowchart LR
 | **$B = 128$** | `cuda_batched_linf_norm` | 0.024 ms | 0.012 ms | 0.016 ms | 0.052 ms | 0.265 ms | 5.10× |
 
 ### 12.3 Mathematical Proof of Strategy Rule R013
-Let $T_{\text{H2D}} + T_{\text{D2H}} = c_{\text{bus}}$ represent the fixed PCIe roundtrip DMA latency ($pprox 0.08$ ms) and let $\gamma_{\text{kernel}}$ and $\gamma_{\text{CPU}}$ represent the execution time per vector. The transfer-inclusive speedup condition $S(B) > 1$ requires:
+Let $T_{\text{H2D}} + T_{\text{D2H}} = c_{\text{bus}}$ represent the fixed PCIe roundtrip DMA latency ($\approx 0.08$ ms) and let $\gamma_{\text{kernel}}$ and $\gamma_{\text{CPU}}$ represent the execution time per vector. The transfer-inclusive speedup condition $S(B) > 1$ requires:
 
 $$
 T_{\text{GPU}}(B) < T_{\text{CPU}}(B) \iff c_{\text{bus}} + B \cdot \gamma_{\text{kernel}} < B \cdot \gamma_{\text{CPU}} \iff B > \frac{c_{\text{bus}}}{\gamma_{\text{CPU}} - \gamma_{\text{kernel}}}
@@ -1044,7 +1044,7 @@ flowchart LR
 - **Memory Growth:** $0$ bytes leaked (`leak-sanitizer: 0 bytes in 0 blocks`).
 - **Resident Set Size:** Remained flat at $1.85$ MB without drift across all $10{,}000$ runs.
 - **Objective Variation:** Bit-exact identical results ($0.0$ deviation across repeated solves).
-- **Independent Verification Pass Rate:** $10{,}000 / 10{,}000$ certified `VERIFIED_OPTIMAL` ($100.0\\%$).
+- **Independent Verification Pass Rate:** $10{,}000 / 10{,}000$ certified `VERIFIED_OPTIMAL` ($100.0\%$).
 
 > **Verification Rule**
 > Sovereign mission-critical engines must demonstrate flat memory profiles over long-running loops. Kavach-Opt's zero-leak architecture guarantees uninterrupted execution in continuous production facilities.
