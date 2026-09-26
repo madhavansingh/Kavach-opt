@@ -351,8 +351,8 @@ export async function loadBenchmarks() {
               objective_value: r.objective_value !== null ? r.objective_value : 0,
               solve_time_seconds: r.solve_time_seconds || 0,
               iterations: r.iterations || 0,
-              verification_passed: r.status === 'OPTIMAL' || r.primal_residual !== null,
-              verified_status: r.status === 'OPTIMAL' ? 'VERIFIED_OPTIMAL' : r.status,
+              verification_passed: typeof r.verification_passed === 'boolean' ? r.verification_passed : (r.status === 'OPTIMAL'),
+              verified_status: r.verified_status || (r.status === 'OPTIMAL' ? 'VERIFIED_OPTIMAL' : r.status),
             });
           }
         }
@@ -391,7 +391,7 @@ export async function loadMRPLData() {
       lp_relaxation_objective: baselineJson.lp_relaxation_objective || 5891.36,
       optimality_gap: baselineJson.optimality_gap || 0.0,
       nodes_explored: baselineJson.nodes_explored || 5,
-      solve_time_seconds: baselineJson.lp_relaxation_time_seconds || 0.002,
+      solve_time_seconds: baselineJson.solve_time_seconds || baselineJson.lp_relaxation_time_seconds || 0.001831,
       mass_balance_max_residual: baselineJson.mass_balance_validation?.max_absolute_residual || 0.0,
       mass_balance_passed: baselineJson.mass_balance_validation?.passed ?? true,
       economics: {

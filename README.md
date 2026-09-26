@@ -8,21 +8,6 @@
 [![Hardware Engine](https://img.shields.io/badge/Hardware-CPU%20Multicore%20%2B%20Scoped%20CUDA-orange.svg?style=flat-square)](docs/CUDA_BACKEND.md)
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20Sovereign-informational.svg?style=flat-square)](LICENSE)
 
-```
-========================================================================================
-                           KAVACH-OPT SOVEREIGN SOLVER ENGINE
-========================================================================================
-  Release Version:       0.1.0 (Production Core)
-  Language Standard:     ISO/IEC 14882:2020 (C++20)
-  Supported Problems:    Linear (LP), Mixed-Integer (MILP), Convex QP, Convex MIQP
-  Authoritative Tests:   387 / 387 Passing Unit & Integration Tests (100.0% Green)
-  Verification Protocol: Air-Gapped Zero-Trust Verifier (7 Orthogonal Residual Checks)
-  Sparse Numerics:       CSR / CSC Dual Engine, SparseLU (Markowitz Pivoting), Ruiz Scaling
-  Hardware Execution:    CPU Multicore Thread Pool & 7 Scoped FP64 CUDA Kernels
-  Dependency Contract:   Zero Foreign Optimization Dependencies in Solving Path
-========================================================================================
-```
-
 
 ## Table of Contents
 
@@ -395,21 +380,27 @@ flowchart TD
 ```
 
 ### 8.1 Markowitz Threshold Pivoting
+
 To minimize fill-in (new nonzeros introduced in $L$ and $U$), pivots are selected by minimizing the Markowitz product subject to numerical stability threshold $\mu$:
 
 $$
-(i^*, j^*) = \arg\min_{(i, j) \in \mathcal{C}} (r_i - 1)(c_j - 1), \qquad \text{where } |a_{ij}| \ge \mu \max_{k} |a_{kj}|, \quad \mu \in (0, 1]
+(i^*, j^*) = \arg\min_{(i,j) \in \mathcal{C}} (r_i - 1)(c_j - 1),
+\qquad
+\text{where } |a_{ij}| \ge \mu \max_k |a_{kj}|,
+\quad \mu \in (0,1]
 $$
 
 By default, $\mu = 0.10$. When the Strategy Engine detects elevated numerical risk (Rules R008, R009), $\mu$ is tightened to $0.25$ or $0.50$ to strictly limit element growth.
 
 ### 8.2 Iterative Refinement
-To eliminate floating-point drift:
-1. Compute high-precision residual: $r = b - B x$.
-2. Solve correction equation: $B \delta = r$.
-3. Update iterate: $x \leftarrow x + \delta$.
-Terminates when $\|r\|_\infty < 10^{-12}$.
 
+To eliminate floating-point drift:
+
+1. Compute high-precision residual: $r = b - Bx$.
+2. Solve correction equation: $B\delta = r$.
+3. Update iterate: $x \leftarrow x + \delta$.
+
+Terminates when $\lVert r \rVert_\infty < 10^{-12}$.
 ---
 
 

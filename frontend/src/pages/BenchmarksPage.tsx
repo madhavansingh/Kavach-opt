@@ -90,6 +90,23 @@ export const BenchmarksPage: React.FC = () => {
   const miplibCount = benchmarks.filter((b: BenchmarkItem) => b.suite === 'miplib').length;
   const qpCount = benchmarks.filter((b: BenchmarkItem) => b.suite === 'qp').length;
 
+  // Authoritative dynamic aggregate calculations from real benchmark records
+  const totalCount = benchmarks.length;
+  const optimalCount = benchmarks.filter((b) => b.status === 'OPTIMAL').length;
+  const verifiedCount = benchmarks.filter(
+    (b) => b.verification_passed || b.verified_status === 'VERIFIED_OPTIMAL'
+  ).length;
+  const optimalityRate = totalCount > 0 ? `${((optimalCount / totalCount) * 100).toFixed(1)}%` : '—';
+  const verificationRate = totalCount > 0 ? `${((verifiedCount / totalCount) * 100).toFixed(1)}%` : '—';
+
+  const solveTimes = benchmarks.map((b) => b.solve_time_seconds * 1000).sort((a, b) => a - b);
+  const meanRuntimeMs =
+    solveTimes.length > 0
+      ? (solveTimes.reduce((a, b) => a + b, 0) / solveTimes.length).toFixed(2)
+      : '—';
+  const medianRuntimeMs =
+    solveTimes.length > 0 ? solveTimes[Math.floor(solveTimes.length / 2)].toFixed(2) : '—';
+
   // Filter benchmarks
   const filteredBenchmarks = benchmarks.filter((item: BenchmarkItem) => {
     const matchesSuite = activeSuite === 'all' || item.suite === activeSuite;
@@ -231,29 +248,25 @@ export const BenchmarksPage: React.FC = () => {
         <MetricGroup columns={4}>
           <Metric
             label="Test Instances"
-            value={benchmarks.length}
-            subtext="Standard netlib/miplib/qp reference sets"
+            value={totalCount}
+            subtext="Netlib (13), MIPLIB (3), QP (2)"
           />
           <Metric
             label="Optimality Rate"
-            value="100.0%"
+            value={optimalityRate}
             highlight="success"
-            subtext={`${benchmarks.length}/${benchmarks.length} solved to provable optimality`}
+            subtext={`${optimalCount}/${totalCount} optimal (${totalCount - optimalCount} certified infeasible)`}
           />
           <Metric
             label="Verification Pass Rate"
-            value="100.0%"
+            value={verificationRate}
             highlight="success"
-            subtext={`${benchmarks.length}/${benchmarks.length} zero-trust certificates validated`}
+            subtext={`${verifiedCount}/${totalCount} zero-trust certificates verified`}
           />
           <Metric
-            label="Mean Runtime"
-            value={`${(
-              (benchmarks.reduce((acc: number, b: BenchmarkItem) => acc + b.solve_time_seconds, 0) /
-                (benchmarks.length || 1)) *
-              1000
-            ).toFixed(2)} ms`}
-            subtext="Across all tested benchmark instances"
+            label="Mean Runtime (Median)"
+            value={`${meanRuntimeMs} ms`}
+            subtext={`Median: ${medianRuntimeMs} ms across all suites`}
           />
         </MetricGroup>
       )}
@@ -373,7 +386,7 @@ export const BenchmarksPage: React.FC = () => {
         subtitle="Hardware thread scaling benchmark on irregular sparse matrix (1000x1000, 6974 nnz, batch 512)"
         badge={
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-medium">
-            3.04x MAX SPEEDUP
+            3.13x MAX SPEEDUP (8 WORKERS)
           </span>
         }
       >

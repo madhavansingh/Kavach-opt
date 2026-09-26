@@ -9,23 +9,39 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const dismissByLifecycleKey = useCallback((key: string) => {
+    setToasts((prev) => prev.filter((t) => t.lifecycleKey !== key));
+  }, []);
+
   const showToast = useCallback(
-    (type: ToastType, title: string, message?: string, duration = 3500) => {
+    (
+      type: ToastType,
+      title: string,
+      message?: string,
+      duration = 3500,
+      lifecycleKey?: string
+    ) => {
       const id = `${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const newToast: ToastItem = { id, type, title, message, duration };
-      setToasts((prev) => [...prev.slice(-4), newToast]); // Limit to max 5 visible
+      const newToast: ToastItem = { id, type, title, message, duration, lifecycleKey };
+
+      setToasts((prev) => {
+        // If this toast belongs to a lifecycle group, dismiss any existing toast in that group immediately
+        const filtered = lifecycleKey ? prev.filter((t) => t.lifecycleKey !== lifecycleKey) : prev;
+        return [...filtered.slice(-4), newToast]; // Limit to max 5 visible
+      });
 
       if (duration > 0) {
         setTimeout(() => {
           dismissToast(id);
         }, duration);
       }
+      return id;
     },
     [dismissToast]
   );
 
   return (
-    <ToastContext.Provider value={{ showToast, dismissToast }}>
+    <ToastContext.Provider value={{ showToast, dismissToast, dismissByLifecycleKey }}>
       {children}
       {/* Toast Render Container */}
       <div

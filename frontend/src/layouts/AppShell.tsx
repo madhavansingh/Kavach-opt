@@ -8,7 +8,8 @@ interface AppShellProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   currentModelName?: string;
-  hasActiveRun?: boolean;
+  isSolving?: boolean;
+  hasCompletedRun?: boolean;
   backend?: BackendType;
   solverStatus?: SolverStatus;
   onOpenOnboarding?: () => void;
@@ -19,7 +20,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   currentTab,
   onSelectTab,
   currentModelName,
-  hasActiveRun = false,
+  isSolving = false,
+  hasCompletedRun = false,
   backend,
   solverStatus,
   onOpenOnboarding,
@@ -62,7 +64,8 @@ export const AppShell: React.FC<AppShellProps> = ({
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar
           currentModelName={currentModelName}
-          hasActiveRun={hasActiveRun}
+          isSolving={isSolving}
+          hasCompletedRun={hasCompletedRun}
           backend={backend}
           solverStatus={solverStatus}
           onOpenOnboarding={onOpenOnboarding}

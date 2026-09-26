@@ -146,16 +146,27 @@ $$
 Each term consists of an index `VarId` and an FP64 coefficient. Duplicate indices are eliminated and terms are sorted in strictly ascending column order upon model finalization.
 
 ### 2.4 Symmetric Quadratic Storage
+
 The quadratic Hessian matrix $Q$ is represented in upper-triangular sparse coordinate format:
 
 $$
-\mathcal{Q} = \left\{ (i, j, q_{ij}) \;\middle|\; 0 \le i \le j < n, \; q_{ij} \ne 0 \right\}
+\mathcal{Q}
+=
+\left\{
+(i, j, q_{ij})
+\;\middle|\;
+0 \le i \le j < n,\; q_{ij} \ne 0
+\right\}
 $$
 
 The full symmetric matrix entry is $Q_{ij} = Q_{ji} = q_{ij}$ for $i < j$, and $Q_{ii} = q_{ii}$. The contribution to the scalar objective is:
 
 $$
-\frac{1}{2} x^T Q x = \frac{1}{2} \sum_{i=1}^n Q_{ii} x_i^2 + \sum_{1 \le i < j \le n} q_{ij} x_i x_j
+\frac{1}{2} x^T Q x
+=
+\frac{1}{2} \sum_{i=1}^{n} Q_{ii} x_i^2
++
+\sum_{1 \le i < j \le n} q_{ij} x_i x_j
 $$
 
 > **Implementation Boundary**
@@ -179,40 +190,69 @@ flowchart LR
 ```
 
 ### 3.1 Compressed Sparse Row (CSR)
+
 A matrix $A \in \mathbb{R}^{m \times n}$ with $\text{nnz}$ nonzeros is stored using three contiguous arrays:
+
 1. `values` $\in \mathbb{R}^{\text{nnz}}$: Nonzero numerical values stored row by row.
+
 2. `col_indices` $\in \mathbb{Z}^{\text{nnz}}$: Column index $j \in [0, n)$ for each nonzero.
+
 3. `row_ptrs` $\in \mathbb{Z}^{m+1}$: Offsets into `values` and `col_indices` where each row starts. Row $i$ spans the half-open range `[row_ptrs[i], row_ptrs[i+1])`.
 
 The number of nonzeros in row $i$ is:
 
 $$
-\text{nnz}(A_{i,:}) = \text{row\_ptrs}[i+1] - \text{row\_ptrs}[i]
+\text{nnz}(A_{i,:})
+=
+\texttt{row\_ptrs}[i+1]
+-
+\texttt{row\_ptrs}[i]
 $$
 
 ### 3.2 Compressed Sparse Column (CSC)
+
 CSC is the column-major dual of CSR:
+
 1. `values` $\in \mathbb{R}^{\text{nnz}}$: Nonzero values stored column by column.
+
 2. `row_indices` $\in \mathbb{Z}^{\text{nnz}}$: Row index $i \in [0, m)$ for each nonzero.
+
 3. `col_ptrs` $\in \mathbb{Z}^{n+1}$: Column boundary offsets where `col_ptrs[j]` indicates the start of column $j$.
 
 The number of nonzeros in column $j$ is:
 
 $$
-\text{nnz}(A_{:,j}) = \text{col\_ptrs}[j+1] - \text{col\_ptrs}[j]
+\text{nnz}(A_{:,j})
+=
+\texttt{col\_ptrs}[j+1]
+-
+\texttt{col\_ptrs}[j]
 $$
 
 ### 3.3 Sparse Matrix-Vector Multiplication (SpMV)
-For a CSR matrix, the forward product $y = A x$ is evaluated row-independently:
+
+For a CSR matrix, the forward product $y = Ax$ is evaluated row-independently:
 
 $$
-y_i = \sum_{k=\text{row\_ptrs}[i]}^{\text{row\_ptrs}[i+1]-1} \text{values}[k] \cdot x_{\text{col\_indices}[k]}, \qquad i = 0, \dots, m-1
+y_i
+=
+\sum_{k=\texttt{row\_ptrs}[i]}^{\texttt{row\_ptrs}[i+1]-1}
+\texttt{values}[k]
+\cdot
+x_{\texttt{col\_indices}[k]},
+\qquad i = 0, \dots, m-1
 $$
 
 The transpose product $z = A^T v$ for a CSR matrix requires scattering into an accumulator or iterating over a CSC representation:
 
 $$
-z_j = \sum_{k=\text{col\_ptrs}[j]}^{\text{col\_ptrs}[j+1]-1} \text{values}[k] \cdot v_{\text{row\_indices}[k]}, \qquad j = 0, \dots, n-1
+z_j
+=
+\sum_{k=\texttt{col\_ptrs}[j]}^{\texttt{col\_ptrs}[j+1]-1}
+\texttt{values}[k]
+\cdot
+v_{\texttt{row\_indices}[k]},
+\qquad j = 0, \dots, n-1
 $$
 
 Both operations incur exactly $2 \cdot \text{nnz}$ floating-point operations (FLOPs), achieving $O(\text{nnz})$ computational complexity independent of ambient dimensions $m$ and $n$.
@@ -238,25 +278,31 @@ flowchart TD
 ```
 
 ### 4.1 Markowitz Pivoting & Fill-In Minimization
+
 To minimize fill-in (creation of new nonzeros in $L$ and $U$), the pivot element $a_{ij}$ at step $k$ of the factorization is chosen from candidates satisfying the Markowitz condition:
 
 $$
-(i^*, j^*) = \arg\min_{(i, j) \in \mathcal{C}} (r_i - 1)(c_j - 1)
+(i^*, j^*) = \arg\min_{(i,j) \in \mathcal{C}} (r_i - 1)(c_j - 1)
 $$
 
 where $r_i$ is the active row count of row $i$, $c_j$ is the active column count of column $j$, and $\mathcal{C}$ is the candidate set of numerically admissible entries satisfying the threshold pivoting condition:
 
 $$
-|a_{ij}| \ge \mu \max_{k \ge k_0} |a_{kj}|, \qquad \mu \in (0, 1]
+|a_{ij}| \ge \mu \max_{k \ge k_0} |a_{kj}|,
+\qquad
+\mu \in (0,1]
 $$
 
 Kavach-Opt sets $\mu = 0.1$ by default, tightening to $\mu = 0.25$ or $\mu = 0.5$ under the ELEVATED and HIGH numerical risk profiles (Rules R008, R009).
 
 > **Numerical Note**
+>
 > Markowitz threshold pivoting provides an explicit, provable upper bound on the growth factor $g$ of the pivot submatrix:
+>
 > $$
 > g \le \left(1 + \frac{1}{\mu}\right)^{m-1}
 > $$
+>
 > Setting $\mu = 0.1$ bounds element growth while preserving extreme sparsity.
 
 ### 4.2 Factorization Architecture

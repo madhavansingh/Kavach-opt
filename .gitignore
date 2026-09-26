@@ -3,7 +3,8 @@ build/
 build-*/
 cmake-build-*/
 bin/
-lib/
+/lib/
+!frontend/src/lib/
 
 # CMake generated files
 CMakeFiles/

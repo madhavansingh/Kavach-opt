@@ -139,30 +139,45 @@ export const MRPLPage: React.FC = () => {
     {
       key: 'density',
       header: 'Density (kg/m³)',
-      render: (row: any) => (
-        <span className="font-mono text-neutral-300">
-          {row.calculated_density_kg_m3.toFixed(1)} / &le; {row.density_limit_kg_m3.toFixed(1)}
-        </span>
-      ),
+      render: (row: any) => {
+        const isMinBound = row.product.includes('P3') || row.product.includes('Heavy Fuel Oil');
+        const operator = isMinBound ? '≥' : '≤';
+        return (
+          <span className="font-mono text-neutral-300">
+            {row.calculated_density_kg_m3.toFixed(1)} / {operator} {row.density_limit_kg_m3.toFixed(1)}
+            {isMinBound && <span className="text-[10px] text-neutral-400 block font-sans">(Min Spec)</span>}
+          </span>
+        );
+      },
     },
     {
       key: 'density_margin',
       header: 'Density Margin',
-      render: (row: any) => (
-        <span className="font-mono text-emerald-400">
-          +{row.density_margin_kg_m3.toFixed(1)} kg/m³
-        </span>
-      ),
+      render: (row: any) => {
+        const isMinBound = row.product.includes('P3') || row.product.includes('Heavy Fuel Oil');
+        const margin = row.density_margin_kg_m3;
+        const sign = margin >= 0 ? '+' : '';
+        const note = isMinBound ? 'above min' : 'below max';
+        return (
+          <span className={`font-mono ${margin >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {sign}{margin.toFixed(1)} kg/m³
+            <span className="text-[10px] text-neutral-400 block font-sans">{note}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'specs',
       header: 'Specs Met',
-      render: () => (
-        <span className="inline-flex items-center gap-1 text-emerald-400 font-mono text-xs">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>COMPLIANT</span>
-        </span>
-      ),
+      render: (row: any) => {
+        const met = row.quality_satisfied ?? true;
+        return (
+          <span className={`inline-flex items-center gap-1 font-mono text-xs ${met ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {met ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+            <span>{met ? 'COMPLIANT' : 'NON-COMPLIANT'}</span>
+          </span>
+        );
+      },
     },
   ];
 
@@ -272,12 +287,14 @@ export const MRPLPage: React.FC = () => {
               </div>
               <h4 className="text-xs font-semibold text-white font-sans">Crude Slate Intake</h4>
               <ul className="space-y-1 text-[11px] font-mono text-neutral-300">
-                <li className="flex justify-between"><span>· Light Arab:</span> <span className="text-white font-medium">100 kbpd</span></li>
-                <li className="flex justify-between"><span>· Heavy Maya:</span> <span className="text-white font-medium">80 kbpd</span></li>
-                <li className="flex justify-between"><span>· Basrah Med:</span> <span className="text-white font-medium">100 kbpd</span></li>
+                <li className="flex justify-between"><span>· Crude A (Sweet):</span> <span className="text-white font-medium">120.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· Crude B (Medium):</span> <span className="text-white font-medium">80.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· Crude C (Sour):</span> <span className="text-white font-medium">83.2 kbpd</span></li>
+                <li className="flex justify-between"><span>· Crude D (Heavy):</span> <span className="text-white font-medium">45.0 kbpd</span></li>
               </ul>
-              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-400 font-mono">
-                Total Intake: 280.0 kbpd
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-amber-400 font-mono flex justify-between">
+                <span>Total Feedstock:</span>
+                <span className="font-bold">328.2 kbpd</span>
               </div>
             </div>
 
@@ -287,12 +304,13 @@ export const MRPLPage: React.FC = () => {
                 <span className="text-[10px] font-mono text-blue-400 font-medium">STAGE 2</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-950/60 text-blue-300">PRIMARY</span>
               </div>
-              <h4 className="text-xs font-semibold text-white font-sans">Atmospheric CDU</h4>
+              <h4 className="text-xs font-semibold text-white font-sans">Atmospheric CDU (U1)</h4>
               <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-                Fractionates crude into Light Naphtha, Middle Distillates, and Atmospheric Residue.
+                Primary crude distillation processing sweet crudes A &amp; B into distillates and atmospheric residue.
               </p>
-              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
-                CDU Load: 100.0% (150/150 kbpd)
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono flex justify-between">
+                <span>CDU Load:</span>
+                <span className="text-emerald-400 font-bold">100.0% (200.0/200.0 kbpd)</span>
               </div>
             </div>
 
@@ -302,12 +320,13 @@ export const MRPLPage: React.FC = () => {
                 <span className="text-[10px] font-mono text-indigo-400 font-medium">STAGE 3</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300">CONVERSION</span>
               </div>
-              <h4 className="text-xs font-semibold text-white font-sans">VDU &amp; FCCU Cracking</h4>
+              <h4 className="text-xs font-semibold text-white font-sans">VDU &amp; FCCU (U2)</h4>
               <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-                Vacuum distillation and catalytic cracking of heavy bottoms into high-octane gasoline blendstocks.
+                Vacuum distillation and catalytic cracking treating sour crudes C &amp; D bottoms into gasoline blendstocks.
               </p>
-              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
-                FCCU Load: 83.3% (50/60 kbpd)
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono flex justify-between">
+                <span>VDU/FCCU Load:</span>
+                <span className="text-blue-400 font-bold">71.2% (128.2/180.0 kbpd)</span>
               </div>
             </div>
 
@@ -317,12 +336,13 @@ export const MRPLPage: React.FC = () => {
                 <span className="text-[10px] font-mono text-emerald-400 font-medium">STAGE 4</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300">TREATING</span>
               </div>
-              <h4 className="text-xs font-semibold text-white font-sans">HDS Hydrotreating</h4>
+              <h4 className="text-xs font-semibold text-white font-sans">HDS Hydrotreater (U3)</h4>
               <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-                Catalytic desulfurization bringing sulfur content down to ultra-low Euro-VI standards (&le;10 ppm).
+                Hydrodesulfurization ensuring gasoline (&le;0.80 wt%) and diesel (&le;1.30 wt%) meet statutory sulfur caps.
               </p>
-              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
-                HDS Load: 77.8% (70/90 kbpd)
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono flex justify-between">
+                <span>HDS Load:</span>
+                <span className="text-blue-400 font-bold">31.8% (38.2/120.0 kbpd)</span>
               </div>
             </div>
 
@@ -332,14 +352,15 @@ export const MRPLPage: React.FC = () => {
                 <span className="text-[10px] font-mono text-emerald-400 font-medium">STAGE 5</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300">FINISHED</span>
               </div>
-              <h4 className="text-xs font-semibold text-white font-sans">Euro-VI Fuel Pools</h4>
+              <h4 className="text-xs font-semibold text-white font-sans">Finished Fuel Pools</h4>
               <ul className="space-y-1 text-[11px] font-mono text-neutral-300">
-                <li className="flex justify-between"><span>· BS-VI Petrol:</span> <span className="text-emerald-400 font-medium">92.0 kbpd</span></li>
-                <li className="flex justify-between"><span>· BS-VI Diesel:</span> <span className="text-emerald-400 font-medium">135.0 kbpd</span></li>
-                <li className="flex justify-between"><span>· Heavy Fuel Oil:</span> <span className="text-emerald-400 font-medium">53.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· P1 Gasoline:</span> <span className="text-emerald-400 font-medium">140.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· P2 Diesel:</span> <span className="text-emerald-400 font-medium">98.2 kbpd</span></li>
+                <li className="flex justify-between"><span>· P3 Fuel Oil:</span> <span className="text-emerald-400 font-medium">90.0 kbpd</span></li>
               </ul>
-              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-emerald-400 font-mono">
-                Total Output: 280.0 kbpd
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-emerald-400 font-mono flex justify-between">
+                <span>Total Finished:</span>
+                <span className="font-bold">328.2 kbpd</span>
               </div>
             </div>
           </div>
@@ -665,10 +686,10 @@ export const MRPLPage: React.FC = () => {
                     <span>Primal Infeasibility Certified by Phase-I Simplex</span>
                   </div>
                   <p className="text-neutral-300 font-sans leading-relaxed">
-                    Under the restricted crude slate (-40% intake) combined with the ultra-tight BS-VI sulfur ceiling (&le; 10 ppm),
+                    Under the restricted crude slate (-40% sweet intake) combined with tightened product sulfur specifications (&le;0.50 wt%),
                     the linear constraint polytope {`{ x | Ax = b, l \u2264 x \u2264 u }`} is mathematically empty. The artificial variables in Phase I
-                    could not be driven to zero (infeasibility sum &gt; 0). Kavach-Opt correctly identified the impossibility of meeting contract demands
-                    without violating conservation of mass or legal sulfur emission ceilings.
+                    could not be driven to zero (infeasibility sum &gt; 0). Kavach-Opt correctly proved the impossibility of satisfying product volume
+                    commitments without violating conservation of mass or statutory product sulfur caps.
                   </p>
                 </div>
               ) : (

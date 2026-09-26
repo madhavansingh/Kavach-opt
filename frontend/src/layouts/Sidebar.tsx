@@ -8,6 +8,7 @@ import {
   Cpu,
   Shield,
 } from 'lucide-react';
+import { SYSTEM_METADATA } from '../lib/constants';
 
 export type NavTab = 'overview' | 'solve' | 'verification' | 'benchmarks' | 'mrpl' | 'system';
 
@@ -83,12 +84,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-bold tracking-tight text-sm text-neutral-100 font-sans">
                 KAVACH-OPT
               </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-800/80 text-neutral-300 border border-neutral-700/50">
-                RC-1
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 font-medium">
+                {SYSTEM_METADATA.PRODUCT_VERSION}
               </span>
             </div>
             <p className="text-[11px] text-neutral-400 font-mono">
-              Sovereign Optimization Engine
+              {SYSTEM_METADATA.PRODUCT_TAGLINE}
             </p>
           </div>
         </div>

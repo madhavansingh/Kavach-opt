@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { solverBridge, type SystemHealth } from '../lib/solverBridge';
+import { SYSTEM_METADATA } from '../lib/constants';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -399,7 +400,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <span>C++20 Active</span>
                   </div>
                   <div className="text-[10px] text-neutral-400 font-mono mt-0.5 truncate">
-                    {health?.version_info || 'v0.1.0-RC1'}
+                    {health?.version_info || SYSTEM_METADATA.PRODUCT_VERSION}
                   </div>
                 </div>
 

@@ -3,6 +3,7 @@ import { Cpu, Terminal, CheckCircle2, ShieldCheck, HardDrive } from 'lucide-reac
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { solverBridge, type SystemHealth } from '../lib/solverBridge';
+import { CUDA_KERNEL_REGISTRY, SYSTEM_METADATA } from '../lib/constants';
 
 import { SkeletonPanel, SkeletonMetric } from '../components/Skeleton';
 
@@ -94,9 +95,9 @@ export const SystemPage: React.FC = () => {
                 <span className="font-sans font-medium text-neutral-300">Version & Build</span>
               </div>
               <div className="font-mono text-white text-[11px] font-medium truncate">
-                {health.version_info}
+                {health.version_info || SYSTEM_METADATA.PRODUCT_VERSION}
               </div>
-              <div className="text-[10px] text-neutral-400 font-sans">C++20 Release Build (-Werror)</div>
+              <div className="text-[10px] text-neutral-400 font-sans">{SYSTEM_METADATA.BUILD_TYPE} Build (-Werror)</div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
@@ -187,7 +188,7 @@ export const SystemPage: React.FC = () => {
             </p>
             <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
               <div>· Exact KKT stationarity solve</div>
-              <div>· Gershgorin PSD verification</div>
+              <div>· Cholesky curvature PSD verification</div>
               <div>· Dual multiplier complementarity</div>
             </div>
           </div>
@@ -205,7 +206,7 @@ export const SystemPage: React.FC = () => {
             <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
               <div>· Strong QP probing</div>
               <div>· Non-convexity detection &amp; reject</div>
-              <div>· Subgradient bound pruning</div>
+              <div>· Continuous QP relaxation bound pruning</div>
             </div>
           </div>
         </div>
@@ -244,7 +245,7 @@ export const SystemPage: React.FC = () => {
                 Internal std::jthread thread pool. Parallel chunking for batched vector multiplications.
               </p>
               <div className="text-[10px] font-mono text-neutral-300 pt-1 border-t border-[#1f283a]">
-                3.04x speedup on 8 cores
+                3.13x measured speedup on 8 workers
               </div>
             </div>
 
@@ -286,15 +287,7 @@ export const SystemPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1f283a]/60">
-                  {[
-                    { name: 'Batched CSR SpMV', layout: 'CSR Matrix', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched CSR Transpose SpMV', layout: 'CSR Transpose', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched CSC SpMV', layout: 'CSC Matrix', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched AXPBY', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched Dot Product', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched L2 Norm', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                    { name: 'Batched L∞ Norm', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
-                  ].map((k) => (
+                  {CUDA_KERNEL_REGISTRY.map((k) => (
                     <tr key={k.name} className="hover:bg-[#161c28] transition-colors">
                       <td className="py-2.5 px-3 text-white font-sans font-medium">{k.name}</td>
                       <td className="py-2.5 px-3 text-slate-300">{k.layout}</td>
@@ -304,7 +297,7 @@ export const SystemPage: React.FC = () => {
                           {k.status}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-neutral-400 font-sans">{k.target}</td>
+                      <td className="py-2.5 px-3 text-neutral-400 font-sans">{k.targetHardware}</td>
                     </tr>
                   ))}
                 </tbody>

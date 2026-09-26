@@ -32,7 +32,7 @@ function AppInner() {
     }
   });
 
-  const { showToast } = useToast();
+  const { showToast, dismissByLifecycleKey } = useToast();
 
   // Mathematical race condition & stale data protection token
   const solveRequestIdRef = useRef<number>(0);
@@ -86,6 +86,8 @@ function AppInner() {
       solveRequestIdRef.current++;
       setIsSolving(false);
       setIsVerifying(false);
+      dismissByLifecycleKey('solve_lifecycle');
+      dismissByLifecycleKey('verify_lifecycle');
       setActiveModel(model);
       // STALE STATE PREVENTION: Immediately purge previous solve/verification results
       setCurrentResult(null);
@@ -105,7 +107,8 @@ function AppInner() {
     setCurrentResult(null);
     setSolveError(null);
 
-    showToast('info', 'Starting Optimization', `Executing Kavach-Opt core for ${activeModel.name}...`);
+    // Lifecycle toast: stays active until replaced on completion or error
+    showToast('info', 'Starting Optimization', `Executing Kavach-Opt core for ${activeModel.name}...`, 0, 'solve_lifecycle');
 
     try {
       const targetPath = activeModel.path || activeModel.name;
@@ -132,19 +135,27 @@ function AppInner() {
         showToast(
           'success',
           'Optimal Solution Found',
-          `${activeModel.name} solved in ${(result.solve_time_seconds * 1000).toFixed(2)} ms (z* = ${objStr})`
+          `${activeModel.name} solved in ${(result.solve_time_seconds * 1000).toFixed(2)} ms (z* = ${objStr})`,
+          3500,
+          'solve_lifecycle'
         );
       } else if (result.status === 'INFEASIBLE') {
-        showToast('warning', 'Problem Infeasible', `${activeModel.name} proven mathematically infeasible.`);
+        showToast(
+          'warning',
+          'Problem Infeasible',
+          `${activeModel.name} proven mathematically infeasible.`,
+          4000,
+          'solve_lifecycle'
+        );
       } else {
-        showToast('info', 'Solve Completed', `Status: ${result.status}`);
+        showToast('info', 'Solve Completed', `Status: ${result.status}`, 3500, 'solve_lifecycle');
       }
     } catch (err: any) {
       if (thisRequestId !== solveRequestIdRef.current) return;
       console.error('Solve error:', err);
       const msg = err?.message || 'Solver execution failed';
       setSolveError(msg);
-      showToast('error', 'Execution Failed', msg);
+      showToast('error', 'Execution Failed', msg, 5000, 'solve_lifecycle');
       throw err;
     } finally {
       if (thisRequestId === solveRequestIdRef.current) {
@@ -159,7 +170,7 @@ function AppInner() {
 
     setIsVerifying(true);
     setSolveError(null);
-    showToast('info', 'Verification Started', `Computing zero-trust mathematical checks for ${activeModel.name}...`);
+    showToast('info', 'Verification Started', `Computing zero-trust mathematical checks for ${activeModel.name}...`, 0, 'verify_lifecycle');
 
     try {
       const targetPath = activeModel.path || activeModel.name;
@@ -179,17 +190,19 @@ function AppInner() {
         showToast(
           'success',
           'Verification Certified',
-          `Primal residual: ${verReport.recomputed_primal_residual.toExponential(2)} (within 1e-6 tol)`
+          `Primal residual: ${verReport.recomputed_primal_residual.toExponential(2)} (within 1e-7 tol)`,
+          3500,
+          'verify_lifecycle'
         );
       } else {
-        showToast('error', 'Verification Failed', 'One or more mathematical invariant checks failed.');
+        showToast('error', 'Verification Failed', 'One or more mathematical invariant checks failed.', 4500, 'verify_lifecycle');
       }
     } catch (err: any) {
       if (thisRequestId !== solveRequestIdRef.current) return;
       console.error('Verification error:', err);
       const msg = err?.message || 'Verification execution failed';
       setSolveError(msg);
-      showToast('error', 'Verification Error', msg);
+      showToast('error', 'Verification Error', msg, 5000, 'verify_lifecycle');
     } finally {
       if (thisRequestId === solveRequestIdRef.current) {
         setIsVerifying(false);
@@ -203,7 +216,8 @@ function AppInner() {
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
         currentModelName={activeModel?.name || (isDiscoveringModels ? 'Discovering Models...' : 'No Model')}
-        hasActiveRun={currentResult !== null}
+        isSolving={isSolving}
+        hasCompletedRun={currentResult !== null}
         backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
         solverStatus={currentResult?.status}
         onOpenOnboarding={() => setShowOnboarding(true)}
