@@ -1221,10 +1221,12 @@ Kavach-Opt is verified across major C++20 compilers and POSIX architectures:
 cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release -j
 
-# Execute Test Suite (387 Authoritative Unit Tests)
+# Execute Test Suite (395 Authoritative Unit Tests)
 ./build-release/tests/kavach_unit_tests
 
 # Verify Dependency Sovereignty
 python3 tools/check_dependencies.py
 ```
 
+### 20.5 Presolve Certificate Reconstruction Pipeline
+In `RevisedSimplex::solve`, `KavachSolver::solve`, and `BenchmarkRunner::run_case`, every presolved LP executes `ReconstructionMap::restore_certificate(x_reduced, dual_reduced, rc_reduced, tolerances)` to reconstruct $(x^{\text{orig}}, y^{\text{orig}}, r^{\text{orig}}, z^{\text{orig}})$ in the original `CanonicalModel` coordinate space before invoking `LPVerifier::verify`.

@@ -147,68 +147,47 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     auto dual_reduced = standard_lp.reconstruct_dual(exec_res.y);
     auto rc_reduced = standard_lp.reconstruct_reduced_costs(exec_res.reduced_costs);
 
-    // 9. Reconstruct original model solution (through Presolve reconstruction map if present)
+    // 9. Reconstruct original model solution and optimality certificate
     if (reconstruction_map.has_value()) {
-        solution.primal_solution = reconstruction_map->restore_solution(x_reduced);
-        solution.dual_multipliers = dual_reduced;
-        solution.reduced_costs = rc_reduced;
+        auto cert = reconstruction_map->restore_certificate(x_reduced, dual_reduced, rc_reduced,
+                                                            options.tolerances);
+        solution.primal_solution = std::move(cert.primal_solution);
+        solution.dual_multipliers = std::move(cert.dual_multipliers);
+        solution.reduced_costs = std::move(cert.reduced_costs);
+        solution.objective_value = cert.objective_value;
     } else {
         solution.primal_solution = x_reduced;
         solution.dual_multipliers = dual_reduced;
         solution.reduced_costs = rc_reduced;
-    }
-
-    // 10. Compute true original objective value directly from original model and unscaled primal
-    double obj = model.objective().offset;
-    for (const auto& term : model.objective().linear_terms.terms()) {
-        if (term.var_id < solution.primal_solution.size()) {
-            obj += term.coefficient * solution.primal_solution[term.var_id];
+        double obj = model.objective().offset;
+        for (const auto& term : model.objective().linear_terms.terms()) {
+            if (term.var_id < solution.primal_solution.size()) {
+                obj += term.coefficient * solution.primal_solution[term.var_id];
+            }
         }
+        solution.objective_value = obj;
     }
-    solution.objective_value = obj;
 
     // 11. Independent Verification [Y] — mandatory for OPTIMAL claim
     // The verifier operates on the original (pre-presolve) model and the
-    // fully-reconstructed solution. It does NOT call any solver-internal
-    // feasibility or residual helpers.
+    // fully-reconstructed primal/dual/reduced-cost certificate.
     {
         verification::LPVerifier verifier(
             verification::VerifierTolerances::from_solver_tolerances(options.tolerances));
 
-        if (working_model != &model) {
-            double obj_reduced = standard_lp.compute_original_objective(x_reduced);
-            auto vr_reduced = verifier.verify(*working_model, x_reduced, dual_reduced, rc_reduced,
-                                              obj_reduced, exec_res.status);
+        auto vr =
+            verifier.verify(model, solution.primal_solution, solution.dual_multipliers,
+                            solution.reduced_costs, solution.objective_value, solution.status);
 
-            // Verify primal feasibility, bounds, nonfinite, and objective on the original model:
-            auto vr_orig = verifier.verify(model, solution.primal_solution, {}, {},
-                                           solution.objective_value, core::SolverStatus::FEASIBLE);
-
-            if (!vr_reduced.fully_verified() || !vr_orig.primal_feasibility.passed ||
-                !vr_orig.bound_feasibility.passed || !vr_orig.objective_consistency.passed ||
-                !vr_orig.nonfinite_check.passed) {
-                solution.status = vr_reduced.certified_status != core::SolverStatus::OPTIMAL
-                                      ? vr_reduced.certified_status
-                                      : core::SolverStatus::NUMERICAL_FAILURE;
-                solution.message = "Verifier rejected presolved solution: " + vr_orig.summary;
-            } else {
-                solution.status = core::SolverStatus::OPTIMAL;
-                solution.message = vr_orig.summary;
-            }
-        } else {
-            auto vr =
-                verifier.verify(model, solution.primal_solution, solution.dual_multipliers,
-                                solution.reduced_costs, solution.objective_value, solution.status);
-
-            if (vr.status_downgraded) {
-                solution.status = vr.certified_status;
-                solution.message = "Verifier downgraded status: " + vr.summary;
-            } else if (vr.certified_status == core::SolverStatus::OPTIMAL && vr.fully_verified()) {
-                // OPTIMAL confirmed — status unchanged
-            }
-            if (solution.message.empty()) {
-                solution.message = vr.summary;
-            }
+        if (vr.status_downgraded) {
+            solution.status = vr.certified_status;
+            solution.message = "Verifier downgraded status: " + vr.summary;
+        } else if (vr.certified_status == core::SolverStatus::OPTIMAL && vr.fully_verified()) {
+            solution.status = core::SolverStatus::OPTIMAL;
+            solution.message = vr.summary;
+        }
+        if (solution.message.empty()) {
+            solution.message = vr.summary;
         }
     }
 

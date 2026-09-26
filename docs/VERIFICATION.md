@@ -1232,3 +1232,5 @@ flowchart TD
 > **Design Principle**
 > Mathematical verification is an active physical safeguard. In industrial actuation, a mathematical error can lead to hardware damage or regulatory violations. Kavach-Opt provides the formal verification barrier that guarantees physical safety.
 
+### 10.4 Presolve Original-Model Certificate Verification Invariant
+When presolve is active, `LPVerifier::verify` always evaluates the reconstructed primal vector $x \in \mathbb{R}^{n_{\text{orig}}}$, reconstructed dual multiplier vector $y \in \mathbb{R}^{m_{\text{orig}}}$, and reconstructed reduced-cost vector $r \in \mathbb{R}^{n_{\text{orig}}}$ directly against the original unpresolved `CanonicalModel`. No dual or complementary slackness checks are bypassed on presolved models, and `LPVerifier::check_dual_feasibility` explicitly enforces $|r_j - (c_j - (A^T y)_j)| \le \epsilon_{\text{dual}}$ as well as exact vector dimensions (`x.size() == n_orig`, `y.size() == m_orig`, `rc.size() == n_orig`).

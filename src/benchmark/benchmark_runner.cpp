@@ -146,15 +146,9 @@ BenchmarkResult BenchmarkRunner::run_case(const BenchmarkCase& c) const {
             auto verif_start = std::chrono::steady_clock::now();
             verification::LPVerifier verifier(
                 verification::VerifierTolerances::from_solver_tolerances(c.tolerances));
-            std::vector<double> dual_to_check = sol.dual_multipliers;
-            std::vector<double> rc_to_check = sol.reduced_costs;
-            if (dual_to_check.size() != model->num_constraints()) {
-                dual_to_check.clear();
-                rc_to_check.clear();
-            }
-
-            auto v_report = verifier.verify(*model, sol.primal_solution, dual_to_check, rc_to_check,
-                                            sol.objective_value, sol.status, c.tolerances);
+            auto v_report =
+                verifier.verify(*model, sol.primal_solution, sol.dual_multipliers,
+                                sol.reduced_costs, sol.objective_value, sol.status, c.tolerances);
             auto verif_end = std::chrono::steady_clock::now();
 
             r.verification_time_seconds =
@@ -162,10 +156,7 @@ BenchmarkResult BenchmarkRunner::run_case(const BenchmarkCase& c) const {
             r.primal_residual = v_report.aggregate_primal_residual;
             r.dual_residual = v_report.aggregate_dual_residual;
 
-            bool passed =
-                v_report.fully_verified() ||
-                (v_report.primal_feasibility.passed && v_report.bound_feasibility.passed &&
-                 v_report.objective_consistency.passed && v_report.nonfinite_check.passed);
+            bool passed = v_report.fully_verified();
 
             if (passed) {
                 r.verification_passed = true;

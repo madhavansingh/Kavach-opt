@@ -123,6 +123,7 @@ StandardFormLP::StandardFormLP(const model::CanonicalModel& model,
             switch (trans.type) {
                 case VariableTransformType::FIXED:
                     rhs_shift += a * trans.shift;
+                    var_transforms_[term.var_id].fixed_terms.push_back({i, a});
                     break;
                 case VariableTransformType::SHIFTED_LOWER:
                 case VariableTransformType::BOXED:
@@ -310,16 +311,45 @@ std::vector<double> StandardFormLP::reconstruct_dual(const std::vector<double>& 
 
 std::vector<double> StandardFormLP::reconstruct_reduced_costs(const std::vector<double>& d) const {
     std::vector<double> rc(num_original_vars_, 0.0);
+    double sigma = (original_sense_ == model::ObjectiveSense::MAXIMIZE) ? -1.0 : 1.0;
+
+    // Recover row dual multipliers in minimization sense from slack/surplus/artificial reduced
+    // costs
+    std::vector<double> y_min(num_original_constrs_, 0.0);
+    for (std::size_t i = 0; i < num_original_constrs_; ++i) {
+        const auto& rtrans = row_transforms_[i];
+        double y_std = 0.0;
+        if (rtrans.has_slack_or_surplus && rtrans.slack_or_surplus_var < d.size()) {
+            y_std = rtrans.is_surplus ? d[rtrans.slack_or_surplus_var]
+                                      : -d[rtrans.slack_or_surplus_var];
+        } else if (rtrans.has_artificial && rtrans.artificial_var < d.size()) {
+            y_std = -d[rtrans.artificial_var];
+        }
+        y_min[i] = rtrans.negated ? -y_std : y_std;
+    }
+
     for (std::size_t j = 0; j < num_original_vars_; ++j) {
         const auto& trans = var_transforms_[j];
         switch (trans.type) {
-            case VariableTransformType::FIXED:
-                rc[j] = 0.0;
+            case VariableTransformType::FIXED: {
+                double rc_min = sigma * original_obj_coeffs_[j];
+                for (const auto& [row_idx, coeff] : trans.fixed_terms) {
+                    if (row_idx < y_min.size()) {
+                        rc_min -= coeff * y_min[row_idx];
+                    }
+                }
+                rc[j] = rc_min;
                 break;
+            }
             case VariableTransformType::SHIFTED_LOWER:
-            case VariableTransformType::BOXED:
                 rc[j] = trans.z_index1 < d.size() ? d[trans.z_index1] : 0.0;
                 break;
+            case VariableTransformType::BOXED: {
+                double d_z1 = trans.z_index1 < d.size() ? d[trans.z_index1] : 0.0;
+                double d_ub = trans.ub_slack_index < d.size() ? d[trans.ub_slack_index] : 0.0;
+                rc[j] = d_z1 - d_ub;
+                break;
+            }
             case VariableTransformType::SHIFTED_UPPER:
                 rc[j] = trans.z_index1 < d.size() ? -d[trans.z_index1] : 0.0;
                 break;

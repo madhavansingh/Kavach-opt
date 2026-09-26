@@ -194,20 +194,10 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
 
         if (sol.is_optimal()) {
             verification::LPVerifier verifier;
-            std::vector<double> dual_to_check = sol.dual_multipliers;
-            std::vector<double> rc_to_check = sol.reduced_costs;
-            if (dual_to_check.size() != model.num_constraints()) {
-                dual_to_check.clear();
-                rc_to_check.clear();
-            }
-            auto lp_rep = verifier.verify(model, sol.primal_solution, dual_to_check, rc_to_check,
-                                          sol.objective_value, sol.status, options.tolerances);
+            auto lp_rep =
+                verifier.verify(model, sol.primal_solution, sol.dual_multipliers, sol.reduced_costs,
+                                sol.objective_value, sol.status, options.tolerances);
             result.verification_report = verification::VerificationReport::from_lp(lp_rep);
-            if (!result.verification_report.passed &&
-                (lp_rep.primal_feasibility.passed && lp_rep.bound_feasibility.passed &&
-                 lp_rep.objective_consistency.passed && lp_rep.nonfinite_check.passed)) {
-                result.verification_report.passed = true;
-            }
             if (result.status == core::SolverStatus::OPTIMAL &&
                 !result.verification_report.passed) {
                 result.status = lp_rep.certified_status;

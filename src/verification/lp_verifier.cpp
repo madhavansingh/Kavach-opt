@@ -122,11 +122,16 @@ CheckResult LPVerifier::check_bound_feasibility(const model::CanonicalModel& mod
     std::size_t worst = std::numeric_limits<std::size_t>::max();
 
     const std::size_t n = model.num_variables();
+    if (x.size() != n) {
+        res.passed = false;
+        res.max_violation = 1.0;
+        std::ostringstream oss;
+        oss << "Primal solution vector dimension mismatch: expected " << n << ", got " << x.size()
+            << ".";
+        res.diagnostic = oss.str();
+        return res;
+    }
     for (std::size_t j = 0; j < n; ++j) {
-        if (j >= x.size()) {
-            // Solution vector shorter than model — treat missing as 0
-            break;
-        }
         const auto& var = model.variable(static_cast<model::VarId>(j));
         const double xj = x[j];
 
@@ -251,17 +256,29 @@ CheckResult LPVerifier::check_primal_feasibility(const model::CanonicalModel& mo
 CheckResult LPVerifier::check_dual_feasibility(const model::CanonicalModel& model,
                                                const std::vector<double>& x,
                                                const std::vector<double>& y,
-                                               const std::vector<double>& /*rc*/) const {
+                                               const std::vector<double>& rc) const {
     CheckResult res;
     res.tolerance_used = tols_.dual_feasibility_tol;
     const double tol = tols_.dual_feasibility_tol;
     const std::size_t n = model.num_variables();
     const std::size_t m = model.num_constraints();
 
-    if (m > 0 && y.size() < m) {
+    if (y.size() != m) {
         res.passed = false;
-        res.diagnostic =
-            "Dual multipliers unavailable or incomplete — dual feasibility cannot be verified.";
+        res.max_violation = 1.0;
+        std::ostringstream oss;
+        oss << "Dual multiplier dimension mismatch: expected " << m << ", got " << y.size() << ".";
+        res.diagnostic = oss.str();
+        return res;
+    }
+
+    if (!rc.empty() && rc.size() != n) {
+        res.passed = false;
+        res.max_violation = 1.0;
+        std::ostringstream oss;
+        oss << "Reduced cost vector dimension mismatch: expected " << n << ", got " << rc.size()
+            << ".";
+        res.diagnostic = oss.str();
         return res;
     }
 
@@ -292,6 +309,14 @@ CheckResult LPVerifier::check_dual_feasibility(const model::CanonicalModel& mode
             }
         }
         double rc_indep = (j < c.size() ? c[j] : 0.0) - yTa_j;
+
+        if (!rc.empty()) {
+            double rc_mismatch = std::abs(rc[j] - rc_indep) - tol;
+            if (rc_mismatch > 0.0 && rc_mismatch > max_viol) {
+                max_viol = rc_mismatch;
+                worst = j;
+            }
+        }
 
         const auto& var = model.variable(static_cast<model::VarId>(j));
         const double xj = j < x.size() ? x[j] : 0.0;

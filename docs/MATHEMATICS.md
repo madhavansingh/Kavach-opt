@@ -1266,3 +1266,26 @@ When the CLI flag `--explain-strategy` or `--json` is supplied, Kavach-Opt emits
 > **Design Principle**
 > Every solver decision is fully traceable and explainable. No black-box machine learning models or probabilistic heuristics are permitted to influence algorithm selection, guaranteeing 100% deterministic reproducibility across platforms and runs.
 
+---
+
+## 16. Presolve Optimality Certificate Reconstruction (Postsolve)
+
+When `Presolver::apply` transforms an original linear program $\mathcal{P}_{\text{orig}} = (A, b, c, l, u, \sigma)$ through $T$ atomic reductions into $\mathcal{P}_{\text{red}} = (\tilde{A}, \tilde{b}, \tilde{c}, \tilde{l}, \tilde{u}, \sigma)$, `ReconstructionMap::restore_certificate` maps the terminal certificate $(\tilde{x}, \tilde{y}, \tilde{r})$ back into the original coordinate space $(x, y, r, z^*) \in \mathbb{R}^n \times \mathbb{R}^m \times \mathbb{R}^n \times \mathbb{R}$ via a reverse postsolve walk ($t = T-1, \dots, 0$):
+
+1. **Terminal Embedding ($t = T$):**
+   $$
+   y_i = \begin{cases} \tilde{y}_{\pi_{\text{row}}(i)} & \text{if row } i \text{ is retained} \\ 0 & \text{otherwise} \end{cases}, \qquad r = c^{\text{orig}} - A^T y
+   $$
+2. **Reverse Atomic Rules ($t = T-1 \to 0$):**
+   - **`FIXED_VARIABLE` ($x_j = \bar{x}_j$):** $x_j \leftarrow \bar{x}_j$, $r_j \leftarrow c_j^{(t-1)} - \sum_{(i, a_{ij}) \in \mathcal{A}_j^{(t-1)}} a_{ij} y_i$.
+   - **`EMPTY_COLUMN` ($x_j = \bar{x}_j$):** $x_j \leftarrow \bar{x}_j$, $r_j \leftarrow c_j^{(t-1)}$.
+   - **`EMPTY_ROW` / `REDUNDANT_ROW`:** $y_i \leftarrow 0$.
+   - **`SINGLETON_ROW` ($a x_j \{\le, =, \ge\} \beta$):** If the bound derived from row $i$ is dual-active at step $t$ (upper bound tightened with $\sigma r_j < -\epsilon_d$ at $x_j \approx u_j^{\text{new}}$, lower bound tightened with $\sigma r_j > \epsilon_d$ at $x_j \approx l_j^{\text{new}}$, or equality), transfer dual weight onto row $i$:
+     $$
+     \Delta y_i = \frac{r_j}{a}, \qquad y_i \leftarrow y_i + \Delta y_i, \qquad r_j \leftarrow 0
+     $$
+   - **`BOUND_PROPAGATION` ($\sum_{q \in S_i} A_{iq} x_q \{\le, =, \ge\} b_i$):** If the implied bound on $x_j$ is dual-active at step $t$ and row $i$ is tight at $x$, transfer dual weight $\Delta y_i = r_j / A_{ij}$ onto row $i$ and update all columns in row $i$:
+     $$
+     y_i \leftarrow y_i + \Delta y_i, \qquad r_q \leftarrow r_q - A_{iq} \Delta y_i \quad \forall q \in S_i
+     $$
+3. **Final Stationarity Projection ($t = 0$):** $r = c^{\text{orig}} - A^{\text{orig}T} y$ and $z^* = c^{\text{orig}T} x + c_0^{\text{orig}}$.

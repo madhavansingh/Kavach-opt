@@ -26,6 +26,7 @@ struct VariableTransform {
     std::size_t z_index2{0};        ///< For FREE variables (z_k2)
     std::size_t ub_row_index{0};    ///< For BOXED variables
     std::size_t ub_slack_index{0};  ///< For BOXED variables
+    std::vector<std::pair<std::size_t, double>> fixed_terms;
 };
 
 struct RowTransform {
