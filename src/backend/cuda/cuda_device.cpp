@@ -85,6 +85,25 @@ std::string get_cuda_status_string() noexcept {
     return oss.str();
 }
 
+std::pair<std::size_t, std::size_t> get_cuda_memory_info() noexcept {
+    std::size_t free_bytes = 0;
+    std::size_t total_bytes = 0;
+    cudaError_t err = cudaMemGetInfo(&free_bytes, &total_bytes);
+    if (err != cudaSuccess) {
+        return {0, 0};
+    }
+    return {free_bytes, total_bytes};
+}
+
+bool check_cuda_memory_sufficient(std::size_t required_bytes, double safety_margin) noexcept {
+    auto [free_bytes, total_bytes] = get_cuda_memory_info();
+    if (free_bytes == 0) {
+        return false;
+    }
+    const double allowed = static_cast<double>(free_bytes) * safety_margin;
+    return static_cast<double>(required_bytes) <= allowed;
+}
+
 #else
 
 bool is_cuda_available() noexcept {
@@ -107,6 +126,14 @@ void set_cuda_device(int device_id) {
 
 std::string get_cuda_status_string() noexcept {
     return "CUDA unavailable (binary compiled in CPU-only mode)";
+}
+
+std::pair<std::size_t, std::size_t> get_cuda_memory_info() noexcept {
+    return {0, 0};
+}
+
+bool check_cuda_memory_sufficient(std::size_t, double) noexcept {
+    return false;
 }
 
 #endif

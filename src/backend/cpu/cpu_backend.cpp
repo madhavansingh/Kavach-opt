@@ -464,6 +464,312 @@ SpmvComparisonResult compare_spmv_results(std::size_t batch_size, std::size_t ou
     return result;
 }
 
+SpmvComparisonResult compare_vector_results(std::size_t total_elements, const double* ref_vec,
+                                            const double* test_vec, double abs_tol,
+                                            double rel_tol) {
+    return compare_spmv_results(1, total_elements, ref_vec, test_vec, abs_tol, rel_tol);
+}
+
+SpmvComparisonResult compare_scalar_results(std::size_t count, const double* ref_scalars,
+                                            const double* test_scalars, double abs_tol,
+                                            double rel_tol) {
+    return compare_spmv_results(1, count, ref_scalars, test_scalars, abs_tol, rel_tol);
+}
+
+void serial_batched_spmv_transpose(const numerics::CsrMatrix& A, const double* batch_x,
+                                   double* batch_y, std::size_t batch_size) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to serial_batched_spmv_transpose");
+    }
+    const std::size_t in_dim = A.rows();
+    const std::size_t out_dim = A.cols();
+    for (std::size_t k = 0; k < batch_size; ++k) {
+        A.spmv_transpose(batch_x + (k * in_dim), batch_y + (k * out_dim));
+    }
+}
+
+void parallel_batched_spmv_transpose(const numerics::CsrMatrix& A, const double* batch_x,
+                                     double* batch_y, std::size_t batch_size,
+                                     const BatchedSpmvOptions& options,
+                                     BatchedSpmvTelemetry* telemetry, ThreadPool* custom_pool) {
+    if (batch_size == 0) {
+        if (telemetry != nullptr) {
+            *telemetry = {};
+            telemetry->rows = A.rows();
+            telemetry->cols = A.cols();
+            telemetry->nonzeros = A.nonzeros();
+        }
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to parallel_batched_spmv_transpose");
+    }
+    const std::size_t in_dim = A.rows();
+    const std::size_t out_dim = A.cols();
+    if (A.rows() == 0 || A.cols() == 0) {
+        std::fill_n(batch_y, batch_size * out_dim, 0.0);
+        return;
+    }
+
+    std::size_t workers = options.num_workers;
+    if (workers == 0) {
+        workers = static_cast<std::size_t>(std::max(1u, std::thread::hardware_concurrency()));
+    }
+    const bool execute_parallel = options.run_parallel && workers > 1 && batch_size > 1;
+    const auto t_start = std::chrono::steady_clock::now();
+
+    if (!execute_parallel) {
+        serial_batched_spmv_transpose(A, batch_x, batch_y, batch_size);
+    } else {
+        std::unique_ptr<ThreadPool> local_pool;
+        ThreadPool* pool = custom_pool;
+        if (pool == nullptr) {
+            local_pool = std::make_unique<ThreadPool>(workers);
+            pool = local_pool.get();
+        }
+        pool->parallel_for_chunks(
+            batch_size, pool->worker_count(),
+            [&A, batch_x, batch_y, in_dim, out_dim](std::size_t start, std::size_t end) {
+                for (std::size_t k = start; k < end; ++k) {
+                    A.spmv_transpose(batch_x + (k * in_dim), batch_y + (k * out_dim));
+                }
+            });
+    }
+
+    const auto t_end = std::chrono::steady_clock::now();
+    const double elapsed_sec = std::chrono::duration<double>(t_end - t_start).count();
+
+    if (telemetry != nullptr) {
+        telemetry->parallel_enabled = execute_parallel;
+        telemetry->worker_count = execute_parallel ? workers : 1;
+        telemetry->batch_size = batch_size;
+        telemetry->rows = A.rows();
+        telemetry->cols = A.cols();
+        telemetry->nonzeros = A.nonzeros();
+        telemetry->parallel_time_seconds = elapsed_sec;
+    }
+}
+
+void serial_batched_csc_spmv(const numerics::CscMatrix& A, const double* batch_x, double* batch_y,
+                             std::size_t batch_size) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to serial_batched_csc_spmv");
+    }
+    const std::size_t in_dim = A.cols();
+    const std::size_t out_dim = A.rows();
+    for (std::size_t k = 0; k < batch_size; ++k) {
+        A.spmv(batch_x + (k * in_dim), batch_y + (k * out_dim));
+    }
+}
+
+void serial_batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
+                          const double* batch_x, double beta, double* batch_y) {
+    if (batch_size == 0 || n == 0) {
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to serial_batched_axpby");
+    }
+    const std::size_t total = batch_size * n;
+    for (std::size_t i = 0; i < total; ++i) {
+        batch_y[i] = alpha * batch_x[i] + beta * batch_y[i];
+    }
+}
+
+void parallel_batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
+                            const double* batch_x, double beta, double* batch_y,
+                            ThreadPool* custom_pool) {
+    if (batch_size == 0 || n == 0) {
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to parallel_batched_axpby");
+    }
+    if (batch_size == 1 || custom_pool == nullptr) {
+        serial_batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y);
+        return;
+    }
+    custom_pool->parallel_for_chunks(
+        batch_size, custom_pool->worker_count(),
+        [n, alpha, batch_x, beta, batch_y](std::size_t start, std::size_t end) {
+            for (std::size_t k = start; k < end; ++k) {
+                const double* x_k = batch_x + (k * n);
+                double* y_k = batch_y + (k * n);
+                for (std::size_t i = 0; i < n; ++i) {
+                    y_k[i] = alpha * x_k[i] + beta * y_k[i];
+                }
+            }
+        });
+}
+
+void serial_batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
+                        const double* batch_y, double* results) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in serial_batched_dot");
+    }
+    if (n == 0) {
+        std::fill_n(results, batch_size, 0.0);
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to serial_batched_dot");
+    }
+    for (std::size_t k = 0; k < batch_size; ++k) {
+        const double* x_k = batch_x + (k * n);
+        const double* y_k = batch_y + (k * n);
+        double sum = 0.0;
+        for (std::size_t i = 0; i < n; ++i) {
+            sum += x_k[i] * y_k[i];
+        }
+        results[k] = sum;
+    }
+}
+
+void parallel_batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
+                          const double* batch_y, double* results, ThreadPool* custom_pool) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in parallel_batched_dot");
+    }
+    if (batch_size == 1 || custom_pool == nullptr || n == 0) {
+        serial_batched_dot(batch_size, n, batch_x, batch_y, results);
+        return;
+    }
+    if (batch_x == nullptr || batch_y == nullptr) {
+        throw core::InputException("Null pointer passed to parallel_batched_dot");
+    }
+    custom_pool->parallel_for_chunks(
+        batch_size, custom_pool->worker_count(),
+        [n, batch_x, batch_y, results](std::size_t start, std::size_t end) {
+            for (std::size_t k = start; k < end; ++k) {
+                const double* x_k = batch_x + (k * n);
+                const double* y_k = batch_y + (k * n);
+                double sum = 0.0;
+                for (std::size_t i = 0; i < n; ++i) {
+                    sum += x_k[i] * y_k[i];
+                }
+                results[k] = sum;
+            }
+        });
+}
+
+void serial_batched_l2_norm(std::size_t batch_size, std::size_t n, const double* batch_x,
+                            double* results) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in serial_batched_l2_norm");
+    }
+    if (n == 0) {
+        std::fill_n(results, batch_size, 0.0);
+        return;
+    }
+    if (batch_x == nullptr) {
+        throw core::InputException("Null pointer for batch_x in serial_batched_l2_norm");
+    }
+    for (std::size_t k = 0; k < batch_size; ++k) {
+        const double* x_k = batch_x + (k * n);
+        double sum = 0.0;
+        for (std::size_t i = 0; i < n; ++i) {
+            sum += x_k[i] * x_k[i];
+        }
+        results[k] = std::sqrt(sum);
+    }
+}
+
+void parallel_batched_l2_norm(std::size_t batch_size, std::size_t n, const double* batch_x,
+                              double* results, ThreadPool* custom_pool) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in parallel_batched_l2_norm");
+    }
+    if (batch_size == 1 || custom_pool == nullptr || n == 0) {
+        serial_batched_l2_norm(batch_size, n, batch_x, results);
+        return;
+    }
+    if (batch_x == nullptr) {
+        throw core::InputException("Null pointer for batch_x in parallel_batched_l2_norm");
+    }
+    custom_pool->parallel_for_chunks(batch_size, custom_pool->worker_count(),
+                                     [n, batch_x, results](std::size_t start, std::size_t end) {
+                                         for (std::size_t k = start; k < end; ++k) {
+                                             const double* x_k = batch_x + (k * n);
+                                             double sum = 0.0;
+                                             for (std::size_t i = 0; i < n; ++i) {
+                                                 sum += x_k[i] * x_k[i];
+                                             }
+                                             results[k] = std::sqrt(sum);
+                                         }
+                                     });
+}
+
+void serial_batched_linf_norm(std::size_t batch_size, std::size_t n, const double* batch_x,
+                              double* results) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in serial_batched_linf_norm");
+    }
+    if (n == 0) {
+        std::fill_n(results, batch_size, 0.0);
+        return;
+    }
+    if (batch_x == nullptr) {
+        throw core::InputException("Null pointer for batch_x in serial_batched_linf_norm");
+    }
+    for (std::size_t k = 0; k < batch_size; ++k) {
+        const double* x_k = batch_x + (k * n);
+        double max_val = 0.0;
+        for (std::size_t i = 0; i < n; ++i) {
+            max_val = std::max(max_val, std::abs(x_k[i]));
+        }
+        results[k] = max_val;
+    }
+}
+
+void parallel_batched_linf_norm(std::size_t batch_size, std::size_t n, const double* batch_x,
+                                double* results, ThreadPool* custom_pool) {
+    if (batch_size == 0) {
+        return;
+    }
+    if (results == nullptr) {
+        throw core::InputException("Null pointer for results in parallel_batched_linf_norm");
+    }
+    if (batch_size == 1 || custom_pool == nullptr || n == 0) {
+        serial_batched_linf_norm(batch_size, n, batch_x, results);
+        return;
+    }
+    if (batch_x == nullptr) {
+        throw core::InputException("Null pointer for batch_x in parallel_batched_linf_norm");
+    }
+    custom_pool->parallel_for_chunks(batch_size, custom_pool->worker_count(),
+                                     [n, batch_x, results](std::size_t start, std::size_t end) {
+                                         for (std::size_t k = start; k < end; ++k) {
+                                             const double* x_k = batch_x + (k * n);
+                                             double max_val = 0.0;
+                                             for (std::size_t i = 0; i < n; ++i) {
+                                                 max_val = std::max(max_val, std::abs(x_k[i]));
+                                             }
+                                             results[k] = max_val;
+                                         }
+                                     });
+}
+
 // ============================================================================
 // CpuSequentialBackend Implementation
 // ============================================================================
@@ -494,6 +800,39 @@ void CpuSequentialBackend::batched_spmv(const numerics::CsrMatrix& A, const doub
     BatchedSpmvOptions opts = options;
     opts.run_parallel = false;
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts);
+}
+
+void CpuSequentialBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
+                                                  const double* batch_x, double* batch_y,
+                                                  std::size_t batch_size,
+                                                  const BatchedSpmvOptions&) {
+    serial_batched_spmv_transpose(A, batch_x, batch_y, batch_size);
+}
+
+void CpuSequentialBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* batch_x,
+                                            double* batch_y, std::size_t batch_size,
+                                            const BatchedSpmvOptions&) {
+    serial_batched_csc_spmv(A, batch_x, batch_y, batch_size);
+}
+
+void CpuSequentialBackend::batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
+                                         const double* batch_x, double beta, double* batch_y) {
+    serial_batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y);
+}
+
+void CpuSequentialBackend::batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
+                                       const double* batch_y, double* results) {
+    serial_batched_dot(batch_size, n, batch_x, batch_y, results);
+}
+
+void CpuSequentialBackend::batched_l2_norm(std::size_t batch_size, std::size_t n,
+                                           const double* batch_x, double* results) {
+    serial_batched_l2_norm(batch_size, n, batch_x, results);
+}
+
+void CpuSequentialBackend::batched_linf_norm(std::size_t batch_size, std::size_t n,
+                                             const double* batch_x, double* results) {
+    serial_batched_linf_norm(batch_size, n, batch_x, results);
 }
 
 // ============================================================================
@@ -541,6 +880,49 @@ void CpuMulticoreBackend::batched_spmv(const numerics::CsrMatrix& A, const doubl
     }
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
                           thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
+                                                 const double* batch_x, double* batch_y,
+                                                 std::size_t batch_size,
+                                                 const BatchedSpmvOptions& options) {
+    BatchedSpmvOptions opts = options;
+    if (opts.num_workers == 0) {
+        opts.num_workers = worker_count();
+    }
+    parallel_batched_spmv_transpose(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
+                                    thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* batch_x,
+                                           double* batch_y, std::size_t batch_size,
+                                           const BatchedSpmvOptions& options) {
+    BatchedSpmvOptions opts = options;
+    if (opts.num_workers == 0) {
+        opts.num_workers = worker_count();
+    }
+    parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
+                          thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
+                                        const double* batch_x, double beta, double* batch_y) {
+    parallel_batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y, thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
+                                      const double* batch_y, double* results) {
+    parallel_batched_dot(batch_size, n, batch_x, batch_y, results, thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_l2_norm(std::size_t batch_size, std::size_t n,
+                                          const double* batch_x, double* results) {
+    parallel_batched_l2_norm(batch_size, n, batch_x, results, thread_pool_.get());
+}
+
+void CpuMulticoreBackend::batched_linf_norm(std::size_t batch_size, std::size_t n,
+                                            const double* batch_x, double* results) {
+    parallel_batched_linf_norm(batch_size, n, batch_x, results, thread_pool_.get());
 }
 
 }  // namespace kavach::backend::cpu

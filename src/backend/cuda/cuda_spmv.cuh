@@ -47,6 +47,51 @@ void cuda_batched_csr_spmv_int(std::size_t batch_size, std::size_t rows, std::si
                                const int* h_col_idx, const double* h_batch_x, double* h_batch_y,
                                int device_id = 0, CudaSpmvExecutionTimes* timings = nullptr);
 
+/**
+ * @brief Executes batched CSR Transpose SpMV on CUDA device: Y_k = A^T * X_k.
+ */
+void cuda_batched_csr_transpose_spmv(std::size_t batch_size, std::size_t rows, std::size_t cols,
+                                     std::size_t nnz, const double* h_values,
+                                     const std::size_t* h_row_ptr, const std::size_t* h_col_idx,
+                                     const double* h_batch_x, double* h_batch_y, int device_id = 0,
+                                     CudaSpmvExecutionTimes* timings = nullptr);
+
+/**
+ * @brief Executes batched CSC SpMV directly on CUDA device: Y_k = A * X_k.
+ */
+void cuda_batched_csc_spmv(std::size_t batch_size, std::size_t rows, std::size_t cols,
+                           std::size_t nnz, const double* h_values, const std::size_t* h_col_ptr,
+                           const std::size_t* h_row_idx, const double* h_batch_x, double* h_batch_y,
+                           int device_id = 0, CudaSpmvExecutionTimes* timings = nullptr);
+
+/**
+ * @brief Executes batched vector AXPBY on CUDA device: Y_k = alpha * X_k + beta * Y_k.
+ */
+void cuda_batched_axpby(std::size_t batch_size, std::size_t n, double alpha, const double* h_x,
+                        double beta, double* h_y, int device_id = 0,
+                        CudaSpmvExecutionTimes* timings = nullptr);
+
+/**
+ * @brief Executes batched vector dot product on CUDA device: results[k] = X_k^T * Y_k.
+ */
+void cuda_batched_dot(std::size_t batch_size, std::size_t n, const double* h_x, const double* h_y,
+                      double* h_results, int device_id = 0,
+                      CudaSpmvExecutionTimes* timings = nullptr);
+
+/**
+ * @brief Executes batched vector L2 norm on CUDA device: results[k] = ||X_k||_2.
+ */
+void cuda_batched_l2_norm(std::size_t batch_size, std::size_t n, const double* h_x,
+                          double* h_results, int device_id = 0,
+                          CudaSpmvExecutionTimes* timings = nullptr);
+
+/**
+ * @brief Executes batched vector Linf norm on CUDA device: results[k] = ||X_k||_inf.
+ */
+void cuda_batched_linf_norm(std::size_t batch_size, std::size_t n, const double* h_x,
+                            double* h_results, int device_id = 0,
+                            CudaSpmvExecutionTimes* timings = nullptr);
+
 #endif
 
 }  // namespace kavach::backend::cuda

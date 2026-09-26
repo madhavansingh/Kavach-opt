@@ -53,4 +53,38 @@ void set_cuda_device(int device_id);
  */
 [[nodiscard]] std::string get_cuda_status_string() noexcept;
 
+/**
+ * @brief Query currently free and total global memory in bytes on the active CUDA device.
+ * @return Pair of {free_bytes, total_bytes}. Returns {0, 0} if CUDA is unavailable.
+ */
+[[nodiscard]] std::pair<std::size_t, std::size_t> get_cuda_memory_info() noexcept;
+
+/**
+ * @brief Checks if CUDA device has sufficient free memory with safety headroom.
+ * @param required_bytes Total memory required by the operation
+ * @param safety_margin Fractional headroom required (default 0.85)
+ */
+[[nodiscard]] bool check_cuda_memory_sufficient(std::size_t required_bytes,
+                                                double safety_margin = 0.85) noexcept;
+
+/**
+ * @brief Estimate device memory required for batched CSR/CSC SpMV.
+ */
+[[nodiscard]] constexpr std::size_t estimate_spmv_memory_bytes(std::size_t batch_size,
+                                                               std::size_t rows, std::size_t cols,
+                                                               std::size_t nnz) noexcept {
+    return (nnz * sizeof(double)) + ((rows + 1) * sizeof(std::size_t)) +
+           (nnz * sizeof(std::size_t)) + (batch_size * cols * sizeof(double)) +
+           (batch_size * rows * sizeof(double));
+}
+
+/**
+ * @brief Estimate device memory required for batched vector operation.
+ */
+[[nodiscard]] constexpr std::size_t estimate_vector_memory_bytes(
+    std::size_t batch_size, std::size_t n, std::size_t num_vectors,
+    std::size_t num_scalars = 0) noexcept {
+    return (batch_size * n * num_vectors * sizeof(double)) + (num_scalars * sizeof(double));
+}
+
 }  // namespace kavach::backend::cuda

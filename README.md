@@ -8,7 +8,7 @@ SIH26119 · Smart India Hackathon · MRPL Industrial Application
 ```
 Kavach-Opt v0.1.0
 Build: C++20 Release · AppleClang
-337 / 337 unit tests passing
+375 / 375 unit tests passing
 13 / 13 Netlib LP instances: OPTIMAL, independently verified
 ```
 
@@ -17,15 +17,16 @@ Build: C++20 Release · AppleClang
 ## Overview
 
 Kavach-Opt is a from-scratch mathematical optimization engine written in C++20. It solves
-Linear Programming (LP), Mixed-Integer Linear Programming (MILP), and Convex Quadratic
-Programming (QP) problems from first principles.
+Linear Programming (LP), Mixed-Integer Linear Programming (MILP), Convex Quadratic
+Programming (QP), and Convex Mixed-Integer Quadratic Programming (MIQP) problems from first principles.
 
 The solver is designed for sparse, constrained optimization problems in industrial and
 engineering contexts. It provides independent mathematical verification of every solution
 it produces, sparse numerical kernels with Markowitz-pivot LU factorization, a
 deterministic rule-based solver strategy engine, multicore CPU parallelism for batched
-sparse matrix-vector operations, a scoped CUDA kernel for GPU-accelerated batched SpMV
-with automatic CPU fallback, and an ergonomic command-line interface and C++ API.
+sparse matrix-vector operations, a sovereign CUDA numerical kernel suite (batched CSR/CSC/Transpose
+SpMV, vector AXPBY, dot product, L2/Linf norm) with automatic CPU fallback and memory safety,
+and an ergonomic command-line interface and C++ API.
 
 The solver's correctness is certified by an independent verification layer that re-derives
 all optimality conditions from first principles, without reusing any solver-internal
@@ -51,8 +52,8 @@ deployed without foreign license constraints.
 Kavach-Opt implements a complete, self-contained optimization engine:
 
 - **No foreign solver dependencies in the solving path.** Every algorithm — LP simplex,
-  MILP branch-and-bound, QP active-set, sparse LU factorization, presolve, scaling,
-  verification — is written from scratch in standard C++20.
+  MILP branch-and-cut, QP active-set, MIQP branch-and-bound, sparse LU factorization, presolve,
+  scaling, verification — is written from scratch in standard C++20.
 - **Independent mathematical verification.** A decoupled verification layer certifies
   primal feasibility, dual feasibility, complementary slackness, integrality, and KKT
   conditions from elementary arithmetic, without calling any solver routine.
@@ -61,7 +62,7 @@ Kavach-Opt implements a complete, self-contained optimization engine:
   serialisable to human-readable JSON with step-by-step English rationale.
 - **Empirically validated on standard corpora.** All 13 tested Netlib LP instances are
   solved to OPTIMAL and independently verified. MILP infeasibility is correctly detected.
-  QP KKT conditions are certified.
+  QP KKT conditions are certified. MIQP integer-quadratic solutions are verified.
 
 ---
 
@@ -75,7 +76,7 @@ Kavach-Opt implements a complete, self-contained optimization engine:
 | R-MIQP-001 | Convex MIQP solver | Branch-and-Bound with Active-Set QP relaxations (`src/algorithms/miqp/`) | ✓ Verified |
 | R-NUM-001 | Sparse numerics | CSR/CSC, SparseLU, Ruiz scaling (`src/numerics/`) | ✓ Verified |
 | R-VER-001 | Independent verification | Zero-trust verifier (`src/verification/`) | ✓ Verified |
-| R-GPU-001 | Scoped GPU acceleration | CUDA batched SpMV (`src/backend/cuda/`) | ✓ Verified |
+| R-GPU-001 | Expanded GPU numerical acceleration | CUDA numerical suite: CSR/CSC/Transpose SpMV, AXPBY, dot, L2/Linf norm (`src/backend/cuda/`) | ✓ Verified |
 | R-PAR-001 | Multicore CPU execution | C++20 thread pool (`src/backend/cpu/`) | ✓ Verified |
 | R-STR-001 | Deterministic strategy | 18-rule engine (`src/strategy/`) | ✓ Verified |
 | R-SOV-001 | Sovereignty audit | Dependency check (`tools/check_dependencies.py`) | ✓ Verified |

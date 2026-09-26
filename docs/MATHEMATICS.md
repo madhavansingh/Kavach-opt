@@ -1022,64 +1022,100 @@ The verifier maps check results to a certified status:
 
 ---
 
-## 12. Batched Sparse Matrix-Vector Multiplication
+## 12. Batched Sparse & Vector Numerical Kernel Suite
 
-### 12.1 Operation Definition
+### 12.1 Mathematical Operation Definitions
 
-Batched SpMV computes $B$ independent products in parallel:
+Kavach-Opt provides a sovereign suite of seven high-throughput numerical operations accelerated across CPU sequential, CPU multicore, and CUDA backends:
 
-$$
-Y_k = A X_k \quad \text{for } k = 0, \dots, B - 1
-$$
-
-where $A \in \mathbb{R}^{m \times n}$ is a fixed sparse CSR matrix, and $X_k, Y_k$ are dense vectors of dimensions $n$ and $m$ respectively. All vectors are stored contiguously:
-
-$$
-X = [X_0 \mid X_1 \mid \dots \mid X_{B-1}] \in \mathbb{R}^{B \cdot n}, \quad Y = [Y_0 \mid Y_1 \mid \dots \mid Y_{B-1}] \in \mathbb{R}^{B \cdot m}
-$$
+1. **Batched CSR SpMV:**
+   $$
+   Y_k = A X_k \quad \text{for } k = 0, \dots, B - 1, \quad A \in \mathbb{R}^{m \times n} \text{ (CSR)}
+   $$
+2. **Batched CSR Transpose SpMV:**
+   $$
+   Y_k = A^T X_k \quad \text{for } k = 0, \dots, B - 1, \quad X_k \in \mathbb{R}^m, \; Y_k \in \mathbb{R}^n
+   $$
+3. **Batched CSC SpMV:**
+   $$
+   Y_k = A X_k \quad \text{for } k = 0, \dots, B - 1, \quad A \in \mathbb{R}^{m \times n} \text{ (CSC)}
+   $$
+4. **Batched Vector AXPBY:**
+   $$
+   Y_k \leftarrow \alpha X_k + \beta Y_k \quad \text{for } k = 0, \dots, B - 1, \quad X_k, Y_k \in \mathbb{R}^n
+   $$
+5. **Batched Dot Product:**
+   $$
+   s_k = X_k^T Y_k = \sum_{i=0}^{n-1} X_{k,i} Y_{k,i} \quad \text{for } k = 0, \dots, B - 1
+   $$
+6. **Batched $L_2$ Euclidean Norm:**
+   $$
+   s_k = \|X_k\|_2 = \sqrt{\sum_{i=0}^{n-1} X_{k,i}^2} \quad \text{for } k = 0, \dots, B - 1
+   $$
+7. **Batched $L_\infty$ Maximum Norm:**
+   $$
+   s_k = \|X_k\|_\infty = \max_{0 \le i < n} |X_{k,i}| \quad \text{for } k = 0, \dots, B - 1
+   $$
 
 ### 12.2 CPU Thread-Pool Partition
 
-For $B$ batch items and $W$ workers, the effective partition count is $P = \min(W, B)$. Worker $w \in \{0, \dots, P-1\}$ is assigned the batch slice:
+For $B$ batch items and $W$ workers, the partition count is $P = \min(W, B)$. Worker $w \in \{0, \dots, P-1\}$ is assigned the contiguous batch slice:
 
 $$
 \text{start}_w = \left\lfloor \frac{w \cdot B}{P} \right\rfloor, \quad \text{end}_w = \left\lfloor \frac{(w+1) \cdot B}{P} \right\rfloor
 $$
 
-This formula guarantees exact coverage $\bigcup_{w} [\text{start}_w, \text{end}_w) = [0, B)$, disjoint intervals (no false sharing on output), and load imbalance of at most 1 item across workers.
+This guarantees exact coverage $\bigcup_{w} [\text{start}_w, \text{end}_w) = [0, B)$, zero false sharing on output arrays, and load imbalance of at most 1 item across workers.
 
-### 12.3 CUDA Kernel
+### 12.3 CUDA Numerical Kernel Suite & Reduction Order Mathematics
 
-When CUDA hardware is available and eligible (Rule R013), a sovereign double-precision CSR kernel accelerates the operation. Total work items $N_{\text{total}} = B \times m$ are distributed across CUDA blocks of 256 threads:
+When CUDA hardware is available and eligible (Rule R013), sovereign double-precision kernels accelerate these operations.
 
-- Grid dimension: $\lceil N_{\text{total}} / 256 \rceil$ blocks.
-- Thread-to-work mapping: $k = \lfloor \text{global\_idx} / m \rfloor$ (batch index), $r = \text{global\_idx} \bmod m$ (row index).
-- Each thread accumulates $Y_k[r] = \sum_{j=\text{row\_ptr}[r]}^{\text{row\_ptr}[r+1]-1} \text{values}[j] \cdot X_k[\text{col\_idx}[j]]$.
+#### Floating-Point Reduction Order
+Floating-point addition in IEEE 754 arithmetic is commutative but non-associative: $(a + b) + c \ne a + (b + c)$. Sequential evaluation on CPU sums items in index order:
+$$
+S_{\text{seq}} = (((x_0 + x_1) + x_2) + \dots)
+$$
+whereas parallel GPU reduction uses a binary tree with $O(\log n)$ depth:
+$$
+S_{\text{GPU}} = \sum_{\text{tree}} x_i
+$$
+The difference is strictly bounded by $O(\epsilon_{\text{mach}} \cdot \log n \cdot \|x\|_1)$. Consequently:
+- **$L_\infty$ Norm:** The $\max$ operator on floating-point absolute values is both associative and commutative. GPU and CPU $L_\infty$ norms are bitwise identical ($\epsilon = 0$).
+- **Sum-based Reductions (Dot Product, $L_2$ Norm, SpMV):** Governed by the reduction tolerance policy:
+  $$
+  |s_{\text{GPU}} - s_{\text{CPU}}| \le \epsilon_{\text{abs}} + \epsilon_{\text{rel}} \cdot \max(1.0, |s_{\text{CPU}}|)
+  $$
+  with $\epsilon_{\text{abs}} = 10^{-12}$ and $\epsilon_{\text{rel}} = 10^{-10}$.
 
-There are no atomics and no shared output elements; correctness is guaranteed by construction.
+### 12.4 Device Memory Safety Pre-Allocation Bound
 
-> [!IMPORTANT]
-> All solver algorithms — Revised Simplex, SparseLU factorization, Branch-and-Bound, and the active-set QP method — execute entirely on the CPU. The CUDA kernel is scoped exclusively to batched CSR SpMV.
+Before launching any GPU kernel, Kavach-Opt estimates the required device memory $M_{\text{est}}$ and queries available VRAM:
 
-### 12.4 Transfer-Inclusive GPU Timing Policy
+$$
+M_{\text{est}}^{\text{SpMV}} = (2 \cdot \text{nnz} + m + 1) \cdot 8 + B \cdot (m + n) \cdot 8 \quad \text{bytes}
+$$
+$$
+M_{\text{est}}^{\text{vec}} = B \cdot n \cdot (\text{num\_vectors}) \cdot 8 + B \cdot (\text{num\_scalars}) \cdot 8 \quad \text{bytes}
+$$
 
-All GPU performance measurements must include host-to-device and device-to-host transfer time:
+Execution is dispatched to GPU only if:
+
+$$
+M_{\text{est}} \le 0.85 \cdot M_{\text{free}}
+$$
+
+If $M_{\text{est}} > 0.85 \cdot M_{\text{free}}$, or if CUDA is unavailable, execution safely and deterministically routes to `CpuMulticoreBackend` without driver allocation faults.
+
+### 12.5 Transfer-Inclusive GPU Timing Policy
+
+All GPU performance measurements include host-to-device and device-to-host transfer time:
 
 $$
 T_{\text{GPU}} = T_{\text{H2D}} + T_{\text{kernel}} + T_{\text{D2H}}
 $$
 
-The kernel-only time $T_{\text{kernel}}$ is recorded as a diagnostic metric to quantify PCIe overhead but is never cited as the operative speedup figure. The GPU execution path is only selected when Rule R013 confirms that empirical crossover data exists for $B \ge 128$ and $\text{nnz} \ge 10{,}000$.
-
-### 12.5 GPU Eligibility and Fallback
-
-GPU execution requires all of the following (Rule R013):
-
-1. A CUDA-capable device is present at runtime.
-2. The `--no-gpu` flag is not set (Rule R011).
-3. Empirical crossover data confirms $B \ge 128$ and $\text{nnz} \ge 10{,}000$.
-
-If any condition fails, computation falls back to `CpuMulticoreBackend` transparently.
+The kernel-only time $T_{\text{kernel}}$ is recorded purely as a diagnostic metric to quantify PCIe transfer overhead. The GPU execution path is selected only when Rule R013 confirms that empirical crossover data exists for $B \ge 128$ and ($\text{nnz} \ge 10{,}000$ or $N \ge 100{,}000$).
 
 ---
 

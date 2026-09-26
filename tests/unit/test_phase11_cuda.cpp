@@ -8,6 +8,7 @@
 #include "backend/cpu/cpu_backend.hpp"
 #include "backend/cuda/cuda_backend.hpp"
 #include "backend/cuda/cuda_device.hpp"
+#include "backend/cuda/cuda_kernel_registry.hpp"
 #include "backend/cuda/cuda_spmv.cuh"
 #include "backend/execution_backend.hpp"
 #include "core/error.hpp"
@@ -530,4 +531,264 @@ KAVACH_TEST(test_cuda_crossover_sweep_and_telemetry) {
     }
     std::cout << "================================================================================="
                  "=====\n";
+}
+
+// Test: CUDA Kernel Registry Descriptors
+KAVACH_TEST(test_cuda_kernel_registry) {
+    const auto& kernels = CudaKernelRegistry::get_all_kernels();
+    KAVACH_ASSERT_EQUAL(kernels.size(), 7);
+
+    const auto* spmv_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_CSR_SPMV);
+    KAVACH_ASSERT(spmv_desc != nullptr);
+    KAVACH_ASSERT_EQUAL(spmv_desc->name, "cuda_batched_csr_spmv");
+    KAVACH_ASSERT_EQUAL(spmv_desc->precision, "FP64 (double)");
+    KAVACH_ASSERT_EQUAL(spmv_desc->default_block_size, 256);
+
+    const auto* transpose_desc =
+        CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_CSR_TRANSPOSE_SPMV);
+    KAVACH_ASSERT(transpose_desc != nullptr);
+    KAVACH_ASSERT_EQUAL(transpose_desc->name, "cuda_batched_csr_transpose_spmv");
+
+    const auto* csc_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_CSC_SPMV);
+    KAVACH_ASSERT(csc_desc != nullptr);
+    KAVACH_ASSERT_EQUAL(csc_desc->name, "cuda_batched_csc_spmv");
+
+    const auto* axpby_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_AXPBY);
+    KAVACH_ASSERT(axpby_desc != nullptr);
+
+    const auto* dot_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_DOT);
+    KAVACH_ASSERT(dot_desc != nullptr);
+
+    const auto* l2_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_L2_NORM);
+    KAVACH_ASSERT(l2_desc != nullptr);
+
+    const auto* linf_desc = CudaKernelRegistry::find_kernel(CudaKernelId::BATCHED_LINF_NORM);
+    KAVACH_ASSERT(linf_desc != nullptr);
+}
+
+// Test: Memory Estimation and Safety Checks
+KAVACH_TEST(test_cuda_memory_estimation_and_safety) {
+    // SpMV memory estimation
+    const std::size_t rows = 500;
+    const std::size_t cols = 600;
+    const std::size_t nnz = 8000;
+    const std::size_t batch = 128;
+    const std::size_t est_bytes = estimate_spmv_memory_bytes(batch, rows, cols, nnz);
+
+    // values: 8000*8 = 64,000
+    // row_ptr: 501*8 = 4,008
+    // col_idx: 8000*8 = 64,000
+    // batch_x: 128*600*8 = 614,400
+    // batch_y: 128*500*8 = 512,000
+    // total = 1,258,408 bytes (~1.2 MB)
+    KAVACH_ASSERT(est_bytes > 1000000);
+    KAVACH_ASSERT(est_bytes < 2000000);
+
+    // Vector memory estimation
+    const std::size_t vec_est = estimate_vector_memory_bytes(128, 1000, 2, 128);
+    KAVACH_ASSERT_EQUAL(vec_est, (128 * 1000 * 2 * 8) + (128 * 8));
+
+    // Memory query on host
+    auto [free_b, tot_b] = get_cuda_memory_info();
+    if (!is_cuda_available()) {
+        KAVACH_ASSERT_EQUAL(free_b, 0);
+        KAVACH_ASSERT_EQUAL(tot_b, 0);
+        KAVACH_ASSERT(!check_cuda_memory_sufficient(1024));
+    }
+}
+
+// Test: Batched Transpose SpMV Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_transpose_spmv) {
+    const std::size_t rows = 20;
+    const std::size_t cols = 30;
+    const std::size_t batch_size = 16;
+
+    CsrMatrix A = create_test_csr(rows, cols, 0.4, 28001);
+    std::vector<double> X = create_test_batch(batch_size, rows, 28002);
+    std::vector<double> Y_ref(batch_size * cols, 0.0);
+    std::vector<double> Y_cuda(batch_size * cols, 0.0);
+
+    serial_batched_spmv_transpose(A, X.data(), Y_ref.data(), batch_size);
+
+    CudaBackend backend;
+    backend.batched_spmv_transpose(A, X.data(), Y_cuda.data(), batch_size);
+
+    auto cmp = compare_spmv_results(batch_size, cols, Y_ref.data(), Y_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.rows, cols);
+    KAVACH_ASSERT_EQUAL(tel.cols, rows);
+    KAVACH_ASSERT_EQUAL(tel.batch_size, batch_size);
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_csr_transpose_spmv");
+    KAVACH_ASSERT_EQUAL(tel.dispatch_decision.requested, BackendType::CUDA_GPU);
+}
+
+// Test: Batched CSC SpMV Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_csc_spmv) {
+    const std::size_t rows = 25;
+    const std::size_t cols = 20;
+    const std::size_t batch_size = 18;
+
+    CsrMatrix csr = create_test_csr(rows, cols, 0.35, 29001);
+    std::vector<Triplet> triplets;
+    for (std::size_t r = 0; r < rows; ++r) {
+        const std::size_t start = csr.row_start(r);
+        const std::size_t end = csr.row_end(r);
+        const auto* cols_ptr = csr.row_indices(r);
+        const auto* vals_ptr = csr.row_values(r);
+        for (std::size_t k = 0; k < end - start; ++k) {
+            triplets.push_back({r, cols_ptr[k], vals_ptr[k]});
+        }
+    }
+    CscMatrix csc = CscMatrix::from_triplets(rows, cols, triplets);
+
+    std::vector<double> X = create_test_batch(batch_size, cols, 29002);
+    std::vector<double> Y_ref(batch_size * rows, 0.0);
+    std::vector<double> Y_cuda(batch_size * rows, 0.0);
+
+    serial_batched_csc_spmv(csc, X.data(), Y_ref.data(), batch_size);
+
+    CudaBackend backend;
+    backend.batched_csc_spmv(csc, X.data(), Y_cuda.data(), batch_size);
+
+    auto cmp = compare_spmv_results(batch_size, rows, Y_ref.data(), Y_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.rows, rows);
+    KAVACH_ASSERT_EQUAL(tel.cols, cols);
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_csc_spmv");
+}
+
+// Test: Batched AXPBY Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_axpby) {
+    const std::size_t batch_size = 32;
+    const std::size_t n = 64;
+    const std::size_t total = batch_size * n;
+    const double alpha = 3.14;
+    const double beta = -2.71;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 30001);
+    std::vector<double> Y_ref = create_test_batch(batch_size, n, 30002);
+    std::vector<double> Y_cuda = Y_ref;
+
+    serial_batched_axpby(batch_size, n, alpha, X.data(), beta, Y_ref.data());
+
+    CudaBackend backend;
+    backend.batched_axpby(batch_size, n, alpha, X.data(), beta, Y_cuda.data());
+
+    auto cmp = compare_vector_results(total, Y_ref.data(), Y_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_axpby");
+    KAVACH_ASSERT_EQUAL(tel.batch_size, batch_size);
+}
+
+// Test: Batched Dot Product Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_dot) {
+    const std::size_t batch_size = 40;
+    const std::size_t n = 100;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 31001);
+    std::vector<double> Y = create_test_batch(batch_size, n, 31002);
+    std::vector<double> dots_ref(batch_size, 0.0);
+    std::vector<double> dots_cuda(batch_size, 0.0);
+
+    serial_batched_dot(batch_size, n, X.data(), Y.data(), dots_ref.data());
+
+    CudaBackend backend;
+    backend.batched_dot(batch_size, n, X.data(), Y.data(), dots_cuda.data());
+
+    auto cmp = compare_scalar_results(batch_size, dots_ref.data(), dots_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-13);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_dot");
+}
+
+// Test: Batched L2 Norm Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_l2_norm) {
+    const std::size_t batch_size = 36;
+    const std::size_t n = 80;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 32001);
+    std::vector<double> norms_ref(batch_size, 0.0);
+    std::vector<double> norms_cuda(batch_size, 0.0);
+
+    serial_batched_l2_norm(batch_size, n, X.data(), norms_ref.data());
+
+    CudaBackend backend;
+    backend.batched_l2_norm(batch_size, n, X.data(), norms_cuda.data());
+
+    auto cmp = compare_scalar_results(batch_size, norms_ref.data(), norms_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-13);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_l2_norm");
+}
+
+// Test: Batched Linf Norm Execution and Equivalence
+KAVACH_TEST(test_cuda_batched_linf_norm) {
+    const std::size_t batch_size = 45;
+    const std::size_t n = 90;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 33001);
+    std::vector<double> norms_ref(batch_size, 0.0);
+    std::vector<double> norms_cuda(batch_size, 0.0);
+
+    serial_batched_linf_norm(batch_size, n, X.data(), norms_ref.data());
+
+    CudaBackend backend;
+    backend.batched_linf_norm(batch_size, n, X.data(), norms_cuda.data());
+
+    auto cmp = compare_scalar_results(batch_size, norms_ref.data(), norms_cuda.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-15);
+
+    const auto& tel = backend.last_telemetry();
+    KAVACH_ASSERT_EQUAL(tel.kernel_name, "cuda_batched_linf_norm");
+}
+
+// Test: Strict GPU Failure on Expanded Kernels
+KAVACH_TEST(test_cuda_strict_gpu_failure_expanded) {
+    CudaBackendOptions opts;
+    opts.strict_gpu = true;
+    opts.force_cpu_fallback = true;
+    CudaBackend backend(opts);
+
+    CsrMatrix A = create_test_csr(10, 15, 0.3, 34001);
+    std::vector<double> X(4 * 10, 1.0);
+    std::vector<double> Y(4 * 15, 0.0);
+
+    bool caught_transpose = false;
+    try {
+        backend.batched_spmv_transpose(A, X.data(), Y.data(), 4);
+    } catch (const core::NumericalException&) {
+        caught_transpose = true;
+    }
+    KAVACH_ASSERT(caught_transpose);
+
+    bool caught_axpby = false;
+    try {
+        backend.batched_axpby(4, 15, 1.0, X.data(), 1.0, Y.data());
+    } catch (const core::NumericalException&) {
+        caught_axpby = true;
+    }
+    KAVACH_ASSERT(caught_axpby);
+
+    std::vector<double> res(4, 0.0);
+    bool caught_dot = false;
+    try {
+        backend.batched_dot(4, 10, X.data(), X.data(), res.data());
+    } catch (const core::NumericalException&) {
+        caught_dot = true;
+    }
+    KAVACH_ASSERT(caught_dot);
 }

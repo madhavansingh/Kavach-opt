@@ -737,3 +737,169 @@ KAVACH_TEST(test_cpu_parallel_comparison_fault_injection) {
     KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.05, 1e-12);
     KAVACH_ASSERT(!cmp.error_message.empty());
 }
+
+// Test: Parallel Batched Transpose SpMV Equivalence
+KAVACH_TEST(test_cpu_parallel_transpose_spmv) {
+    const std::size_t rows = 15;
+    const std::size_t cols = 25;
+    const std::size_t batch_size = 40;
+
+    CsrMatrix A = create_test_csr(rows, cols, 0.35, 21001);
+    std::vector<double> X = create_test_batch(batch_size, rows, 21002);
+    std::vector<double> Y_ser(batch_size * cols, 0.0);
+    std::vector<double> Y_par(batch_size * cols, 0.0);
+
+    serial_batched_spmv_transpose(A, X.data(), Y_ser.data(), batch_size);
+
+    BatchedSpmvOptions opts;
+    opts.num_workers = 4;
+    opts.run_parallel = true;
+    parallel_batched_spmv_transpose(A, X.data(), Y_par.data(), batch_size, opts);
+
+    auto cmp = compare_spmv_results(batch_size, cols, Y_ser.data(), Y_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+
+    // Also test via ExecutionBackend polymorphic interface
+    CpuSequentialBackend seq_backend;
+    CpuMulticoreBackend par_backend(4);
+    std::vector<double> Y_backend(batch_size * cols, 0.0);
+    par_backend.batched_spmv_transpose(A, X.data(), Y_backend.data(), batch_size);
+    auto cmp_backend = compare_spmv_results(batch_size, cols, Y_ser.data(), Y_backend.data());
+    KAVACH_ASSERT(cmp_backend.passed);
+}
+
+// Test: Parallel Batched CSC SpMV Equivalence
+KAVACH_TEST(test_cpu_parallel_csc_spmv_equivalence) {
+    const std::size_t rows = 24;
+    const std::size_t cols = 18;
+    const std::size_t batch_size = 32;
+
+    CsrMatrix csr = create_test_csr(rows, cols, 0.3, 22001);
+    std::vector<Triplet> triplets;
+    for (std::size_t r = 0; r < rows; ++r) {
+        const std::size_t start = csr.row_start(r);
+        const std::size_t end = csr.row_end(r);
+        const auto* cols_ptr = csr.row_indices(r);
+        const auto* vals_ptr = csr.row_values(r);
+        for (std::size_t k = 0; k < end - start; ++k) {
+            triplets.push_back({r, cols_ptr[k], vals_ptr[k]});
+        }
+    }
+    CscMatrix csc = CscMatrix::from_triplets(rows, cols, triplets);
+
+    std::vector<double> X = create_test_batch(batch_size, cols, 22002);
+    std::vector<double> Y_ser(batch_size * rows, 0.0);
+    std::vector<double> Y_par(batch_size * rows, 0.0);
+
+    serial_batched_csc_spmv(csc, X.data(), Y_ser.data(), batch_size);
+
+    CpuMulticoreBackend par_backend(4);
+    par_backend.batched_csc_spmv(csc, X.data(), Y_par.data(), batch_size);
+
+    auto cmp = compare_spmv_results(batch_size, rows, Y_ser.data(), Y_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+}
+
+// Test: Parallel Batched Vector AXPBY
+KAVACH_TEST(test_cpu_parallel_batched_axpby) {
+    const std::size_t batch_size = 50;
+    const std::size_t n = 120;
+    const std::size_t total = batch_size * n;
+    const double alpha = 2.5;
+    const double beta = -1.2;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 23001);
+    std::vector<double> Y_ser = create_test_batch(batch_size, n, 23002);
+    std::vector<double> Y_par = Y_ser;
+
+    serial_batched_axpby(batch_size, n, alpha, X.data(), beta, Y_ser.data());
+
+    ThreadPool pool(4);
+    parallel_batched_axpby(batch_size, n, alpha, X.data(), beta, Y_par.data(), &pool);
+
+    auto cmp = compare_vector_results(total, Y_ser.data(), Y_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-14);
+
+    // Also test via CpuMulticoreBackend
+    std::vector<double> Y_backend = create_test_batch(batch_size, n, 23002);
+    CpuMulticoreBackend backend(4);
+    backend.batched_axpby(batch_size, n, alpha, X.data(), beta, Y_backend.data());
+    auto cmp_backend = compare_vector_results(total, Y_ser.data(), Y_backend.data());
+    KAVACH_ASSERT(cmp_backend.passed);
+}
+
+// Test: Parallel Batched Dot Product
+KAVACH_TEST(test_cpu_parallel_batched_dot) {
+    const std::size_t batch_size = 64;
+    const std::size_t n = 200;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 24001);
+    std::vector<double> Y = create_test_batch(batch_size, n, 24002);
+    std::vector<double> dots_ser(batch_size, 0.0);
+    std::vector<double> dots_par(batch_size, 0.0);
+
+    serial_batched_dot(batch_size, n, X.data(), Y.data(), dots_ser.data());
+
+    ThreadPool pool(4);
+    parallel_batched_dot(batch_size, n, X.data(), Y.data(), dots_par.data(), &pool);
+
+    auto cmp = compare_scalar_results(batch_size, dots_ser.data(), dots_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-13);
+}
+
+// Test: Parallel Batched L2 Norm
+KAVACH_TEST(test_cpu_parallel_batched_l2_norm) {
+    const std::size_t batch_size = 48;
+    const std::size_t n = 150;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 25001);
+    std::vector<double> norms_ser(batch_size, 0.0);
+    std::vector<double> norms_par(batch_size, 0.0);
+
+    serial_batched_l2_norm(batch_size, n, X.data(), norms_ser.data());
+
+    ThreadPool pool(4);
+    parallel_batched_l2_norm(batch_size, n, X.data(), norms_par.data(), &pool);
+
+    auto cmp = compare_scalar_results(batch_size, norms_ser.data(), norms_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-13);
+}
+
+// Test: Parallel Batched Linf Norm
+KAVACH_TEST(test_cpu_parallel_batched_linf_norm) {
+    const std::size_t batch_size = 50;
+    const std::size_t n = 100;
+
+    std::vector<double> X = create_test_batch(batch_size, n, 26001);
+    std::vector<double> norms_ser(batch_size, 0.0);
+    std::vector<double> norms_par(batch_size, 0.0);
+
+    serial_batched_linf_norm(batch_size, n, X.data(), norms_ser.data());
+
+    ThreadPool pool(4);
+    parallel_batched_linf_norm(batch_size, n, X.data(), norms_par.data(), &pool);
+
+    auto cmp = compare_scalar_results(batch_size, norms_ser.data(), norms_par.data());
+    KAVACH_ASSERT(cmp.passed);
+    // Linf norm max-abs is exact and order-independent!
+    KAVACH_ASSERT_NEAR(cmp.max_absolute_error, 0.0, 1e-15);
+}
+
+// Test: Vector and Scalar Comparison Utilities
+KAVACH_TEST(test_cpu_parallel_vector_and_scalar_comparison_utilities) {
+    std::vector<double> vec1 = {1.0, 2.0, 3.0, 4.0};
+    std::vector<double> vec2 = {1.0, 2.0, 3.0, 4.00000000000001};
+
+    auto res = compare_vector_results(4, vec1.data(), vec2.data(), 1e-12, 1e-10);
+    KAVACH_ASSERT(res.passed);
+
+    vec2[3] = 4.5;
+    auto fail_res = compare_vector_results(4, vec1.data(), vec2.data(), 1e-6, 1e-6);
+    KAVACH_ASSERT(!fail_res.passed);
+    KAVACH_ASSERT_NEAR(fail_res.max_absolute_error, 0.5, 1e-12);
+}
