@@ -562,6 +562,110 @@ $$
 
 A zero gap is reported only when the search tree is exhausted or $\text{gap} \le \epsilon_{\text{gap}}$. The solver never claims `OPTIMAL` unless the independent verification layer confirms integrality, feasibility, and gap conditions (Section 11).
 
+### 8.7 Cutting-Plane Separation Engine (Branch-and-Cut)
+
+The pure Branch-and-Bound algorithm partitions the search space when fractional variables arise. To accelerate convergence and reduce tree exploration, Kavach-Opt integrates a sovereign Cutting-Plane Separation Engine into the root relaxation and search nodes (Branch-and-Cut).
+
+Cutting planes are valid linear inequalities $\alpha^T x \le \beta$ satisfied by all integer-feasible solutions $x \in P \cap \mathbb{Z}^n$ but violated by the continuous LP relaxation solution $x^*$:
+
+$$
+\alpha^T x \le \beta \quad \forall x \in \operatorname{conv}(P \cap \mathbb{Z}^n), \qquad \alpha^T x^* > \beta
+$$
+
+Adding these cuts strictly tightens the continuous polyhedral relaxation without eliminating any feasible mixed-integer solutions.
+
+#### 8.7.1 Gomory Fractional and Mixed-Integer Cuts (GMI)
+
+Let the optimal basic solution of the LP relaxation in standard form be represented as $x_B = \bar{b} - \bar{A}_N x_N$, where $\bar{b} = B^{-1} b$ and $\bar{A}_N = B^{-1} N$. For any basic integer variable $x_{B(i)}$ ($i \in \{1,\ldots,m\}$) that takes a fractional value in the relaxation:
+
+$$
+x_{B(i)} + \sum_{j \in \mathcal{N}} \bar{a}_{i,j} x_j = \bar{b}_i
+$$
+
+The tableau row coefficients $\bar{a}_{i,j}$ and RHS $\bar{b}_i$ are extracted numerically via the dual system:
+
+$$
+B^T u = e_i \implies \bar{b}_i = u^T b, \quad \bar{a}_{i,j} = u^T a_j
+$$
+
+where $e_i$ is the $i$-th elementary unit vector and $u$ is obtained from the basis factorizer.
+
+Let $f_0 = \bar{b}_i - \lfloor \bar{b}_i \rfloor$ denote the fractional part of the RHS, with $f_0 \in (0, 1)$. For each nonbasic variable $j \in \mathcal{N}$, let $f_j = \bar{a}_{i,j} - \lfloor \bar{a}_{i,j} \rfloor$.
+
+**Case 1: Pure Integer Variables ($j \in \mathcal{I}$).**
+Gomory's fractional cutting plane takes the form:
+
+$$
+\sum_{j \in \mathcal{N} \cap \mathcal{I}} f_j x_j \ge f_0 \iff -\sum_{j \in \mathcal{N} \cap \mathcal{I}} f_j x_j \le -f_0
+$$
+
+**Case 2: Mixed-Integer Case (Gomory Mixed-Integer Cut — GMI).**
+When continuous nonbasic variables $\mathcal{C}$ are present, the split disjunction yields the GMI cut:
+
+$$
+\sum_{j \in \mathcal{I}, f_j \le f_0} f_j x_j + \frac{f_0}{1 - f_0} \sum_{j \in \mathcal{I}, f_j > f_0} (1 - f_j) x_j + \sum_{j \in \mathcal{C}, \bar{a}_{i,j} \ge 0} \bar{a}_{i,j} x_j - \frac{f_0}{1 - f_0} \sum_{j \in \mathcal{C}, \bar{a}_{i,j} < 0} \bar{a}_{i,j} x_j \ge f_0
+$$
+
+**Projection to Original Variable Space:**
+Because standard-form variables $z$ are related to the original canonical model variables $x$ via affine transformations $z_k = s_k x_{v(k)} + d_k$ (accounting for lower bounds and split free variables), the generated cut $\sum_k \gamma_k z_k \ge \gamma_0$ is projected directly back to original model space:
+
+$$
+a_{\text{orig}}^T x \le b_{\text{orig}}
+$$
+
+#### 8.7.2 Mixed-Integer Rounding (MIR) Cuts
+
+Kavach-Opt derives MIR cuts directly from original mixed-integer constraints $\sum_{j \in \mathcal{I}} a_j x_j + \sum_{j \in \mathcal{C}} g_j y_j \le b$.
+
+1. **Non-Negative Bound Shifting:**
+   For bounded integer variables, let $x_j' = x_j - l_j \ge 0$. The inequality shifts to:
+   $$
+   \sum_{j \in \mathcal{I}} a_j x_j' + \sum_{j \in \mathcal{C}} g_j (y_j - l_{y_j}) \le b - \sum_{j \in \mathcal{I}} a_j l_j - \sum_{j \in \mathcal{C}} g_j l_{y_j} \equiv \beta_0
+   $$
+2. **Multi-Scaling:**
+   Given a positive scaling parameter $\delta > 0$, scale the constraint by $\delta$. Let $\beta = \delta \beta_0$, and fractionality $\alpha = \beta - \lfloor \beta \rfloor \in (0, 1)$.
+   Candidate scaling factors evaluated include $\delta \in \{1.0, 0.5, 2.0\}$ and $\delta = 1 / |a_k|$ for dominant integer coefficients.
+3. **MIR Function Application:**
+   Define the MIR scalar function $F_\alpha: \mathbb{R} \to \mathbb{R}$:
+   $$
+   F_\alpha(d) = \lfloor d \rfloor + \frac{\max(0,\; d - \lfloor d \rfloor - \alpha)}{1 - \alpha}
+   $$
+   The resulting valid MIR inequality is:
+   $$
+   \sum_{j \in \mathcal{I}} F_\alpha(\delta a_j) x_j' + \frac{1}{1 - \alpha} \sum_{j \in \mathcal{C}, \delta g_j < 0} \delta g_j y_j' \le \lfloor \beta \rfloor
+   $$
+4. **Substitution & Normalization:**
+   Substituting $x_j' = x_j - l_j$ back yields a valid cut in the original variables.
+
+#### 8.7.3 Cut Filtering, Efficacy, and Orthogonality
+
+To prevent numerical degradation and ill-conditioning, candidate cuts are evaluated through rigorous geometric and numerical filters before entering the working model:
+
+1. **Euclidean Efficacy:**
+   The geometric distance from the fractional point $x^*$ to the cut hyper-plane $a^T x \le b$ is:
+   $$
+   \gamma(a, b, x^*) = \frac{a^T x^* - b}{\|a\|_2}
+   $$
+   A candidate cut is accepted only if $\gamma(a, b, x^*) \ge \epsilon_{\text{efficacy}} = 10^{-4}$.
+2. **Cosine Parallelism Deduplication:**
+   For each new candidate cut $a_{\text{new}}$ against an existing cut $a_{\text{pool}}$ in the pool:
+   $$
+   \cos(\theta) = \frac{|a_{\text{new}}^T a_{\text{pool}}|}{\|a_{\text{new}}\|_2 \|a_{\text{pool}}\|_2}
+   $$
+   If $\cos(\theta) > 0.999$, the cut is deemed parallel/redundant and discarded.
+3. **Numerical Safety & Dynamic Range:**
+   - Coefficients with $|a_j| < 10^{-12}$ are pruned to exact zeros.
+   - Any cut with $\max_j |a_j| > 10^7$ or $\min_{j, a_j \ne 0} |a_j| < 10^{-7}$ is rejected.
+   - Dynamic range ratio is strictly bounded:
+     $$
+     \kappa_{\text{cut}} = \frac{\max_{j, a_j \ne 0} |a_j|}{\min_{j, a_j \ne 0} |a_j|} \le 10^6
+     $$
+4. **Tail-Off Detection:**
+   Root cut separation terminates when successive LP relaxation iterations yield negligible bound improvement:
+   $$
+   \frac{z_{\text{LP}}^{(k)} - z_{\text{LP}}^{(k-1)}}{\max(1.0,\; |z_{\text{LP}}^{(k-1)}|)} < 10^{-4}
+   $$
+
 ---
 
 ## 9. Dual Simplex Method

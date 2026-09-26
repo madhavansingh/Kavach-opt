@@ -168,6 +168,24 @@ node exploration.
 for 3 nodes before all branches are pruned, confirming the problem has no feasible integer
 solution. Infeasibility is a first-class certified outcome.
 
+### 3.2 Cutting-Plane Separation Evaluation (Cuts OFF vs. ROOT Cuts ON)
+
+Kavach-Opt's Branch-and-Cut pipeline integrates Gomory fractional cuts and Mixed-Integer Rounding (MIR) cuts. The table below presents empirical measurements on the standard test instances comparing pure Branch-and-Bound (`--cuts off`) against Branch-and-Cut with root cuts (`--cuts root`):
+
+| Instance | Mode | Cuts Applied | Cuts Gen (Gomory / MIR) | Root Rounds | Nodes Explored | Simplex Iterations | Objective | Node Reduction | Verified |
+|---|---|---|---|---|---|---|---|---|---|
+| `knapsack.lp` | Cuts OFF | 0 | 0 / 0 | 0 | 19 | 36 | 41.0 | Baseline | ✓ OPTIMAL |
+| `knapsack.lp` | Cuts ROOT | 3 | 17 (14 / 3) | 2 | 11 | 23 | 41.0 | **−42.1%** | ✓ OPTIMAL |
+| `facility_loc.lp` | Cuts OFF | 0 | 0 / 0 | 0 | 3 | 9 | 180.0 | Baseline | ✓ OPTIMAL |
+| `facility_loc.lp` | Cuts ROOT | 0 | 0 / 0 | 0 | 3 | 9 | 180.0 | 0.0% | ✓ OPTIMAL |
+| `infeasible_milp.lp`| Cuts OFF | 0 | 0 / 0 | 0 | 3 | 5 | — | Baseline | ✓ INFEASIBLE |
+| `infeasible_milp.lp`| Cuts ROOT | 0 | 0 / 0 | 0 | 3 | 5 | — | 0.0% | ✓ INFEASIBLE |
+
+#### Analysis:
+1. **Knapsack MILP:** Root cutting planes tighten the initial relaxation bounds, pruning fractional regions immediately. The tree size drops from 19 nodes to 11 nodes (a **42.1% reduction in branch-and-bound nodes**), while simplex iterations drop from 36 to 23 (a **36.1% reduction**).
+2. **Facility Location MILP:** Resolves at root without requiring cuts beyond initial bounds, cleanly terminating in 3 nodes.
+3. **Verification Invariance:** Under both `--cuts off` and `--cuts root`, all solutions pass the independent verification layer (`MILPVerifier`) with 0 integrality violation and 0 primal constraint residual.
+
 ---
 
 ## 4. Convex QP Benchmark

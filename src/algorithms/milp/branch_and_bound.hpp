@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include "algorithms/milp/cut_types.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
@@ -42,6 +43,7 @@ struct MILPSolverOptions {
     bool enable_presolve{true};            ///< Pass through to LP sub-solver
     bool enable_scaling{true};             ///< Pass through to LP sub-solver
     bool enable_warm_starts{true};         ///< Enable dual simplex warm starts on child nodes
+    CutOptions cut_options;                ///< Cutting plane engine configuration (Gomory + MIR)
     bool verbose{false};
 };
 
@@ -73,6 +75,9 @@ struct MILPSolverTelemetry {
     double warm_start_time_seconds{0.0};
     double cold_start_time_seconds{0.0};
     std::size_t basis_transfer_count{0};
+
+    // Cutting Plane Telemetry
+    CutTelemetry cut_telemetry;
 };
 
 // ============================================================================

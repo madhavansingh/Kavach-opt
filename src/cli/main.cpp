@@ -59,6 +59,7 @@ void print_help() {
         << "  --gpu                              Request CUDA GPU execution backend\n"
         << "  --no-gpu                           Disable CUDA GPU execution (force CPU)\n"
         << "  --time-limit <seconds>             Wall-clock time limit in seconds\n"
+        << "  --cuts <off|root|periodic>         Cutting-plane strategy for MILP (default: root)\n"
         << "  --json                             Output strategy and solve result as JSON\n\n"
         << "MRPL Case Study Options:\n"
         << "  --scenario <name>                  Specific scenario to solve\n"
@@ -369,6 +370,7 @@ int handle_solve(const std::vector<std::string_view>& args) {
     bool explain_strategy = false;
     bool json_output = false;
     double time_limit_sec = 0.0;
+    std::optional<kavach::algorithms::milp::CutStrategy> cut_strategy_override;
     kavach::strategy::StrategyConfig config;
 
     for (std::size_t i = 2; i < args.size(); ++i) {
@@ -382,6 +384,15 @@ int handle_solve(const std::vector<std::string_view>& args) {
             config.override_backend = kavach::backend::BackendType::CUDA_GPU;
         } else if (args[i] == "--no-gpu") {
             config.force_no_gpu = true;
+        } else if (args[i] == "--cuts" && i + 1 < args.size()) {
+            std::string_view c_arg = args[++i];
+            if (c_arg == "off" || c_arg == "none" || c_arg == "disabled") {
+                cut_strategy_override = kavach::algorithms::milp::CutStrategy::OFF;
+            } else if (c_arg == "root" || c_arg == "root_only") {
+                cut_strategy_override = kavach::algorithms::milp::CutStrategy::ROOT_ONLY;
+            } else if (c_arg == "periodic") {
+                cut_strategy_override = kavach::algorithms::milp::CutStrategy::PERIODIC;
+            }
         } else if (args[i] == "--strategy" && i + 1 < args.size()) {
             std::string_view strat_arg = args[++i];
             if (strat_arg == "auto") {
@@ -460,6 +471,9 @@ int handle_solve(const std::vector<std::string_view>& args) {
             opts.time_limit =
                 std::chrono::milliseconds(static_cast<int64_t>(time_limit_sec * 1000.0));
         }
+        if (cut_strategy_override.has_value()) {
+            opts.cut_options.strategy = *cut_strategy_override;
+        }
 
         auto decision = solver.plan(*model, opts);
 
@@ -484,6 +498,15 @@ int handle_solve(const std::vector<std::string_view>& args) {
             res["backend_used"] = kavach::backend::to_string(result.backend_used);
             res["verified"] = result.verification_report.passed;
             res["optimality_gap"] = result.optimality_gap;
+            if (result.cut_telemetry.has_value()) {
+                kavach::benchmark::JsonValue::Object cuts;
+                cuts["cuts_generated"] = static_cast<double>(result.cut_telemetry->cuts_generated);
+                cuts["cuts_applied"] = static_cast<double>(result.cut_telemetry->cuts_accepted);
+                cuts["gomory_cuts"] = static_cast<double>(result.cut_telemetry->gomory_cuts);
+                cuts["mir_cuts"] = static_cast<double>(result.cut_telemetry->mir_cuts);
+                cuts["root_rounds"] = static_cast<double>(result.cut_telemetry->cut_rounds);
+                res["cuts"] = std::move(cuts);
+            }
             root["result"] = std::move(res);
 
             kavach::benchmark::JsonValue::Object ver;
@@ -536,8 +559,14 @@ int handle_solve(const std::vector<std::string_view>& args) {
                       << "Status: " << kavach::core::to_string(result.status) << "\n"
                       << "Best Objective: " << result.objective_value << "\n"
                       << "Optimality Gap: " << result.optimality_gap << "\n"
-                      << "Nodes Explored: " << result.nodes << "\n"
-                      << "Verification: "
+                      << "Nodes Explored: " << result.nodes << "\n";
+            if (result.cut_telemetry.has_value() && result.cut_telemetry->cuts_accepted > 0) {
+                std::cout << "Cuts Applied: " << result.cut_telemetry->cuts_accepted
+                          << " (Gomory: " << result.cut_telemetry->gomory_cuts
+                          << ", MIR: " << result.cut_telemetry->mir_cuts
+                          << ", Rounds: " << result.cut_telemetry->cut_rounds << ")\n";
+            }
+            std::cout << "Verification: "
                       << (result.verification_report.passed
                               ? "VERIFIED_OPTIMAL (Certified by MILPVerifier)"
                               : "UNVERIFIED")

@@ -63,7 +63,7 @@ flowchart LR
 - **LP Relaxation Bound**: $5891.36 k/day
 - **Optimality Gap**: 0.00%
 - **Nodes Explored**: 5
-- **Solve Runtime**: 0.0015 s
+- **Solve Runtime**: 0.0011 s
 
 ## 7. Blending plan
 
@@ -88,7 +88,7 @@ flowchart LR
 |---|---|---|---|---|---|---|---|
 | P1 (Motor Spirit (Gasoline)) | 140.0 | 0.80 | 0.80 | +0.00 | 828.7 | 840.0 | +11.3 |
 | P2 (High-Speed Diesel (HSD)) | 98.2 | 1.30 | 1.30 | +0.00 | 853.5 | 865.0 | +11.5 |
-| P3 (Heavy Fuel Oil (HFO)) | 90.0 | 3.00 | 3.00 | +0.00 | 892.5 | 875.0 | +17.5 |
+| P3 (Heavy Fuel Oil (HFO)) | 90.0 | 3.00 | 3.00 | +-0.00 | 892.5 | 875.0 | +17.5 |
 
 ## 10. Economics
 
@@ -121,10 +121,10 @@ Independent mathematical certification performed by `MILPVerifier`:
 
 | Scenario | Kavach-Opt Obj | HiGHS Obj | Rel Error | Kavach Time | HiGHS Status |
 |---|---|---|---|---|---|
-| `baseline` | 5445.909091 | N/A | N/A | 0.0015 s | UNAVAILABLE |
-| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0022 s | UNAVAILABLE |
-| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0016 s | UNAVAILABLE |
-| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0014 s | UNAVAILABLE |
+| `baseline` | 5445.909091 | N/A | N/A | 0.0011 s | UNAVAILABLE |
+| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0011 s | UNAVAILABLE |
+| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0010 s | UNAVAILABLE |
+| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0009 s | UNAVAILABLE |
 | `scenario_d_infeasible` | N/A | N/A | N/A | 0.0000 s | UNAVAILABLE |
 
 ## 14. Limitations

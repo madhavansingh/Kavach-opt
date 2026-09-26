@@ -105,9 +105,8 @@ flowchart TD
     CM --> SE
     SE --> PRE
     PRE --> LP
-    PRE --> BB
-    PRE --> QP
-    BB -->|"warm-start LP sub-problems"| LP
+    PRE --> BB["Branch-and-Cut\n(B&B + Gomory & MIR Cuts)\n(MILP Solver)"]
+    PRE --> QP["Primal Active-Set\n(QP Solver)"]    BB -->|"warm-start LP sub-problems"| LP
     LP --> VER
     BB --> VER
     QP --> VER
@@ -248,19 +247,32 @@ Each reduction step records an inverse operation. After the solver returns a sol
 
 ---
 
-### 4.6 MILP Solver
+### 4.6 MILP Solver & Cutting-Plane Subsystem
 
 **Path:** `src/algorithms/milp/`
 
 | File | Responsibility |
 |---|---|
-| `branch_and_bound.cpp/hpp` | Branch-and-Bound tree search |
+| `branch_and_bound.cpp/hpp` | Branch-and-Bound tree search, node queue, branch selection |
+| `cut_types.hpp` | Cut representation (`LinearCut`), `CutType`, `CutStrategy`, `CutOptions`, `CutTelemetry` |
+| `cut_pool.hpp/cpp` | Bounded candidate pool, cosine parallelism deduplication, Euclidean efficacy ranking |
+| `gomory_separator.hpp/cpp` | Gomory fractional / GMI cuts from simplex tableau rows ($B^T u = e_i$) |
+| `mir_separator.hpp/cpp` | Mixed-Integer Rounding (MIR) cuts from mixed-integer constraints with multi-scaling |
+| `cutting_plane_engine.hpp/cpp` | Separation loop orchestration, tail-off detection, constraint injection, LP re-solving |
 
-The MILP solver implements a Branch-and-Bound algorithm. The LP relaxation at each node is solved using the Dual Simplex with a warm-started basis, dramatically reducing node solve times relative to cold-start LP.
+#### Branch-and-Bound Tree Search
+The MILP solver implements a Branch-and-Bound algorithm augmented with cutting-plane separation (Branch-and-Cut). The LP relaxation at each node is solved using the Dual Simplex with a warm-started basis, dramatically reducing node solve times relative to cold-start LP.
 
 Branching variable selection applies a configurable strategy (default: most-infeasible fractional variable). Bound propagation is applied at each node to tighten integer variable domains. The solver maintains an incumbent solution and prunes nodes whose LP relaxation bound cannot improve upon it.
 
 Termination is governed by integrality tolerance, optimality gap tolerance, and the user-supplied `--time-limit`.
+
+#### Cutting-Plane Separation Engine
+To tighten the polyhedral relaxation before and during tree search, Kavach-Opt provides an indigenous cutting-plane engine supporting:
+- **Gomory Fractional Cuts:** Derived from fractional basic variables in the optimal LP tableau row ($B^{-1} A$). Generates both pure integer Gomory cuts and Gomory Mixed-Integer (GMI) cuts, projecting back to the original model variable space via explicit affine transformations.
+- **Mixed-Integer Rounding (MIR) Cuts:** Generated directly from mixed-integer linear inequalities after non-negative lower-bound variable shifts ($x' = x - l$), utilizing multi-scaling factors ($\delta \in \{1.0, 0.5, 2.0, 1/a_k\}$) and continuous variable penalty terms.
+- **Cut Pool & Filtering:** Manages cut storage up to a bounded capacity (`max_pool_size = 500`). Deduplicates parallel cuts using cosine similarity ($\cos\theta > 0.999$), filters by Euclidean efficacy ($\gamma = (a^T x^* - b) / \|a\|_2 \ge 10^{-4}$), and enforces strict coefficient dynamic range limits ($\max |a_j| / \min |a_j| \le 10^6$) for numerical stability.
+- **Separation Pipeline:** Executes configurable separation rounds at the root node (and optionally periodic tree nodes), re-solving the tightened LP relaxation, detecting objective tail-off, and injecting valid cuts directly into the working model.
 
 **Internal dependencies:** `src/model/`, `src/numerics/`, `src/algorithms/lp/`, `src/backend/`.
 
@@ -384,9 +396,9 @@ The case study is exercised through the `kavach-opt mrpl` subcommand. Output inc
 `KavachSolver` is the sole intended programmatic integration surface for embedding Kavach-Opt in host applications. It exposes methods to:
 
 - Load a model from a file path or a `CanonicalModel` object.
-- Configure strategy, presolve, scaling, and backend options.
+- Configure strategy, presolve, scaling, cutting-plane strategy (`CutOptions`), and backend options.
 - Execute the solve.
-- Retrieve a typed `SolveResult` containing status, objective value, solution vector, verification status, and telemetry.
+- Retrieve a typed `SolverResult` containing status, objective value, solution vector, verification status, solver telemetry, and cutting-plane telemetry (`CutTelemetry`).
 
 All internal modules are accessed exclusively through this API in the CLI. Direct inclusion of internal headers by external consumers is not supported.
 
@@ -418,6 +430,7 @@ The `kavach-opt` CLI provides the following subcommands:
 | Flag | Values | Effect |
 |---|---|---|
 | `--strategy` | `auto` \| `conservative` \| `fast` | Override automatic strategy tier |
+| `--cuts` | `off` \| `root` \| `periodic` | Cutting-plane strategy (default: root) |
 | `--presolve` | `full` \| `none` \| `auto` | Presolve level |
 | `--scaling` | `on` \| `off` \| `auto` | Ruiz scaling control |
 | `--backend` | `cpu` \| `multicore` \| `cuda` | Execution backend override |
@@ -642,7 +655,7 @@ Artifacts are written to the directory specified by `--output <dir>` (default: `
 | Target | Artifact | Description |
 |---|---|---|
 | `kavach-opt` | Executable | Primary CLI binary |
-| `kavach_unit_tests` | Executable | 329-test unit suite |
+| `kavach_unit_tests` | Executable | 337-test unit suite |
 | `kavach_api_example` | Executable | Reference integration example using the public C++ API |
 
 ### 10.4 Standard Build
@@ -696,7 +709,7 @@ SIH26119/
 │   ├── presolve/               # Presolve reduction suite and reconstruction stack
 │   ├── algorithms/
 │   │   ├── lp/                 # Revised Simplex, Dual Simplex, Bland anti-cycling, basis
-│   │   ├── milp/               # Branch-and-Bound with dual simplex warm starts
+│   │   ├── milp/               # Branch-and-Cut: B&B, CutPool, Gomory & MIR Separators
 │   │   └── qp/                 # Primal Active-Set QP, PSD validation, KKT convergence
 │   ├── verification/           # Independent verifier (LP, MILP, QP); six-check protocol
 │   ├── backend/
@@ -709,7 +722,7 @@ SIH26119/
 │   ├── api/                    # KavachSolver public C++ API (solver.hpp / solver.cpp)
 │   └── cli/                    # kavach-opt CLI entry point (main.cpp)
 │
-├── tests/                      # 329 unit tests
+├── tests/                      # 337 unit tests
 │
 ├── benchmarks/
 │   ├── netlib/                 # Netlib LP model files

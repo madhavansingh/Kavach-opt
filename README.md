@@ -8,7 +8,7 @@ SIH26119 · Smart India Hackathon · MRPL Industrial Application
 ```
 Kavach-Opt v0.1.0
 Build: C++20 Release · AppleClang
-329 / 329 unit tests passing
+337 / 337 unit tests passing
 13 / 13 Netlib LP instances: OPTIMAL, independently verified
 ```
 
@@ -122,10 +122,13 @@ flowchart TD
 - Sparse LU factorization with Markowitz threshold pivoting
 
 ### Mixed-Integer Linear Programming (MILP)
-- Branch-and-Bound with most-fractional branching
-- Best-bound node selection queue
+- Branch-and-Cut pipeline integrating sovereign cutting-plane separation
+- Gomory fractional cuts and Gomory Mixed-Integer (GMI) cuts from LP tableau rows
+- Mixed-Integer Rounding (MIR) cuts with non-negative lower-bound variable shifting and multi-scaling
+- Dynamic cut pool with cosine parallelism deduplication ($\cos\theta > 0.999$) and Euclidean efficacy ranking
+- Branch-and-Bound with most-fractional branching and best-bound node selection
 - Dual simplex warm starts for child LP solves (reuses parent basis)
-- Root-node LP presolve
+- Root-node LP presolve and tail-off termination
 - Certified infeasibility detection
 
 ### Convex Quadratic Programming (QP)
@@ -465,6 +468,7 @@ Usage:
 
 Solve Options:
   --strategy <auto|conservative|fast>   Strategy decision mode (default: auto)
+  --cuts <off|root|periodic>            Cutting-plane strategy (default: root)
   --show-strategy                       Display concise strategy decision
   --explain-strategy                    Display comprehensive strategy explanation
   --presolve <full|none|auto>           Explicit presolve override

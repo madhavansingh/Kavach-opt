@@ -513,12 +513,14 @@ KAVACH_TEST(milp_regression_knapsack_binary) {
     // 1. Solve with warm starts disabled (pure cold start)
     MILPSolverOptions opts_cold;
     opts_cold.enable_warm_starts = false;
+    opts_cold.cut_options.strategy = CutStrategy::OFF;
     BranchAndBound solver_cold(opts_cold);
     auto sol_cold = solver_cold.solve(m);
 
     // 2. Solve with warm starts enabled
     MILPSolverOptions opts_warm;
     opts_warm.enable_warm_starts = true;
+    opts_warm.cut_options.strategy = CutStrategy::OFF;
     BranchAndBound solver_warm(opts_warm);
     auto sol_warm = solver_warm.solve(m);
 

@@ -20,6 +20,7 @@
 
 #include "algorithms/lp/lp_types.hpp"
 #include "algorithms/lp/simplex.hpp"
+#include "algorithms/milp/cutting_plane_engine.hpp"
 #include "core/error.hpp"
 #include "core/logger.hpp"
 #include "core/status.hpp"
@@ -324,6 +325,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
 
         auto cs_start = Clock::now();
         lp::LPSolverOptions cs_opts = lp_opts;
+        cs_opts.enable_presolve = false;
         cs_opts.preserve_bounds_structure = true;
         auto cs_sol = lp_solver.solve(wm, cs_opts);
         double cs_sec = std::chrono::duration<double>(Clock::now() - cs_start).count();
@@ -443,6 +445,60 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             try_update_incumbent_via_rounding(root_sol.primal_solution);
         }
 
+        // -------------------------------------------------------------------
+        // Root Cutting Plane Engine (Gomory + MIR)
+        // -------------------------------------------------------------------
+        if (opts.cut_options.strategy != CutStrategy::OFF) {
+            CuttingPlaneEngine cut_engine(opts.cut_options);
+            auto cut_res = cut_engine.run_root_cuts(work_model, lp_solver, lp_opts, root_sol,
+                                                    tel.cut_telemetry, tols.integrality_tol);
+
+            if (cut_res.infeasible) {
+                result.status = core::SolverStatus::INFEASIBLE;
+                result.message =
+                    "Root LP became infeasible after valid cut separation — MILP is infeasible.";
+                tel.solve_time_seconds = elapsed();
+                return result;
+            }
+
+            if (cut_res.cuts_added > 0) {
+                root_sol.objective_value = cut_res.objective;
+                root_sol.primal_solution = cut_res.primal_solution;
+                root_sol.basis = cut_res.basis;
+                tel.root_lp_bound = root_sol.objective_value;
+                tel.final_best_bound = root_sol.objective_value;
+
+                if (cut_res.integer_feasible ||
+                    is_integer_feasible(orig_model, root_sol.primal_solution,
+                                        tols.integrality_tol)) {
+                    incumbent_obj = root_sol.objective_value;
+                    incumbent = root_sol.primal_solution;
+                    tel.incumbent_updates = 1;
+                    tel.final_best_bound = incumbent_obj;
+                    result.best_bound = incumbent_obj;
+                    result.best_objective = incumbent_obj;
+                    result.incumbent_solution = incumbent;
+                    result.optimality_gap = 0.0;
+                    tel.solve_time_seconds = elapsed();
+
+                    verification::MILPVerifier verifier;
+                    auto vrpt = verifier.verify(orig_model, incumbent, incumbent_obj, incumbent_obj,
+                                                core::SolverStatus::OPTIMAL, tols, 0.0);
+                    if (vrpt.certified_status == core::SolverStatus::OPTIMAL) {
+                        result.status = core::SolverStatus::OPTIMAL;
+                        result.message =
+                            "Root LP with cutting planes is integer feasible and verified.";
+                    } else {
+                        result.status = core::SolverStatus::NUMERICAL_FAILURE;
+                        result.message =
+                            "Root LP with cuts appears integer-feasible but verification failed: " +
+                            vrpt.summary;
+                    }
+                    return result;
+                }
+            }
+        }
+
         // Initialize B&B tree with root node
         if (is_minimize) {
             std::priority_queue<BranchNode, std::vector<BranchNode>, MinBestBound> pq;
@@ -495,7 +551,6 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                 restore_modifications(work_model, node.mods);
 
                 ++tel.nodes_explored;
-
                 if (node_sol.status == core::SolverStatus::INFEASIBLE) {
                     ++tel.nodes_pruned_infeasible;
                     continue;

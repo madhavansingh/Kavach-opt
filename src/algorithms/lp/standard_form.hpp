@@ -78,6 +78,29 @@ public:
     [[nodiscard]] std::vector<double> reconstruct_reduced_costs(const std::vector<double>& d) const;
     [[nodiscard]] double compute_original_objective(const std::vector<double>& x) const;
 
+    // --- Transforms & Substitution ---
+    [[nodiscard]] const std::vector<VariableTransform>& var_transforms() const noexcept {
+        return var_transforms_;
+    }
+    [[nodiscard]] const std::vector<RowTransform>& row_transforms() const noexcept {
+        return row_transforms_;
+    }
+    [[nodiscard]] std::size_t num_original_vars() const noexcept { return num_original_vars_; }
+    [[nodiscard]] std::size_t num_original_constrs() const noexcept {
+        return num_original_constrs_;
+    }
+
+    /**
+     * @brief Translate a linear inequality in standard-form variables z:
+     *        \sum_k gamma_k * z_k >= delta
+     *        into an equivalent linear inequality on original model variables x:
+     *        \sum_j alpha_j * x_j <= beta (or >= beta).
+     */
+    void substitute_standard_to_model(const model::CanonicalModel& model,
+                                      const std::vector<double>& gamma, double delta,
+                                      std::vector<double>& out_alpha, double& out_beta,
+                                      bool as_less_equal = true) const;
+
     // Mutator for scaling support
     void apply_scaling(const numerics::ScalingFactors& factors);
 

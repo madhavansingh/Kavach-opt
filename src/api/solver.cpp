@@ -86,7 +86,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         milp_opts.enable_presolve = (decision.presolve_policy == strategy::PresolvePolicy::FULL);
         milp_opts.enable_scaling = decision.scaling_enabled;
         milp_opts.enable_warm_starts = decision.prefer_dual_simplex_warm_start;
-        milp_opts.enable_rounding_heuristic = decision.enable_rounding_heuristic;
+        milp_opts.cut_options = options.cut_options;
         milp_opts.time_limit_seconds = time_limit_sec;
         milp_opts.max_nodes = options.max_nodes;
 
@@ -102,6 +102,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         result.nodes = sol.telemetry.nodes_explored;
         result.iterations =
             sol.telemetry.dual_simplex_iterations + sol.telemetry.cold_start_iterations;
+        result.cut_telemetry = sol.telemetry.cut_telemetry;
 
         if (sol.is_optimal() && sol.has_incumbent()) {
             verification::MILPVerifier verifier;

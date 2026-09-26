@@ -351,4 +351,105 @@ void StandardFormLP::apply_scaling(const numerics::ScalingFactors& factors) {
     c_ = factors.scale_objective(c_);
 }
 
+void StandardFormLP::substitute_standard_to_model(const model::CanonicalModel& model,
+                                                  const std::vector<double>& gamma, double delta,
+                                                  std::vector<double>& out_alpha, double& out_beta,
+                                                  bool as_less_equal) const {
+    out_alpha.assign(num_original_vars_, 0.0);
+    double constant_offset = 0.0;
+
+    // 1. Process variable transforms
+    for (std::size_t j = 0; j < num_original_vars_; ++j) {
+        const auto& trans = var_transforms_[j];
+        switch (trans.type) {
+            case VariableTransformType::FIXED:
+                // x_j is constant, not in z
+                break;
+            case VariableTransformType::SHIFTED_LOWER:
+                // z1 = x_j - shift
+                if (trans.z_index1 < gamma.size()) {
+                    double g = gamma[trans.z_index1];
+                    out_alpha[j] += g;
+                    constant_offset -= g * trans.shift;
+                }
+                break;
+            case VariableTransformType::BOXED:
+                // z1 = x_j - shift
+                if (trans.z_index1 < gamma.size()) {
+                    double g = gamma[trans.z_index1];
+                    out_alpha[j] += g;
+                    constant_offset -= g * trans.shift;
+                }
+                // s_ub = u_j - x_j
+                if (trans.ub_slack_index < gamma.size()) {
+                    double g = gamma[trans.ub_slack_index];
+                    out_alpha[j] -= g;
+                    const auto& var = model.variable(static_cast<model::VarId>(j));
+                    constant_offset += g * var.upper_bound;
+                }
+                break;
+            case VariableTransformType::SHIFTED_UPPER:
+                // z1 = shift - x_j
+                if (trans.z_index1 < gamma.size()) {
+                    double g = gamma[trans.z_index1];
+                    out_alpha[j] -= g;
+                    constant_offset += g * trans.shift;
+                }
+                break;
+            case VariableTransformType::FREE:
+                // x_j = z1 - z2
+                if (trans.z_index1 < gamma.size()) {
+                    out_alpha[j] += gamma[trans.z_index1];
+                }
+                if (trans.z_index2 < gamma.size()) {
+                    out_alpha[j] -= gamma[trans.z_index2];
+                }
+                break;
+        }
+    }
+
+    // 2. Process constraint slacks / surplus
+    for (std::size_t i = 0; i < num_original_constrs_; ++i) {
+        const auto& rtrans = row_transforms_[i];
+        if (rtrans.has_slack_or_surplus && rtrans.slack_or_surplus_var < gamma.size()) {
+            double g = gamma[rtrans.slack_or_surplus_var];
+            if (std::abs(g) > 1e-15) {
+                const auto& constr = model.constraint(static_cast<model::ConstrId>(i));
+                if (constr.sense == model::ConstraintSense::LESS_EQUAL) {
+                    // s = b_i - A_i x
+                    // g * s = g * b_i - sum (g * a_ij) x_j
+                    constant_offset += g * constr.rhs;
+                    for (const auto& term : constr.expression.terms()) {
+                        if (term.var_id < num_original_vars_) {
+                            out_alpha[term.var_id] -= g * term.coefficient;
+                        }
+                    }
+                } else if (constr.sense == model::ConstraintSense::GREATER_EQUAL) {
+                    // s = A_i x - b_i
+                    // g * s = sum (g * a_ij) x_j - g * b_i
+                    constant_offset -= g * constr.rhs;
+                    for (const auto& term : constr.expression.terms()) {
+                        if (term.var_id < num_original_vars_) {
+                            out_alpha[term.var_id] += g * term.coefficient;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Now: sum_k gamma_k * z_k = sum_j out_alpha_j * x_j + constant_offset >= delta
+    // => sum_j out_alpha_j * x_j >= delta - constant_offset
+    // If as_less_equal:
+    // => sum_j (-out_alpha_j) * x_j <= constant_offset - delta
+    if (as_less_equal) {
+        for (std::size_t j = 0; j < num_original_vars_; ++j) {
+            out_alpha[j] = -out_alpha[j];
+        }
+        out_beta = constant_offset - delta;
+    } else {
+        out_beta = delta - constant_offset;
+    }
+}
+
 }  // namespace kavach::algorithms::lp

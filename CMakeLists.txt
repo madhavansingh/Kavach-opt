@@ -110,6 +110,10 @@ add_library(kavach_core
     src/algorithms/lp/dual_simplex.cpp
     src/algorithms/lp/simplex.cpp
     src/algorithms/milp/branch_and_bound.cpp
+    src/algorithms/milp/cut_pool.cpp
+    src/algorithms/milp/gomory_separator.cpp
+    src/algorithms/milp/mir_separator.cpp
+    src/algorithms/milp/cutting_plane_engine.cpp
     src/algorithms/qp/active_set.cpp
     src/verification/lp_verifier.cpp
     src/verification/milp_verifier.cpp

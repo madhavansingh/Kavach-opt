@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "algorithms/milp/cut_types.hpp"
 #include "backend/execution_backend.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
@@ -28,6 +29,7 @@ struct SolverOptions {
     bool deterministic{true};
     bool run_presolve{true};
     strategy::StrategyConfig strategy_config;
+    algorithms::milp::CutOptions cut_options;
 };
 
 struct SolverResult {
@@ -43,6 +45,7 @@ struct SolverResult {
     verification::VerificationReport verification_report;
     backend::BackendType backend_used{backend::BackendType::CPU_SEQUENTIAL};
     strategy::StrategyDecision strategy_decision;
+    std::optional<algorithms::milp::CutTelemetry> cut_telemetry{std::nullopt};
 };
 
 /**
