@@ -90,6 +90,9 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
             auto qp_rep = verifier.verify(model, sol.primal_solution, sol.dual_solution,
                                           sol.objective_value, sol.status, options.tolerances);
             result.verification_report = verification::VerificationReport::from_qp(qp_rep);
+            if (result.status == core::SolverStatus::OPTIMAL && !qp_rep.fully_verified()) {
+                result.status = qp_rep.certified_status;
+            }
         }
     } else if (decision.problem_class == strategy::ProblemClass::MILP) {
         algorithms::milp::MILPSolverOptions milp_opts;
@@ -126,6 +129,9 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
                 verifier.verify(model, sol.incumbent_solution, sol.best_bound, sol.best_objective,
                                 sol.status, options.tolerances, sol.optimality_gap);
             result.verification_report = verification::VerificationReport::from_milp(milp_rep);
+            if (result.status == core::SolverStatus::OPTIMAL && !milp_rep.fully_verified()) {
+                result.status = milp_rep.certified_status;
+            }
         }
     } else if (decision.problem_class == strategy::ProblemClass::CONVEX_MIQP) {
         algorithms::miqp::MIQPSolverOptions miqp_opts;
@@ -160,6 +166,9 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
                 verifier.verify(model, sol.incumbent_solution, sol.best_bound, sol.best_objective,
                                 sol.status, options.tolerances, sol.optimality_gap);
             result.verification_report = verification::VerificationReport::from_miqp(miqp_rep);
+            if (result.status == core::SolverStatus::OPTIMAL && !miqp_rep.fully_verified()) {
+                result.status = miqp_rep.certified_status;
+            }
         }
     } else {
         algorithms::lp::LPSolverOptions lp_opts;
@@ -198,6 +207,10 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
                 (lp_rep.primal_feasibility.passed && lp_rep.bound_feasibility.passed &&
                  lp_rep.objective_consistency.passed && lp_rep.nonfinite_check.passed)) {
                 result.verification_report.passed = true;
+            }
+            if (result.status == core::SolverStatus::OPTIMAL &&
+                !result.verification_report.passed) {
+                result.status = lp_rep.certified_status;
             }
         }
     }

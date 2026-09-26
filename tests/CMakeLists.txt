@@ -18,6 +18,7 @@ add_executable(kavach_unit_tests
     unit/test_cutting_planes.cpp
     unit/test_advanced_search.cpp
     unit/test_miqp.cpp
+    unit/test_final_hardening.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)

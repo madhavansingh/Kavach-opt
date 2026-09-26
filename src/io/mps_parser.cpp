@@ -595,9 +595,9 @@ std::unique_ptr<model::CanonicalModel> MpsParser::parse_string(std::string_view 
         }
     }
 
-    if (!found_endata && current_section == MpsSection::NONE) {
+    if (!found_endata) {
         throw ParserException(filename, line_num, "MPS",
-                              "Empty or invalid MPS file (missing sections)");
+                              "Empty or invalid MPS file (missing mandatory ENDATA statement)");
     }
 
     auto canonical_model = std::make_unique<model::CanonicalModel>(model_name);

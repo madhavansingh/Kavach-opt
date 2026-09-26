@@ -8,7 +8,7 @@ SIH26119 · Smart India Hackathon · MRPL Industrial Application
 ```
 Kavach-Opt v0.1.0
 Build: C++20 Release · AppleClang
-375 / 375 unit tests passing
+387 / 387 unit tests passing
 13 / 13 Netlib LP instances: OPTIMAL, independently verified
 ```
 
