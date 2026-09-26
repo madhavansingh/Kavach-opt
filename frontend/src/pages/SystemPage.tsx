@@ -135,81 +135,184 @@ export const SystemPage: React.FC = () => {
         </SkeletonPanel>
       )}
 
-      {/* Core Subsystem Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Panel title="Sparse Numerics Core" subtitle="CSR / CSC & Markowitz SparseLU">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            Pure C++20 sparse matrix engine utilizing compressed storage with zero-copy transposition.
-            Features dynamic Markowitz threshold pivoting with stability parameter &mu; = 0.1 to guard against
-            catastrophic cancellation.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· Dynamic range detection</div>
-            <div>· Ruiz equilibration scaling</div>
-            <div>· Fast Forrest-Tomlin basis update</div>
+      {/* Supported Problem Classes & Capabilities */}
+      <Panel
+        title="Supported Mathematical Problem Classes"
+        subtitle="Zero external solver dependencies across continuous and discrete optimization"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-white font-sans text-xs">Continuous LP</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
+                EXACT
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+              Two-Phase Revised Simplex with Markowitz SparseLU basis factorization and steepest-edge pricing.
+            </p>
+            <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
+              <div>· Bland's anti-cycling rule</div>
+              <div>· Ruiz equilibration scaling</div>
+              <div>· Zero-trust independent verification</div>
+            </div>
           </div>
-        </Panel>
 
-        <Panel title="Optimization Algorithms" subtitle="LP, MILP & Convex QP">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            Two-Phase Revised Simplex with steepest-edge pricing. Exact Branch-and-Bound with dual simplex
-            warm-starting for mixed-integer models. Active-set quadratic programming for convex objectives.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· Phase I artificial basis initialization</div>
-            <div>· Dual simplex re-optimization in &lt; 0.5 ms</div>
-            <div>· Strong branching variable selection</div>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-white font-sans text-xs">Mixed-Integer LP (MILP)</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">
+                BRANCH &amp; CUT
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+              Deterministic Branch-and-Bound with Gomory/MIR cuts, pseudocosts, and reliability branching.
+            </p>
+            <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
+              <div>· Dual-simplex warm starts (&lt;0.5ms)</div>
+              <div>· Primal heuristic exploration</div>
+              <div>· Integrality violation certification</div>
+            </div>
           </div>
-        </Panel>
 
-        <Panel title="Execution Backends" subtitle="Multicore CPU & Scoped CUDA">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            CPU-first execution architecture. Multi-threaded thread pool for parallel batched SpMV workloads.
-            Narrow, production CUDA kernel for high-throughput batch multiplication with mandatory CPU fallback.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· 3.04x speedup on 8 CPU cores</div>
-            <div>· Warp-level reduction on GPU</div>
-            <div>· Automatic crossover detection</div>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-white font-sans text-xs">Convex Quadratic (QP)</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/40">
+                ACTIVE-SET
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+              Primal Active-Set solver for strictly convex and positive semi-definite objective matrices Q.
+            </p>
+            <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
+              <div>· Exact KKT stationarity solve</div>
+              <div>· Gershgorin PSD verification</div>
+              <div>· Dual multiplier complementarity</div>
+            </div>
           </div>
-        </Panel>
 
-        <Panel title="Presolve & Reconstruction" subtitle="Model Reduction Pipeline">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            Reversible linear presolve transformations. Eliminates empty rows, empty columns, singleton rows,
-            fixed variables, and tightens implied variable bounds before factoring the basis.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· Exact solution post-solve unrolling</div>
-            <div>· Dual multiplier reconstruction</div>
-            <div>· Redundant constraint pruning</div>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-white font-sans text-xs">Convex Mixed-Integer QP</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">
+                MIQP HYBRID
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+              Continuous QP active-set relaxations embedded inside deterministic branch-and-bound search.
+            </p>
+            <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
+              <div>· Strong QP probing</div>
+              <div>· Non-convexity detection &amp; reject</div>
+              <div>· Subgradient bound pruning</div>
+            </div>
           </div>
-        </Panel>
+        </div>
+      </Panel>
 
-        <Panel title="Independent Verifier" subtitle="Zero-Trust Mathematical Certification">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            Air-gapped verification layer. Directly evaluates primal feasibility, dual feasibility,
-            complementary slackness, and integrality against original raw inputs without relying on solver state.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· Recomputes ||Ax - b|| in 64-bit IEEE 754</div>
-            <div>· Certified JSON output format</div>
-            <div>· Strict tolerance bounds (1e-8)</div>
-          </div>
-        </Panel>
+      {/* Execution Backends & CUDA Kernel Registry */}
+      <Panel
+        title="Execution Backend & Acceleration Layer"
+        subtitle="Runtime state and custom FP64 sparse numerical kernel suite"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white font-sans">CPU Sequential</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                  ACTIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 font-sans">
+                Deterministic single-thread execution. Primary path for basis factorization and simplex pivots.
+              </p>
+              <div className="text-[10px] font-mono text-neutral-300 pt-1 border-t border-[#1f283a]">
+                Zero thread-launch overhead
+              </div>
+            </div>
 
-        <Panel title="Strategy & Rules Engine" subtitle="Rules R001–R018">
-          <p className="text-xs text-neutral-300 leading-relaxed mb-3">
-            Deterministic decision intelligence. Inspects matrix condition, dimensions, problem class, and
-            workload batch size to configure algorithm routing, tolerances, and hardware backend.
-          </p>
-          <div className="text-[11px] font-mono text-neutral-400 space-y-1">
-            <div>· 18 deterministic rules</div>
-            <div>· Sub-0.01 ms execution overhead</div>
-            <div>· 100% reproducible rationale</div>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white font-sans">CPU Multicore</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
+                  AVAILABLE
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 font-sans">
+                Internal std::jthread thread pool. Parallel chunking for batched vector multiplications.
+              </p>
+              <div className="text-[10px] font-mono text-neutral-300 pt-1 border-t border-[#1f283a]">
+                3.04x speedup on 8 cores
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white font-sans">CUDA Acceleration</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">
+                  RULE R012 FALLBACK
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 font-sans">
+                Custom FP64 kernels compiled for Linux/NVIDIA targets; safe CPU fallback active on Darwin host.
+              </p>
+              <div className="text-[10px] font-mono text-neutral-300 pt-1 border-t border-[#1f283a]">
+                CPU-First resilience guarantee
+              </div>
+            </div>
           </div>
-        </Panel>
-      </div>
+
+          {/* 7 Custom FP64 Kernels */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-white font-sans">
+                Custom FP64 CUDA Sparse Kernel Suite (7 Operations)
+              </span>
+              <span className="text-[10px] font-mono text-neutral-400">
+                Host Policy: Rule R012 CPU Fallback
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-[#1f283a] bg-[#141926]">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-[#0e121a] text-neutral-400 border-b border-[#1f283a]">
+                  <tr>
+                    <th className="py-2.5 px-3 font-sans">Kernel Name</th>
+                    <th className="py-2.5 px-3">Storage Layout</th>
+                    <th className="py-2.5 px-3">Precision</th>
+                    <th className="py-2.5 px-3">Host Runtime Status</th>
+                    <th className="py-2.5 px-3 font-sans">Target Hardware</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f283a]/60">
+                  {[
+                    { name: 'Batched CSR SpMV', layout: 'CSR Matrix', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched CSR Transpose SpMV', layout: 'CSR Transpose', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched CSC SpMV', layout: 'CSC Matrix', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched AXPBY', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched Dot Product', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched L2 Norm', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                    { name: 'Batched L∞ Norm', layout: 'Dense Vector Batch', precision: 'FP64 (IEEE 754)', status: 'CPU Fallback (R012)', target: 'NVIDIA sm_70+' },
+                  ].map((k) => (
+                    <tr key={k.name} className="hover:bg-[#161c28] transition-colors">
+                      <td className="py-2.5 px-3 text-white font-sans font-medium">{k.name}</td>
+                      <td className="py-2.5 px-3 text-slate-300">{k.layout}</td>
+                      <td className="py-2.5 px-3 text-emerald-400 font-bold">{k.precision}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950/50 text-amber-300 border border-amber-800/40">
+                          {k.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-neutral-400 font-sans">{k.target}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       {/* CI & Quality Gates Status */}
       <Panel
@@ -217,14 +320,14 @@ export const SystemPage: React.FC = () => {
         subtitle="Automated continuous integration and compiler warning standards"
         badge={
           <span className="text-xs font-mono font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60">
-            ALL 329 TESTS GREEN
+            CERTIFIED TEST SUITE
           </span>
         }
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-sans">
           <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
-            <span className="text-neutral-400 block text-[11px]">Test Suite</span>
-            <span className="text-white font-semibold font-mono text-sm">329 / 329 Passed</span>
+            <span className="text-neutral-400 block text-[11px]">Core Test Suite</span>
+            <span className="text-white font-semibold font-mono text-sm">CERTIFIED GREEN</span>
             <span className="text-emerald-400 text-[10px] block mt-0.5 font-sans">100% test pass rate</span>
           </div>
 

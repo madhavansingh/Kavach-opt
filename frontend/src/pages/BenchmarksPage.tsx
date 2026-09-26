@@ -178,13 +178,36 @@ export const BenchmarksPage: React.FC = () => {
     },
     {
       key: 'verification',
-      header: 'Verification',
-      render: () => (
-        <span className="inline-flex items-center gap-1 text-emerald-400 font-mono text-xs">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>PASS</span>
-        </span>
-      ),
+      header: 'Trust Indicator',
+      render: (row: BenchmarkItem) => {
+        if (row.verified_status === 'VERIFIED_OPTIMAL' || (row.status === 'OPTIMAL' && row.verification_passed)) {
+          return (
+            <span className="inline-flex items-center gap-1 text-emerald-400 font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>VERIFIED</span>
+            </span>
+          );
+        }
+        if (row.status === 'LIMIT_REACHED' || row.status === 'UNBOUNDED') {
+          return (
+            <span className="inline-flex items-center gap-1 text-amber-400 font-mono text-[11px] px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/40">
+              <span>LIMIT REACHED</span>
+            </span>
+          );
+        }
+        if (row.status === 'NUMERICAL_ERROR') {
+          return (
+            <span className="inline-flex items-center gap-1 text-rose-400 font-mono text-[11px] px-2 py-0.5 rounded bg-rose-950/60 border border-rose-800/40">
+              <span>NUMERICAL FAILURE</span>
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 text-neutral-400 font-mono text-[11px] px-2 py-0.5 rounded bg-neutral-900 border border-neutral-700/50">
+            <span>UNVERIFIED</span>
+          </span>
+        );
+      },
       align: 'center' as const,
     },
   ];

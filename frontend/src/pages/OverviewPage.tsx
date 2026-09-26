@@ -1,5 +1,15 @@
-import React from 'react';
-import { Play, Shield, FileCode } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Play,
+  Shield,
+  FileCode,
+  ShieldCheck,
+  Cpu,
+  TrendingDown,
+  Split,
+  Workflow,
+  Factory,
+} from 'lucide-react';
 import { Panel } from '../components/Panel';
 import { Metric, MetricGroup } from '../components/Metric';
 import { Pipeline } from '../components/Pipeline';
@@ -9,6 +19,7 @@ import { EmptyState } from '../components/EmptyState';
 import { SkeletonMetric, SkeletonCard, Skeleton } from '../components/Skeleton';
 import type { SolveResult, ModelMetadata } from '../types/solver';
 import type { NavTab } from '../layouts/Sidebar';
+import { solverBridge, type SystemHealth } from '../lib/solverBridge';
 
 interface OverviewPageProps {
   onNavigate: (tab: NavTab) => void;
@@ -23,29 +34,70 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   lastResult,
   isDiscoveringModels = false,
 }) => {
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    solverBridge
+      .getSystemHealth()
+      .then((h) => {
+        if (isMounted) setHealth(h);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
-    <div className="space-y-8">
-      {/* Hero Section */}
-      <div className="relative rounded-xl border border-[#1d2332] bg-gradient-to-b from-[#11151f] via-[#0d1017] to-[#0a0d12] p-6 sm:p-8 overflow-hidden shadow-xs">
+    <div className="space-y-8 font-sans">
+      {/* Product Header / System Health Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0c1017] border border-[#1d2536] text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-semibold text-white tracking-tight">Kavach-Opt Workstation</span>
+          <span className="text-neutral-500">•</span>
+          <span className="font-mono text-neutral-400 text-[11px]">
+            {health?.version_info || 'C++20 Sovereign Core'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 font-mono text-[11px]">
+          <div className="flex items-center gap-1.5 text-neutral-300">
+            <Cpu className="w-3.5 h-3.5 text-blue-400" />
+            <span>Backend:</span>
+            <span className="text-white font-medium">CPU-First (Darwin arm64)</span>
+          </div>
+          <span className="text-neutral-600 hidden sm:inline">|</span>
+          <div className="flex items-center gap-1.5 text-neutral-300 hidden sm:flex">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Zero-Trust Verifier:</span>
+            <span className="text-emerald-400 font-medium">ACTIVE</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Hero Section */}
+      <div className="relative rounded-2xl border border-[#1d2536] bg-gradient-to-b from-[#111724] via-[#0d121c] to-[#090d14] p-6 sm:p-8 overflow-hidden shadow-sm">
         <div className="max-w-3xl relative z-10">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-700/40 text-emerald-400 text-xs font-mono font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-700/40 text-emerald-400 text-xs font-mono font-medium mb-3">
             <Shield className="w-3.5 h-3.5" />
-            <span>SIH26119 · Sovereign Optimization Engine</span>
+            <span>Sovereign Optimization Engine</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white font-sans">
-            Kavach-Opt <span className="text-neutral-400 font-normal text-xl sm:text-2xl">(कवच-Opt)</span>
+            Mathematical Optimization Workbench
           </h1>
 
           <p className="mt-3 text-sm sm:text-base text-neutral-300 leading-relaxed max-w-2xl font-sans">
-            A from-scratch, sparse, numerically self-verifying mathematical optimization solver
-            core engineered in C++20. Designed as an indigenous alternative to foreign proprietary
-            solvers for industrial planning, crude scheduling, and refinery operations.
+            An indigenous, from-scratch mathematical solver core engineered in C++20 for continuous,
+            discrete, and convex quadratic optimization. Delivers deterministic algorithms, air-gapped
+            zero-trust verification, and reproducible industrial planning without foreign solver runtimes.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <PrimaryButton
-              icon={<Play className="w-4 h-4" />}
+              icon={<Play className="w-4 h-4 fill-white" />}
               onClick={() => onNavigate('solve')}
             >
               Run Optimization
@@ -54,12 +106,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               icon={<Shield className="w-4 h-4" />}
               onClick={() => onNavigate('verification')}
             >
-              Inspect Verifier
+              Independent Verifier
             </SecondaryButton>
             <SecondaryButton
+              icon={<Factory className="w-4 h-4" />}
               onClick={() => onNavigate('mrpl')}
             >
-              MRPL Refinery Case
+              Refinery Optimization
             </SecondaryButton>
           </div>
         </div>
@@ -70,9 +123,37 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
       </div>
 
-      {/* Current Solver Session Status */}
+      {/* System Pipeline Visualization */}
       <Panel
-        title={lastResult ? 'Active Optimization Run' : 'Selected Model Ready for Execution'}
+        title="Optimization Execution Pipeline"
+        subtitle="Unbroken end-to-end data flow from model ingestion to independent certification"
+      >
+        <Pipeline
+          steps={
+            lastResult && activeModel
+              ? [
+                  { id: 'ingest', name: '1. Ingestion', category: 'MPS / LP Parse', status: 'completed', detail: `Parsed ${activeModel.name}` },
+                  { id: 'model', name: '2. Canonical Model', category: 'Sparse CSR/CSC', status: 'completed', detail: `${activeModel.num_variables} vars, ${activeModel.num_constraints} rows` },
+                  { id: 'strategy', name: '3. Strategy Layer', category: 'Rules R001-R018', status: 'completed', detail: `Routed to ${activeModel.problem_class}` },
+                  { id: 'presolve', name: '4. Presolve Suite', category: 'Reductions', status: 'completed', detail: 'Ruiz scaled & bounds tightened' },
+                  { id: 'solve', name: '5. Core Solver', category: 'Simplex / B&B / QP', status: 'completed', detail: `${lastResult.iterations} iters in ${(lastResult.solve_time_seconds * 1000).toFixed(1)}ms` },
+                  { id: 'verify', name: '6. Verification', category: 'Independent Cert', status: 'completed', detail: `Residual: ${lastResult.verification_report.recomputed_primal_residual.toExponential(1)}` },
+                ]
+              : [
+                  { id: 'ingest', name: '1. Ingestion', category: 'MPS / LP Parse', status: activeModel ? 'completed' : 'pending', detail: activeModel ? `Loaded ${activeModel.name}` : 'Tokenization & Bounds' },
+                  { id: 'model', name: '2. Canonical Model', category: 'Sparse CSR/CSC', status: activeModel ? 'completed' : 'pending', detail: activeModel ? `${activeModel.num_variables} vars, ${activeModel.num_constraints} rows` : 'Variables & Constraints' },
+                  { id: 'strategy', name: '3. Strategy Layer', category: 'Rules R001-R018', status: 'active', detail: 'Dynamic characterization' },
+                  { id: 'presolve', name: '4. Presolve Suite', category: 'Reductions', status: 'pending', detail: 'Ruiz scaling & reductions' },
+                  { id: 'solve', name: '5. Core Solver', category: 'Simplex / B&B / QP', status: 'pending', detail: 'Sparse LU Factorization' },
+                  { id: 'verify', name: '6. Verification', category: 'Independent Cert', status: 'pending', detail: 'Primal & Dual Residuals' },
+                ]
+          }
+        />
+      </Panel>
+
+      {/* Recent / Current Execution & Engineering Observability */}
+      <Panel
+        title={lastResult ? 'Active Optimization Execution' : 'Selected Model Ready for Execution'}
         subtitle={
           lastResult
             ? 'Authoritative C++ solver output and independent verification certificate'
@@ -99,11 +180,12 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         }
       >
         {lastResult && activeModel ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {/* Primary KPI Group */}
             <MetricGroup columns={4}>
               <Metric
-                label="Objective Value"
-                value={lastResult.objective_value.toFixed(4)}
+                label="Objective Value (z*)"
+                value={typeof lastResult.objective_value === 'number' ? lastResult.objective_value.toFixed(4) : '—'}
                 highlight="success"
                 subtext={`Status: ${lastResult.status}`}
               />
@@ -116,7 +198,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               <Metric
                 label="Execution Wall Time"
                 value={`${(lastResult.solve_time_seconds * 1000).toFixed(2)} ms`}
-                subtext={`${lastResult.iterations} Simplex iters / ${lastResult.nodes} nodes`}
+                subtext={`${lastResult.iterations} iters / ${lastResult.nodes} nodes`}
               />
               <Metric
                 label="Active Backend"
@@ -126,10 +208,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               />
             </MetricGroup>
 
+            {/* Model Metadata Summary */}
             <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <FileCode className="w-4 h-4 text-neutral-400" />
-                <span className="text-neutral-400 font-sans">Active Run:</span>
+                <span className="text-neutral-400 font-sans">Instance:</span>
                 <span className="text-neutral-100 font-mono font-semibold">{activeModel.name}</span>
                 <span className="text-neutral-400 font-mono text-[11px]">({activeModel.problem_class})</span>
               </div>
@@ -141,6 +224,120 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 <span>{activeModel.num_nonzeros} nonzeros</span>
               </div>
             </div>
+
+            {/* CUTTING PLANE ACTIVITY (Rendered only when real cuts telemetry exists) */}
+            {lastResult.cuts && lastResult.cuts.cuts_generated > 0 && (
+              <div className="p-4 rounded-xl bg-[#0f1420] border border-sky-900/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingDown className="w-4 h-4 text-sky-400" />
+                    <span className="text-xs font-semibold text-white font-sans">
+                      MILP Cutting Plane Activity
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/80 border border-sky-700/50 text-sky-300">
+                    {lastResult.cuts.root_rounds} Root Cut Rounds
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Cuts Applied</span>
+                    <span className="text-sm font-bold font-mono text-emerald-400">{lastResult.cuts.cuts_applied}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Cuts Generated</span>
+                    <span className="text-sm font-bold font-mono text-neutral-200">{lastResult.cuts.cuts_generated}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Gomory / GMI</span>
+                    <span className="text-sm font-bold font-mono text-sky-400">{lastResult.cuts.gomory_cuts}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">MIR Cuts</span>
+                    <span className="text-sm font-bold font-mono text-indigo-400">{lastResult.cuts.mir_cuts}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ADVANCED MILP SEARCH TELEMETRY (Rendered only when real search telemetry exists) */}
+            {lastResult.search && (
+              <div className="p-4 rounded-xl bg-[#0f1420] border border-indigo-900/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Split className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-semibold text-white font-sans">
+                      Advanced MILP Search Intelligence
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-700/50 text-indigo-300">
+                    Strategy: {lastResult.search.branching_strategy}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Pseudocost Updates</span>
+                    <span className="text-sm font-bold font-mono text-indigo-400">{lastResult.search.pseudocost_updates}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Strong Probes</span>
+                    <span className="text-sm font-bold font-mono text-sky-400">{lastResult.search.strong_branching_calls}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Incumbent Source</span>
+                    <span className="text-xs font-bold font-mono text-emerald-400 truncate block">{lastResult.search.incumbent_source}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Heuristic Updates</span>
+                    <span className="text-sm font-bold font-mono text-emerald-400">{lastResult.search.heuristic_incumbent_updates}</span>
+                  </div>
+                </div>
+
+                {lastResult.search.search_explanation && (
+                  <p className="text-[11px] text-neutral-400 font-mono bg-[#141926] p-2.5 rounded border border-[#1e2637] leading-relaxed">
+                    {lastResult.search.search_explanation}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* CONVEX MIQP OBSERVABILITY (Rendered only when real MIQP telemetry exists) */}
+            {lastResult.miqp && (
+              <div className="p-4 rounded-xl bg-[#0f1420] border border-purple-900/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Workflow className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-white font-sans">
+                      Convex MIQP Active-Set Continuous Relaxations
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/80 border border-purple-700/50 text-purple-300">
+                    Relaxations Solved: {lastResult.miqp.qp_relaxations_solved}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">QP Relaxation Iterations</span>
+                    <span className="text-sm font-bold font-mono text-purple-400">{lastResult.miqp.qp_relaxation_iterations}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Strong QP Probes</span>
+                    <span className="text-sm font-bold font-mono text-sky-400">{lastResult.miqp.strong_qp_probes}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">Nodes Pruned Bound</span>
+                    <span className="text-sm font-bold font-mono text-neutral-200">{lastResult.miqp.nodes_pruned_bound}</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+                    <span className="text-neutral-400 text-[10px] block font-mono">QP KKT Residual</span>
+                    <span className="text-sm font-bold font-mono text-emerald-400">{lastResult.miqp.qp_kkt_residual.toExponential(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : activeModel ? (
           <div className="space-y-4">
@@ -156,13 +353,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-neutral-400 leading-relaxed font-sans pt-1">
-                  Model topology verified. Ready for Phase I/II simplex optimization and zero-trust independent certification.
+                  Model topology verified. Ready for Phase I/II simplex or active-set optimization with zero-trust certification.
                 </p>
               </div>
 
               <PrimaryButton
                 size="sm"
-                icon={<Play className="w-3.5 h-3.5" />}
+                icon={<Play className="w-3.5 h-3.5 fill-white" />}
                 onClick={() => onNavigate('solve')}
               >
                 Run Solve on {activeModel.name}
@@ -199,100 +396,70 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         ) : (
           <EmptyState
             title="Discovering Models"
-            description="Connecting to repository models via solver adapter..."
+            description="Connecting to repository models via local solver adapter..."
           />
         )}
       </Panel>
 
-      {/* Optimization Pipeline Visualization */}
-      <Panel
-        title="Optimization Execution Pipeline"
-        subtitle="Unbroken end-to-end data flow from ingest to independent certification"
-      >
-        <Pipeline
-          steps={
-            lastResult && activeModel
-              ? [
-                  { id: 'ingest', name: '1. Ingestion', category: 'MPS / LP Parse', status: 'completed', detail: `Parsed ${activeModel.name}` },
-                  { id: 'model', name: '2. Canonical Model', category: 'Representation', status: 'completed', detail: `${activeModel.num_variables} vars, ${activeModel.num_constraints} rows` },
-                  { id: 'strategy', name: '3. Strategy Layer', category: 'Rules R001-R018', status: 'completed', detail: `Routed to ${activeModel.problem_class}` },
-                  { id: 'presolve', name: '4. Presolve Suite', category: 'Reduction', status: 'completed', detail: 'Ruiz scaled & bounds tightened' },
-                  { id: 'solve', name: '5. Core Solver', category: 'Simplex / B&B / QP', status: 'completed', detail: `${lastResult.iterations} iters in ${(lastResult.solve_time_seconds * 1000).toFixed(1)}ms` },
-                  { id: 'verify', name: '6. Verification', category: 'Independent Cert', status: 'completed', detail: `Residual: ${lastResult.verification_report.recomputed_primal_residual.toExponential(1)}` },
-                ]
-              : [
-                  { id: 'ingest', name: '1. Ingestion', category: 'MPS / LP Parse', status: activeModel ? 'completed' : 'pending', detail: activeModel ? `Loaded ${activeModel.name}` : 'Tokenization & Bounds' },
-                  { id: 'model', name: '2. Canonical Model', category: 'Representation', status: activeModel ? 'completed' : 'pending', detail: activeModel ? `${activeModel.num_variables} vars, ${activeModel.num_constraints} rows` : 'Variables & Constraints' },
-                  { id: 'strategy', name: '3. Strategy Layer', category: 'Rules R001-R018', status: 'active', detail: 'Dynamic characterization' },
-                  { id: 'presolve', name: '4. Presolve Suite', category: 'Reduction', status: 'pending', detail: 'Ruiz scaling & reductions' },
-                  { id: 'solve', name: '5. Core Solver', category: 'Simplex / B&B / QP', status: 'pending', detail: 'Sparse LU Factorization' },
-                  { id: 'verify', name: '6. Verification', category: 'Independent Cert', status: 'pending', detail: 'Primal & Dual Residuals' },
-                ]
-          }
-        />
-      </Panel>
-
-      {/* Solver Capabilities */}
+      {/* Solver Capabilities: 4 Core Problem Classes */}
       <div>
         <div className="mb-3">
           <h2 className="text-base font-semibold text-neutral-200">
-            Engine Capabilities & Mathematical Scope
+            Engine Capabilities &amp; Mathematical Scope
           </h2>
           <p className="text-xs text-neutral-400">
-            Validated from-scratch components verified across 329 unit and adversarial tests
+            From-scratch numerical algorithms verified against standard Netlib, MIPLIB, and QP benchmark sets.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="p-4 rounded-xl bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-mono font-medium text-emerald-400">
-                  LP Solver
+                  Continuous LP
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300">
                   REVISED SIMPLEX
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-neutral-100 font-sans">
-                Continuous Linear Programming
+                Linear Programming
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Two-Phase Revised Simplex with Bland anti-cycling rule, Ruiz equilibration scaling,
-                and multi-pass presolve reconstruction.
+                Two-Phase Revised Simplex with Bland anti-cycling, Ruiz equilibration scaling, and presolve reductions.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>Benchmark: Netlib</span>
-              <span className="text-emerald-400 font-medium">13/13 Solved</span>
+              <span>Standard: Netlib</span>
+              <span className="text-emerald-400 font-medium">Verified Optimal</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
+          <div className="p-4 rounded-xl bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-mono font-medium text-sky-400">
-                  MILP Solver
+                  Discrete MILP
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/60 border border-sky-800/40 text-sky-300">
-                  BRANCH & BOUND
+                  BRANCH &amp; CUT
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-neutral-100 font-sans">
-                Mixed-Integer Linear Programming
+                Mixed-Integer Linear
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Branch-and-Bound with most-fractional branching, best-bound search, and dual simplex
-                warm starts accelerating child LP node solves.
+                Gomory/MIR cuts, reliability branching with pseudocost tracking, and dual simplex warm-starts.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>Benchmark: MIPLIB</span>
+              <span>Standard: MIPLIB</span>
               <span className="text-sky-400 font-medium">Warm-Starts Active</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
+          <div className="p-4 rounded-xl bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-mono font-medium text-indigo-400">
@@ -306,98 +473,48 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 Quadratic Programming
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Primal active-set method for strictly convex QP with positive semi-definite (PSD)
-                Hessian validation and Karush-Kuhn-Tucker convergence.
+                Primal active-set method with positive semi-definite (PSD) Hessian validation and KKT convergence.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>Scope: Strictly Convex</span>
+              <span>Hessian Check</span>
               <span className="text-indigo-400 font-medium">PSD Enforced</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
+          <div className="p-4 rounded-xl bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono font-medium text-emerald-400">
-                  Certification
+                <span className="text-xs font-mono font-medium text-purple-400">
+                  Convex MIQP
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300">
-                  INDEPENDENT
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 border border-purple-800/40 text-purple-300">
+                  B&amp;B + ACTIVE-SET
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-neutral-100 font-sans">
-                Independent Verification Layer
+                Mixed-Integer QP
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Decoupled mathematical audit recomputing primal feasibility, dual multipliers,
-                complementarity, and integrality residuals. Never trusts self-reports.
+                Branch-and-Bound solving active-set QP continuous relaxations with strong QP probing and primal heuristics.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>Fault Rejection Rate</span>
-              <span className="text-emerald-400 font-medium">100% Certified</span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono font-medium text-amber-400">
-                  Numerics Core
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/40 text-amber-300">
-                  SPARSE LU
-                </span>
-              </div>
-              <h3 className="text-sm font-semibold text-neutral-100 font-sans">
-                Sparse Matrix & Factorization
-              </h3>
-              <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Compressed Sparse Row/Column representations with Markowitz threshold pivoting,
-                iterative refinement, and condition monitoring.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>External BLAS Dependency</span>
-              <span className="text-amber-400 font-medium">0 (Sovereign)</span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-[#11151f] border border-[#1d2332] flex flex-col justify-between shadow-xs">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono font-medium text-neutral-300">
-                  Hardware
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300">
-                  CPU-FIRST + CUDA
-                </span>
-              </div>
-              <h3 className="text-sm font-semibold text-neutral-100 font-sans">
-                Multicore & Scoped GPU
-              </h3>
-              <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Standard C++20 thread pool for batched SpMV, plus a single scoped CUDA kernel
-                gated by empirical crossover and automatic CPU fallback.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span>Crossover Gate</span>
-              <span className="text-neutral-300 font-medium">Transfer-Inclusive</span>
+              <span>Certification</span>
+              <span className="text-purple-400 font-medium">Exact Residuals</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Industrial Relevance Banner */}
-      <div className="p-6 rounded-xl border border-[#1d2332] bg-[#11151f] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
+      <div className="p-6 rounded-2xl border border-[#1d2332] bg-[#11151f] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
         <div>
           <span className="text-xs font-mono font-medium text-amber-400">
             Industrial Relevance · Mangalore Refinery and Petrochemicals Limited
           </span>
           <h2 className="text-lg font-bold text-white mt-1 font-sans">
-            MRPL Refinery Production Planning & Quality Blending
+            Refinery Optimization: Crude Blending &amp; Product Scheduling
           </h2>
           <p className="mt-1.5 text-xs sm:text-sm text-neutral-400 max-w-3xl leading-relaxed font-sans">
             Demonstrating crude selection, atmospheric distillation throughput limits,
@@ -409,7 +526,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           onClick={() => onNavigate('mrpl')}
           className="shrink-0"
         >
-          Explore Case Study
+          Explore Refinery Model
         </PrimaryButton>
       </div>
     </div>

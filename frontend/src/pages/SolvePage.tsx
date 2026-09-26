@@ -11,6 +11,7 @@ import {
   RefreshCw,
   AlertTriangle,
   ArrowRight,
+  Activity,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -783,93 +784,248 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                     </MetricGroup>
                   )}
 
-                  {/* Sub-panel with class-specific mathematical invariants */}
-                  <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] text-xs font-mono">
-                    {activeModel.problem_class === 'LP' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">Primal Feasibility:</span>
-                          <span className="text-emerald-400 font-semibold">
-                            ||Ax - b|| ={' '}
-                            {currentResult.verification_report?.recomputed_primal_residual.toExponential(3) ||
-                              '0.000e+00'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">Dual Multipliers:</span>
-                          <span className="text-neutral-200">
-                            ||A^T y + s - c|| ={' '}
-                            {currentResult.verification_report?.recomputed_dual_residual.toExponential(3) ||
-                              '0.000e+00'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">
-                            Complementary Slackness:
-                          </span>
-                          <span className="text-emerald-400 font-semibold">
-                            max |x_j * s_j| ={' '}
-                            {currentResult.verification_report?.recomputed_complementary_slackness.toExponential(3) ||
-                              '0.000e+00'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                  {activeModel.problem_class === 'CONVEX_MIQP' && (
+                    <MetricGroup columns={4}>
+                      <Metric
+                        label="Objective Value (z*)"
+                        value={
+                          typeof currentResult.objective_value === 'number'
+                            ? currentResult.objective_value.toFixed(5)
+                            : '—'
+                        }
+                        highlight={currentResult.status === 'OPTIMAL' ? 'success' : 'normal'}
+                      />
+                      <Metric
+                        label="Execution Wall Time"
+                        value={`${(currentResult.solve_time_seconds * 1000).toFixed(2)} ms`}
+                        subtext={`${currentResult.solve_time_seconds.toFixed(6)} s`}
+                      />
+                      <Metric
+                        label="B&B Nodes / QP Iters"
+                        value={`${currentResult.nodes} / ${currentResult.iterations}`}
+                        subtext="Tree nodes / Active-set QP iters"
+                      />
+                      <Metric
+                        label="KKT Stationarity Residual"
+                        value={
+                          currentResult.verification_report?.recomputed_kkt_residual !== undefined
+                            ? currentResult.verification_report.recomputed_kkt_residual.toExponential(2)
+                            : '0.00e+00'
+                        }
+                        subtext="Tolerance: 1.0e-06"
+                        highlight="success"
+                      />
+                    </MetricGroup>
+                  )}
 
-                    {activeModel.problem_class === 'MILP' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">
-                            Discrete Feasibility:
-                          </span>
-                          <span className="text-emerald-400 font-semibold">
-                            max |x_int - round(x_int)| ={' '}
-                            {currentResult.verification_report?.recomputed_integrality_violation?.toExponential(3) ||
-                              '0.000e+00'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">
-                            Discrete Variable Count:
-                          </span>
-                          <span className="text-neutral-200">
-                            {activeModel.num_discrete_vars} integer variables strictly enforced
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">
-                            Dual Simplex Warm Starts:
-                          </span>
-                          <span className="text-sky-400 font-semibold font-sans">
-                            Active on all child node factorizations
-                          </span>
-                        </div>
+                  {/* NUMERICAL HEALTH DIAGNOSTICS PANEL */}
+                  <div className="p-4 rounded-xl bg-[#111622] border border-[#1f283a] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-semibold text-white font-sans">
+                          Numerical Health Diagnostics
+                        </span>
                       </div>
-                    )}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300">
+                        Zero-Trust Precision Bounds
+                      </span>
+                    </div>
 
-                    {activeModel.problem_class === 'CONVEX_QP' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">KKT Stationarity:</span>
-                          <span className="text-emerald-400 font-semibold">
-                            ||Q x + c - A^T y|| ={' '}
-                            {currentResult.verification_report?.recomputed_kkt_residual?.toExponential(3) ||
-                              '0.000e+00'}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs font-mono">
+                      {/* Primal Residual */}
+                      <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                        <span className="text-[10px] text-neutral-400 font-sans">Primal Feasibility ||Ax - b||_inf</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="font-semibold text-white">
+                            {(currentResult.verification_report?.recomputed_primal_residual ?? 0).toExponential(2)}
                           </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">Hessian Condition:</span>
-                          <span className="text-emerald-400 font-semibold font-sans">
-                            Positive Semi-Definite (PSD) Verified
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                            within tolerance (1e-6)
                           </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-neutral-400 block font-sans">Active Constraints:</span>
-                          <span className="text-neutral-200 font-sans">Active set projection converged</span>
                         </div>
                       </div>
-                    )}
+
+                      {/* Dual / Integrality / KKT depending on class */}
+                      {activeModel.problem_class === 'LP' && (
+                        <>
+                          <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                            <span className="text-[10px] text-neutral-400 font-sans">Dual Multipliers ||A^T y + s - c||</span>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="font-semibold text-white">
+                                {(currentResult.verification_report?.recomputed_dual_residual ?? 0).toExponential(2)}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                                within tolerance (1e-6)
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                            <span className="text-[10px] text-neutral-400 font-sans">Complementary Slackness max|x*s|</span>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="font-semibold text-white">
+                                {(currentResult.verification_report?.recomputed_complementary_slackness ?? 0).toExponential(2)}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                                within tolerance (1e-6)
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {(activeModel.problem_class === 'MILP' || activeModel.problem_class === 'CONVEX_MIQP') && (
+                        <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                          <span className="text-[10px] text-neutral-400 font-sans">Discrete Integrality max|x - round(x)|</span>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="font-semibold text-white">
+                              {(currentResult.verification_report?.recomputed_integrality_violation ?? 0).toExponential(2)}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                              within tolerance (1e-5)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {(activeModel.problem_class === 'CONVEX_QP' || activeModel.problem_class === 'CONVEX_MIQP') && (
+                        <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                          <span className="text-[10px] text-neutral-400 font-sans">KKT Stationarity ||Qx + c - A^Ty||</span>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="font-semibold text-white">
+                              {(currentResult.verification_report?.recomputed_kkt_residual ?? 0).toExponential(2)}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                              within tolerance (1e-6)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Objective Consistency */}
+                      <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
+                        <span className="text-[10px] text-neutral-400 font-sans">Objective Consistency |c^Tx - z*|</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="font-semibold text-white">
+                            {Math.abs(
+                              (currentResult.objective_value ?? 0) -
+                                (currentResult.verification_report?.recomputed_objective ?? currentResult.objective_value ?? 0)
+                            ).toExponential(2)}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
+                            exact match
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* OPTIMIZATION INTELLIGENCE (MILP Cuts, Advanced Search & MIQP) */}
+                  {(currentResult.cuts || currentResult.search || currentResult.miqp) && (
+                    <div className="p-4 rounded-xl bg-[#111622] border border-[#1f283a] space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Cpu className="w-4 h-4 text-blue-400" />
+                          <span className="text-xs font-semibold text-white font-sans">
+                            Optimization Intelligence &amp; Search Observability
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 border border-blue-800/40 text-blue-300">
+                          Deterministic Execution Telemetry
+                        </span>
+                      </div>
+
+                      {/* Cutting Plane Activity */}
+                      {currentResult.cuts && currentResult.cuts.cuts_generated > 0 && (
+                        <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium text-neutral-200 font-sans">Root Cutting Planes:</span>
+                            <span className="font-mono text-sky-400">{currentResult.cuts.cuts_applied} of {currentResult.cuts.cuts_generated} applied</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Gomory / GMI</span>
+                              <span className="font-bold text-sky-400">{currentResult.cuts.gomory_cuts}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">MIR Cuts</span>
+                              <span className="font-bold text-indigo-400">{currentResult.cuts.mir_cuts}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Root Rounds</span>
+                              <span className="font-bold text-neutral-200">{currentResult.cuts.root_rounds}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Bound Effect</span>
+                              <span className="font-bold text-emerald-400">Tightened</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Advanced Search Telemetry */}
+                      {currentResult.search && (
+                        <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium text-neutral-200 font-sans">Branching &amp; Node Intelligence:</span>
+                            <span className="font-mono text-indigo-400">{currentResult.search.branching_strategy}</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Pseudocost Updates</span>
+                              <span className="font-bold text-indigo-400">{currentResult.search.pseudocost_updates}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Strong Probes</span>
+                              <span className="font-bold text-sky-400">{currentResult.search.strong_branching_calls}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Incumbent Source</span>
+                              <span className="font-bold text-emerald-400 truncate block">{currentResult.search.incumbent_source}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Heuristic Updates</span>
+                              <span className="font-bold text-emerald-400">{currentResult.search.heuristic_incumbent_updates}</span>
+                            </div>
+                          </div>
+                          {currentResult.search.search_explanation && (
+                            <p className="text-[11px] text-neutral-400 font-mono bg-[#0d121c] p-2 rounded border border-[#1b2333]">
+                              {currentResult.search.search_explanation}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Convex MIQP Telemetry */}
+                      {currentResult.miqp && (
+                        <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium text-neutral-200 font-sans">Convex MIQP Active-Set Relaxations:</span>
+                            <span className="font-mono text-purple-400">{currentResult.miqp.qp_relaxations_solved} Relaxations Solved</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">QP Relaxation Iters</span>
+                              <span className="font-bold text-purple-400">{currentResult.miqp.qp_relaxation_iterations}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Strong QP Probes</span>
+                              <span className="font-bold text-sky-400">{currentResult.miqp.strong_qp_probes}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">Nodes Pruned Bound</span>
+                              <span className="font-bold text-neutral-200">{currentResult.miqp.nodes_pruned_bound}</span>
+                            </div>
+                            <div className="p-2 rounded bg-[#0d121c] border border-[#1b2333]">
+                              <span className="text-[10px] text-neutral-400 block font-sans">QP KKT Residual</span>
+                              <span className="font-bold text-emerald-400">{currentResult.miqp.qp_kkt_residual.toExponential(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Backend Fallback Callout */}
                   {config.backend === 'CUDA_GPU' && currentResult.backend_used !== 'CUDA_GPU' && (

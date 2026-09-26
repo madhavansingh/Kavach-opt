@@ -56,8 +56,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'mrpl',
-      label: 'MRPL Case Study',
-      sublabel: 'Refinery Blending MILP',
+      label: 'Refinery Optimization',
+      sublabel: 'Crude Blending & Capacity',
       icon: <Factory className="w-4 h-4" />,
     },
     {
@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-neutral-400 font-mono">
-              SIH26119 · MRPL
+              Sovereign Optimization Engine
             </p>
           </div>
         </div>
@@ -141,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
         <div className="mt-1 text-[10px] text-neutral-400 font-mono leading-tight">
-          Sovereign C++20 · Zero Dependencies
+          Sovereign C++20 · Independent Core
         </div>
       </div>
     </aside>

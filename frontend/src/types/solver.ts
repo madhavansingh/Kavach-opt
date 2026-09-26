@@ -4,7 +4,7 @@
  * Strictly reflects the C++ API, CLI JSON output, and verification structures.
  */
 
-export type ProblemClass = 'LP' | 'MILP' | 'CONVEX_QP';
+export type ProblemClass = 'LP' | 'MILP' | 'CONVEX_QP' | 'CONVEX_MIQP';
 
 export type SolverStatus =
   | 'OPTIMAL'
@@ -25,6 +25,46 @@ export type PresolvePolicy = 'FULL' | 'NONE' | 'AUTO';
 export type ScalingPolicy = 'AUTO' | 'ENABLED' | 'DISABLED';
 
 export type NumericalRiskProfile = 'NORMAL' | 'ELEVATED' | 'HIGH';
+
+export interface CuttingPlaneTelemetry {
+  cuts_applied: number;
+  cuts_generated: number;
+  gomory_cuts: number;
+  mir_cuts: number;
+  root_rounds: number;
+}
+
+export interface AdvancedSearchTelemetry {
+  branching_strategy: string;
+  heuristic_calls: number;
+  heuristic_feasible_candidates: number;
+  heuristic_incumbent_updates: number;
+  incumbent_source: string;
+  pseudocost_candidates: number;
+  pseudocost_updates: number;
+  reliability_fallbacks: number;
+  search_explanation: string;
+  strong_branching_calls: number;
+  strong_branching_candidates: number;
+  strong_branching_infeasible_children: number;
+}
+
+export interface MiqpTelemetry {
+  nodes_pruned_bound: number;
+  nodes_pruned_infeasible: number;
+  qp_kkt_residual: number;
+  qp_relaxation_iterations: number;
+  qp_relaxation_time_seconds: number;
+  qp_relaxations_solved: number;
+  strong_qp_probes: number;
+}
+
+export interface CudaKernelInfo {
+  name: string;
+  layout: string;
+  precision: string;
+  available: boolean;
+}
 
 export interface VerificationCheckItem {
   name: string;
@@ -94,6 +134,9 @@ export interface SolveResult {
   primal_solution?: Record<string, number>;
   dual_solution?: Record<string, number>;
   strategy_decision?: StrategyDecision;
+  cuts?: CuttingPlaneTelemetry;
+  search?: AdvancedSearchTelemetry;
+  miqp?: MiqpTelemetry;
 }
 
 export interface SolverSession {
@@ -159,6 +202,10 @@ export interface MRPLScenario {
   profit_delta_k_usd?: number;
   throughput_kbpd?: number;
   mass_balance_passed: boolean;
+  solve_time_seconds?: number;
+  mass_balance_residual?: number;
+  units?: MRPLUnitDecision[];
+  qualities?: MRPLProductQuality[];
 }
 
 export interface MRPLCaseData {

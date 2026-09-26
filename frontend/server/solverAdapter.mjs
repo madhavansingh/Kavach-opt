@@ -97,7 +97,9 @@ export async function discoverModels() {
 
       // Determine class from directory / extension
       let problemClass = 'LP';
-      if (dir.includes('miplib') || file.includes('blending') || file.includes('knapsack') || file.includes('facility')) {
+      if (file.includes('miqp')) {
+        problemClass = 'CONVEX_MIQP';
+      } else if (dir.includes('miplib') || file.includes('blending') || file.includes('knapsack') || file.includes('facility')) {
         problemClass = 'MILP';
       } else if (dir.includes('qp') || file.includes('portfolio') || file.includes('constrained_ls')) {
         problemClass = 'CONVEX_QP';
@@ -448,9 +450,30 @@ export async function loadMRPLData() {
             description: descMap[scenarioKey] || `Industrial operating scenario: ${scenarioKey}`,
             status,
             net_profit_k_usd: profit,
-            profit_delta_k_usd: delta,
-            throughput_kbpd: s.production_kbpd ? Object.values(s.production_kbpd).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) : 328.2,
+            profit_delta_k_usd: scenarioKey === 'baseline' ? 0.0 : delta,
+            throughput_kbpd: s.production_kbpd ? Object.values(s.production_kbpd).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) : 0,
             mass_balance_passed: s.mass_balance_validation?.passed ?? (status === 'OPTIMAL'),
+            solve_time_seconds: s.solve_time_seconds ?? s.lp_relaxation_time_seconds ?? 0.001,
+            mass_balance_residual: s.mass_balance_validation?.max_absolute_residual ?? 0.0,
+            units: (s.unit_decisions || []).map((u) => ({
+              unit: u.description || u.unit,
+              is_active: u.is_active ?? true,
+              throughput_kbpd: u.throughput_kbpd || 0,
+              capacity_limit_kbpd: u.unit === 'U1' ? 200.0 : u.unit === 'U2' ? 180.0 : 120.0,
+              utilization_pct: u.utilization_pct || 0,
+              summary: u.summary || `${u.unit}: throughput ${u.throughput_kbpd?.toFixed(1)} kbpd (${u.utilization_pct?.toFixed(1)}% load)`,
+            })),
+            qualities: (s.product_qualities || []).map((q) => ({
+              product: q.product,
+              production_kbpd: q.production_kbpd,
+              calculated_sulfur_wt_pct: q.calculated_sulfur_wt_pct,
+              sulfur_limit_wt_pct: q.sulfur_limit_wt_pct,
+              sulfur_margin_wt_pct: q.sulfur_margin_wt_pct,
+              calculated_density_kg_m3: q.calculated_density_kg_m3,
+              density_limit_kg_m3: q.density_limit_kg_m3,
+              density_margin_kg_m3: q.density_margin_kg_m3,
+              quality_satisfied: q.quality_satisfied,
+            })),
           };
         })
       : [],
@@ -482,5 +505,15 @@ export async function getSystemHealth() {
     cuda_device_present: false,
     version_info: versionInfo,
     server_time: new Date().toISOString(),
+    supported_problem_classes: ['LP', 'MILP', 'CONVEX_QP', 'CONVEX_MIQP'],
+    kernels: [
+      { name: 'Batched CSR SpMV', layout: 'CSR', precision: 'FP64', available: false },
+      { name: 'Batched CSR Transpose SpMV', layout: 'CSR Transpose', precision: 'FP64', available: false },
+      { name: 'Batched CSC SpMV', layout: 'CSC', precision: 'FP64', available: false },
+      { name: 'Batched AXPBY', layout: 'Dense Vector Batch', precision: 'FP64', available: false },
+      { name: 'Batched Dot', layout: 'Dense Vector Batch', precision: 'FP64', available: false },
+      { name: 'Batched L2 Norm', layout: 'Dense Vector Batch', precision: 'FP64', available: false },
+      { name: 'Batched L∞ Norm', layout: 'Dense Vector Batch', precision: 'FP64', available: false },
+    ],
   };
 }

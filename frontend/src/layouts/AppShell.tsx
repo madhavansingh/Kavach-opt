@@ -11,6 +11,7 @@ interface AppShellProps {
   hasActiveRun?: boolean;
   backend?: BackendType;
   solverStatus?: SolverStatus;
+  onOpenOnboarding?: () => void;
   children: React.ReactNode;
 }
 
@@ -21,6 +22,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   hasActiveRun = false,
   backend,
   solverStatus,
+  onOpenOnboarding,
   children,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,6 +65,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           hasActiveRun={hasActiveRun}
           backend={backend}
           solverStatus={solverStatus}
+          onOpenOnboarding={onOpenOnboarding}
           onToggleMobileMenu={() => setMobileMenuOpen((o) => !o)}
         />
 

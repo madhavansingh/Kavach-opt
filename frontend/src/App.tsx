@@ -11,6 +11,7 @@ import type { ModelMetadata, SolveConfig, SolveResult } from './types/solver';
 import { solverBridge } from './lib/solverBridge';
 import { ToastProvider } from './context/ToastContext';
 import { useToast } from './context/useToast';
+import { OnboardingModal } from './components/OnboardingModal';
 
 function AppInner() {
   const [currentTab, setCurrentTab] = useState<NavTab>('overview');
@@ -23,6 +24,13 @@ function AppInner() {
   const [isDiscoveringModels, setIsDiscoveringModels] = useState(true);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [discoveryAttempt, setDiscoveryAttempt] = useState<number>(0);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('kavach_onboarding_completed') !== 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const { showToast } = useToast();
 
@@ -190,55 +198,67 @@ function AppInner() {
   };
 
   return (
-    <AppShell
-      currentTab={currentTab}
-      onSelectTab={handleSelectTab}
-      currentModelName={activeModel?.name || (isDiscoveringModels ? 'Discovering Models...' : 'No Model')}
-      hasActiveRun={currentResult !== null}
-      backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
-      solverStatus={currentResult?.status}
-    >
-      {currentTab === 'overview' && (
-        <OverviewPage
-          onNavigate={handleSelectTab}
-          activeModel={activeModel ?? undefined}
-          lastResult={currentResult ?? undefined}
-          isDiscoveringModels={isDiscoveringModels}
-        />
-      )}
+    <>
+      <AppShell
+        currentTab={currentTab}
+        onSelectTab={handleSelectTab}
+        currentModelName={activeModel?.name || (isDiscoveringModels ? 'Discovering Models...' : 'No Model')}
+        hasActiveRun={currentResult !== null}
+        backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
+        solverStatus={currentResult?.status}
+        onOpenOnboarding={() => setShowOnboarding(true)}
+      >
+        {currentTab === 'overview' && (
+          <OverviewPage
+            onNavigate={handleSelectTab}
+            activeModel={activeModel ?? undefined}
+            lastResult={currentResult ?? undefined}
+            isDiscoveringModels={isDiscoveringModels}
+          />
+        )}
 
-      {currentTab === 'solve' && (
-        <SolvePage
-          activeModel={activeModel}
-          availableModels={availableModels}
-          isDiscoveringModels={isDiscoveringModels}
-          discoveryError={discoveryError}
-          onRetryDiscovery={handleRetryDiscovery}
-          onSelectModel={handleSelectModel}
-          onNavigate={handleSelectTab}
-          currentResult={currentResult}
-          onRunSolve={handleRunSolve}
-          isSolving={isSolving}
-          solveError={solveError}
-        />
-      )}
+        {currentTab === 'solve' && (
+          <SolvePage
+            activeModel={activeModel}
+            availableModels={availableModels}
+            isDiscoveringModels={isDiscoveringModels}
+            discoveryError={discoveryError}
+            onRetryDiscovery={handleRetryDiscovery}
+            onSelectModel={handleSelectModel}
+            onNavigate={handleSelectTab}
+            currentResult={currentResult}
+            onRunSolve={handleRunSolve}
+            isSolving={isSolving}
+            solveError={solveError}
+          />
+        )}
 
-      {currentTab === 'verification' && (
-        <VerificationPage
-          activeModel={activeModel}
-          result={currentResult}
-          onNavigate={handleSelectTab}
-          onRunVerify={handleVerifyCurrent}
-          isVerifying={isVerifying}
-        />
-      )}
+        {currentTab === 'verification' && (
+          <VerificationPage
+            activeModel={activeModel}
+            result={currentResult}
+            onNavigate={handleSelectTab}
+            onRunVerify={handleVerifyCurrent}
+            isVerifying={isVerifying}
+          />
+        )}
 
-      {currentTab === 'benchmarks' && <BenchmarksPage />}
+        {currentTab === 'benchmarks' && <BenchmarksPage />}
 
-      {currentTab === 'mrpl' && <MRPLPage />}
+        {currentTab === 'mrpl' && <MRPLPage />}
 
-      {currentTab === 'system' && <SystemPage />}
-    </AppShell>
+        {currentTab === 'system' && <SystemPage />}
+      </AppShell>
+
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onNavigateToSolve={() => {
+          setShowOnboarding(false);
+          handleSelectTab('solve');
+        }}
+      />
+    </>
   );
 }
 

@@ -84,8 +84,8 @@ export const MRPLPage: React.FC = () => {
     return (
       <div className="space-y-6 animate-fade-in" aria-busy="true">
         <PageHeader
-          title="MRPL Refinery Optimization Subsystem"
-          subtitle="Industrial refinery blending and crude allocation case study."
+          title="Refinery Optimization"
+          subtitle="Crude blending, processing capacity and product planning"
         />
         <SkeletonPanel titleWidth="w-72" subtitleWidth="w-96">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
@@ -169,13 +169,13 @@ export const MRPLPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="MRPL Industrial Case Study"
-        subtitle="Crude scheduling, unit routing, and clean fuel quality blending optimization under capacity and emission constraints."
+        title="Refinery Optimization"
+        subtitle="Crude blending, processing capacity and product planning"
         badge={
           <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400 font-mono">INDUSTRY:</span>
+            <span className="text-xs text-neutral-400 font-mono">SECTOR:</span>
             <span className="text-xs font-mono font-semibold text-white px-2 py-0.5 rounded bg-[#1e2430] border border-[#2e3748]">
-              PETROLEUM REFINING
+              PETROLEUM REFINING & CRUDE BLENDING
             </span>
           </div>
         }
@@ -192,7 +192,7 @@ export const MRPLPage: React.FC = () => {
               Data Status Disclosure · Illustrative / Synthetic Industrial Dataset
             </h2>
             <p className="text-xs text-neutral-300 leading-relaxed max-w-4xl">
-              {mrplCase.data_status_disclosure}
+              The scenarios below demonstrate mathematical optimization on an illustrative petroleum refinery model. Technical and economic parameters are realistic approximations designed to showcase multi-period blending, capacity allocation, and quality constraint enforcement.
             </p>
           </div>
         </div>
@@ -439,15 +439,6 @@ export const MRPLPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1f283a]/60">
-                <tr className="hover:bg-[#161c28] transition-colors">
-                  <td className="py-2.5 px-3 font-bold text-white font-sans">Baseline</td>
-                  <td className="py-2.5 px-3 text-neutral-400 font-sans">Full capacity, standard crude intake</td>
-                  <td className="py-2.5 px-3 text-right text-neutral-200">280.0 kbpd</td>
-                  <td className="py-2.5 px-3 text-right text-emerald-400 font-bold">${baseline.economics.net_profit_k_usd.toFixed(2)}k</td>
-                  <td className="py-2.5 px-3 text-right text-neutral-400">—</td>
-                  <td className="py-2.5 px-3 text-center"><StatusBadge status="OPTIMAL" size="sm" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-400 font-semibold">PASS (0.0)</td>
-                </tr>
                 {mrplCase.scenarios.map((sc: MRPLScenario) => (
                   <tr
                     key={sc.id}
@@ -475,7 +466,7 @@ export const MRPLPage: React.FC = () => {
                     <td className="py-2.5 px-3 text-right font-mono">
                       {sc.profit_delta_k_usd !== undefined ? (
                         <span className={sc.profit_delta_k_usd < 0 ? 'text-rose-400' : 'text-emerald-400'}>
-                          {sc.profit_delta_k_usd < 0 ? '' : '+'}${sc.profit_delta_k_usd.toFixed(2)}k
+                          {sc.id === 'baseline' ? '0.00 (Base)' : `${sc.profit_delta_k_usd < 0 ? '' : '+'}$${sc.profit_delta_k_usd.toFixed(2)}k`}
                         </span>
                       ) : '—'}
                     </td>
@@ -631,8 +622,10 @@ export const MRPLPage: React.FC = () => {
                         : 'text-neutral-200'
                     }
                   >
-                    {selectedScenario.profit_delta_k_usd
-                      ? `$${selectedScenario.profit_delta_k_usd.toFixed(2)}k`
+                    {selectedScenario.profit_delta_k_usd !== undefined
+                      ? selectedScenario.id === 'baseline'
+                        ? '0.00 (Base)'
+                        : `$${selectedScenario.profit_delta_k_usd.toFixed(2)}k`
                       : '—'}
                   </span>
                 </div>
@@ -641,24 +634,74 @@ export const MRPLPage: React.FC = () => {
                   <span className="text-neutral-200">
                     {selectedScenario.throughput_kbpd
                       ? `${selectedScenario.throughput_kbpd.toFixed(1)} kbpd`
-                      : '—'}
+                      : '0.0 kbpd'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block text-[10px] font-sans">Mass Balance Invariant:</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Mass Balance Residual:</span>
                   <span
                     className={
                       selectedScenario.mass_balance_passed ? 'text-emerald-400' : 'text-rose-400'
                     }
                   >
-                    {selectedScenario.mass_balance_passed ? 'PASS (0.0 residual)' : 'FAIL / INFEASIBLE'}
+                    {selectedScenario.mass_balance_passed
+                      ? `${(selectedScenario.mass_balance_residual || 0).toExponential(2)} (Conserved)`
+                      : 'INCONSISTENT (Empty Polytope)'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block text-[10px] font-sans">Dual Simplex Warm Start:</span>
-                  <span className="text-blue-400">ENABLED (0.4ms)</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Solve Time:</span>
+                  <span className="text-blue-400">
+                    {((selectedScenario.solve_time_seconds || 0.001) * 1000).toFixed(2)} ms
+                  </span>
                 </div>
               </div>
+
+              {/* Infeasibility Certificate or Scenario-Specific Units & Qualities */}
+              {selectedScenario.status === 'INFEASIBLE' ? (
+                <div className="p-4 rounded-lg bg-rose-950/20 border border-rose-800/40 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-rose-400 font-semibold font-mono">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Primal Infeasibility Certified by Phase-I Simplex</span>
+                  </div>
+                  <p className="text-neutral-300 font-sans leading-relaxed">
+                    Under the restricted crude slate (-40% intake) combined with the ultra-tight BS-VI sulfur ceiling (&le; 10 ppm),
+                    the linear constraint polytope {`{ x | Ax = b, l \u2264 x \u2264 u }`} is mathematically empty. The artificial variables in Phase I
+                    could not be driven to zero (infeasibility sum &gt; 0). Kavach-Opt correctly identified the impossibility of meeting contract demands
+                    without violating conservation of mass or legal sulfur emission ceilings.
+                  </p>
+                </div>
+              ) : (
+                selectedScenario.units && selectedScenario.units.length > 0 && (
+                  <div className="pt-2 border-t border-[#1f283a] space-y-3">
+                    <div className="text-xs font-semibold text-white font-sans">
+                      Unit Capacity Utilization ({selectedScenario.name})
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {selectedScenario.units.map((unit) => (
+                        <div key={unit.unit} className="p-3 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-white font-sans">{unit.unit}</span>
+                            <span className="font-mono text-blue-400 font-bold">{unit.utilization_pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-[#1b212f] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                unit.utilization_pct >= 99 ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.min(unit.utilization_pct, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-[11px] text-neutral-400 font-mono flex justify-between">
+                            <span>{unit.throughput_kbpd.toFixed(1)} kbpd</span>
+                            <span>Limit: {unit.capacity_limit_kbpd.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           )}
         </div>

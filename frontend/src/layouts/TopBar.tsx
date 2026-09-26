@@ -9,6 +9,7 @@ interface TopBarProps {
   backend?: BackendType;
   solverStatus?: SolverStatus;
   onToggleMobileMenu?: () => void;
+  onOpenOnboarding?: () => void;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   backend = 'CPU_SEQUENTIAL',
   solverStatus = 'UNKNOWN',
   onToggleMobileMenu,
+  onOpenOnboarding,
   className = '',
 }) => {
   return (
@@ -54,6 +56,16 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {onOpenOnboarding && (
+          <button
+            onClick={onOpenOnboarding}
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141926] hover:bg-[#1c2336] border border-[#232c3f] text-[11px] font-medium text-neutral-300 transition-colors"
+            title="Open Interactive Workstation Onboarding Tour"
+          >
+            <span>Engine Guide</span>
+          </button>
+        )}
+
         <BackendIndicator backend={backend} />
 
         <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded bg-[#11151f] border border-[#1d2332] text-[11px] font-mono text-neutral-400">
@@ -66,7 +78,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             AUDIT:
           </span>
           <span className="text-[11px] font-mono font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-2 py-0.5 rounded">
-            PASS (329/329)
+            CERTIFIED GREEN
           </span>
         </div>
       </div>
