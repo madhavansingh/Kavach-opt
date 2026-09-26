@@ -330,6 +330,10 @@ bool CanonicalModel::is_qp() const noexcept {
     return num_integer_variables() == 0 && num_binary_variables() == 0 && objective_.is_quadratic();
 }
 
+bool CanonicalModel::is_miqp() const noexcept {
+    return (num_integer_variables() > 0 || num_binary_variables() > 0) && objective_.is_quadratic();
+}
+
 void CanonicalModel::canonicalize() {
     for (auto& c : constraints_) {
         c.expression.canonicalize();

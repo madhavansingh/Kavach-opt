@@ -837,6 +837,42 @@ the candidate constraint is linearly dependent and rejected, ensuring $A_{\mathc
 
 When $\alpha_k = 0$ (blocking constraint with zero slack), the active set could cycle. Kavach-Opt prevents cycling by maintaining a 64-bit hash signature of the working set $\mathcal{W}_k$ across iterations. If a signature repeats, Bland-style deterministic tie-breaking is engaged. If cycles persist beyond the iteration threshold, the solver terminates with `LIMIT_REACHED`.
 
+### 10.7 Convex Mixed-Integer Quadratic Programming (MIQP)
+
+Kavach-Opt extends continuous active-set quadratic optimization to discrete domains via a rigorous Branch-and-Bound framework:
+
+$$
+\min_{x \in \mathbb{R}^n} \quad f(x) = \frac{1}{2} x^T Q x + c^T x + c_0
+$$
+
+$$
+\text{s.t.} \quad A x \le b, \quad l \le x \le u, \quad x_j \in \mathbb{Z} \; (j \in \mathcal{I})
+$$
+
+where $Q \in \mathbb{R}^{n \times n}$ is symmetric positive semidefinite ($Q \succeq 0$).
+
+#### 10.7.1 Active-Set QP Node Relaxations
+At each node of the search tree, the continuous relaxation is a convex QP subject to the inherited variable bounds $[l_j^{\text{node}}, u_j^{\text{node}}]$. The relaxation is solved using `PrimalActiveSetQPSolver`. In contrast to LP simplex where bound branching preserves dual feasibility, bound tightening in QP immediately shifts the unconstrained minimizer and alters the active set. Thus, each node undergoes a numerically stable active-set solve initialized via internal phase-1 feasibility projection.
+
+#### 10.7.2 Branching Strategies and Pseudocost Scoring
+Branching candidates are evaluated using:
+1. **Pseudocosts:** Directional degradation tracking $\Psi_j^-, \Psi_j^+$:
+   $$
+   \Psi_j^- = \frac{z(\lfloor x_j^* \rfloor) - z^*}{x_j^* - \lfloor x_j^* \rfloor}, \quad \Psi_j^+ = \frac{z(\lceil x_j^* \rceil) - z^*}{\lceil x_j^* \rceil - x_j^*}
+   $$
+2. **Strong Branching:** Probes candidate integer variables by speculatively solving child QP relaxations with updated upper/lower bounds. Dual degradations are recorded into pseudocost history.
+3. **Reliability Branching (Default):** Hybrid policy using strong branching probes while observation counts $N_j < \eta_{\text{rel}}$ (default $\eta_{\text{rel}} = 4$), switching to product score $s_j = (\max(\Psi_j^-, 10^{-6})) \cdot (\max(\Psi_j^+, 10^{-6}))$ once reliable.
+
+#### 10.7.3 Quadratic Primal Heuristics
+Integer rounding combined with bounded continuous slack repair is evaluated periodically. Every heuristic candidate is evaluated under the exact quadratic objective function $f(x) = \frac{1}{2} x^T Q x + c^T x + c_0$ and verified against all linear constraints and integrality requirements.
+
+#### 10.7.4 Maximization Canonicalization
+For concave quadratic maximization ($\max f(x)$ with $-Q \succeq 0$), the model is canonicalized to minimization:
+$$
+\min \quad -f(x) = \frac{1}{2} x^T (-Q) x - c^T x - c_0
+$$
+Since $-Q$ is positive semidefinite, the problem is solved via standard convex MIQP minimization, and optimal objectives and bounds are negated upon return. Non-convex instances ($Q$ indefinite) are detected via pivoted Cholesky factorization and rejected with `NUMERICAL_FAILURE`.
+
 ---
 
 ## 11. Independent Verification Layer
@@ -959,7 +995,22 @@ $$
 
 PSD of $Q$ is independently re-certified by pivoted Cholesky.
 
-### 11.10 Certification Hierarchy
+### 11.10 MIQP-Specific Verification
+
+The `MIQPVerifier` executes seven independent validation passes without re-using solver routines:
+1. **Non-Finite Sanity:** Ensures all incumbent elements are finite ($\text{std::isfinite}(x_j) = \text{true}$).
+2. **Bound Feasibility:** $l_j - \epsilon_{\text{bound}} \le x_j \le u_j + \epsilon_{\text{bound}}$ for all $j \in \{0, \dots, n-1\}$.
+3. **Primal Constraint Feasibility:** Independent row activity evaluation $\text{activity}_i = \sum_j A_{ij} x_j$ checked against LHS/RHS bounds within $\epsilon_{\text{primal}}$.
+4. **Integrality:** $|x_j - \operatorname{round}(x_j)| \le \epsilon_{\text{int}}$ for all discrete variables $j \in \mathcal{I}$, and $x_j \in [-\epsilon_{\text{int}}, 1 + \epsilon_{\text{int}}]$ for binary variables.
+5. **Independent Quadratic Objective Recomputation:** Direct evaluation from scratch:
+   $$
+   f(x) = \frac{1}{2} \sum_{i,j} Q_{ij} x_i x_j + \sum_j c_j x_j + c_0
+   $$
+   verified against reported objective within absolute/relative tolerances ($\epsilon_{\text{obj,abs}} = 10^{-6}, \epsilon_{\text{obj,rel}} = 10^{-6}$).
+6. **Optimality Gap Consistency:** Recomputed gap $\text{gap} = |z_{\text{inc}} - z_{\text{bound}}| / \max(1, |z_{\text{inc}}|) \le \epsilon_{\text{gap}}$ ($10^{-4}$).
+7. **Independent Convexity / PSD Certification:** Complete diagonal-pivoted Cholesky factorization of $Q$ (or $-Q$ for maximization) verifying non-negative pivots ($D_{kk} \ge -\epsilon_{\text{psd}}$).
+
+### 11.11 Certification Hierarchy
 
 The verifier maps check results to a certified status:
 

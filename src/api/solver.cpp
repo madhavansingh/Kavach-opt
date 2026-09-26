@@ -5,9 +5,11 @@
 #include "algorithms/lp/revised_simplex.hpp"
 #include "algorithms/lp/simplex.hpp"
 #include "algorithms/milp/branch_and_bound.hpp"
+#include "algorithms/miqp/miqp_solver.hpp"
 #include "algorithms/qp/active_set.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
+#include "verification/miqp_verifier.hpp"
 #include "verification/qp_verifier.hpp"
 
 namespace kavach::api {
@@ -29,6 +31,15 @@ strategy::StrategyDecision KavachSolver::plan(const model::CanonicalModel& model
     }
 
     auto characteristics = engine_.characterize(model);
+    if (options.problem_type == ProblemType::MIQP) {
+        characteristics.problem_class = strategy::ProblemClass::CONVEX_MIQP;
+    } else if (options.problem_type == ProblemType::QP) {
+        characteristics.problem_class = strategy::ProblemClass::CONVEX_QP;
+    } else if (options.problem_type == ProblemType::MILP) {
+        characteristics.problem_class = strategy::ProblemClass::MILP;
+    } else if (options.problem_type == ProblemType::LP) {
+        characteristics.problem_class = strategy::ProblemClass::LP;
+    }
     return engine_.decide(characteristics, config);
 }
 
@@ -115,6 +126,40 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
                 verifier.verify(model, sol.incumbent_solution, sol.best_bound, sol.best_objective,
                                 sol.status, options.tolerances, sol.optimality_gap);
             result.verification_report = verification::VerificationReport::from_milp(milp_rep);
+        }
+    } else if (decision.problem_class == strategy::ProblemClass::CONVEX_MIQP) {
+        algorithms::miqp::MIQPSolverOptions miqp_opts;
+        miqp_opts.tolerances = decision.recommended_tolerances;
+        miqp_opts.enable_presolve = (decision.presolve_policy == strategy::PresolvePolicy::FULL);
+        miqp_opts.enable_scaling = decision.scaling_enabled;
+        miqp_opts.cut_options = options.cut_options;
+        miqp_opts.branching_strategy = options.branching_strategy;
+        miqp_opts.strong_branching_candidates = options.strong_branching_candidates;
+        miqp_opts.pseudocost_reliability_threshold = options.pseudocost_reliability_threshold;
+        miqp_opts.enable_primal_heuristic = options.enable_primal_heuristic;
+        miqp_opts.time_limit_seconds = time_limit_sec;
+        miqp_opts.max_nodes = options.max_nodes;
+
+        algorithms::miqp::ConvexMIQPSolver miqp_solver(miqp_opts);
+        auto sol = miqp_solver.solve(model);
+
+        auto end_time = std::chrono::steady_clock::now();
+        result.solve_time_seconds = std::chrono::duration<double>(end_time - start_time).count();
+        result.status = sol.status;
+        result.objective_value = sol.best_objective;
+        result.primal_solution = sol.incumbent_solution;
+        result.optimality_gap = sol.optimality_gap;
+        result.nodes = sol.nodes;
+        result.iterations = sol.iterations;
+        result.search_telemetry = sol.telemetry.search_telemetry;
+        result.miqp_telemetry = sol.telemetry;
+
+        if (sol.is_optimal() && sol.has_incumbent()) {
+            verification::MIQPVerifier verifier;
+            auto miqp_rep =
+                verifier.verify(model, sol.incumbent_solution, sol.best_bound, sol.best_objective,
+                                sol.status, options.tolerances, sol.optimality_gap);
+            result.verification_report = verification::VerificationReport::from_miqp(miqp_rep);
         }
     } else {
         algorithms::lp::LPSolverOptions lp_opts;

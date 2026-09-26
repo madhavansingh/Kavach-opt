@@ -118,9 +118,11 @@ add_library(kavach_core
     src/algorithms/milp/strong_branching.cpp
     src/algorithms/milp/primal_heuristic.cpp
     src/algorithms/qp/active_set.cpp
+    src/algorithms/miqp/miqp_solver.cpp
     src/verification/lp_verifier.cpp
     src/verification/milp_verifier.cpp
     src/verification/qp_verifier.cpp
+    src/verification/miqp_verifier.cpp
     src/backend/cpu/thread_pool.cpp
     src/backend/cpu/cpu_backend.cpp
     src/backend/cuda/cuda_device.cpp

@@ -72,6 +72,7 @@ Kavach-Opt implements a complete, self-contained optimization engine:
 | R-LP-001 | Continuous LP solver | Two-Phase Revised Simplex (`src/algorithms/lp/`) | ✓ Verified |
 | R-MILP-001 | Mixed-Integer LP solver | Branch-and-Cut (Gomory, MIR, Pseudocost, Strong Branching) (`src/algorithms/milp/`) | ✓ Verified |
 | R-QP-001 | Convex QP solver | Primal Active-Set (`src/algorithms/qp/`) | ✓ Verified |
+| R-MIQP-001 | Convex MIQP solver | Branch-and-Bound with Active-Set QP relaxations (`src/algorithms/miqp/`) | ✓ Verified |
 | R-NUM-001 | Sparse numerics | CSR/CSC, SparseLU, Ruiz scaling (`src/numerics/`) | ✓ Verified |
 | R-VER-001 | Independent verification | Zero-trust verifier (`src/verification/`) | ✓ Verified |
 | R-GPU-001 | Scoped GPU acceleration | CUDA batched SpMV (`src/backend/cuda/`) | ✓ Verified |
@@ -93,9 +94,11 @@ flowchart TD
     E --> F1["Revised Simplex LP"]
     E --> F2["Branch-and-Bound MILP"]
     E --> F3["Active-Set Convex QP"]
+    E --> F4["Active-Set Convex MIQP"]
     F1 --> G["Independent Verifier"]
     F2 --> G
     F3 --> G
+    F4 --> G
     G --> H["Certified Result + Telemetry"]
 
     subgraph Backends
@@ -562,17 +565,15 @@ SIH26119/
 
 ## Current Scope & Limitations
 
-Kavach-Opt provides production-verified support for LP, MILP, and strictly convex QP.
+Kavach-Opt provides production-verified support for continuous LP, MILP (with Gomory/MIR cutting planes and reliability branching), convex QP, and convex MIQP.
 The following are explicitly **not implemented**:
 
 | Capability | Status |
 |------------|--------|
-| Mixed-Integer Quadratic Programming (MIQP) | Not implemented |
+| General Non-Convex QP / Non-Convex MIQP (indefinite Hessian) | Not implemented — detected and rejected |
 | Nonlinear Programming (NLP) | Not implemented |
 | Mixed-Integer Nonlinear Programming (MINLP) | Not implemented |
-| General Non-Convex QP (non-PSD Hessian) | Not implemented — detected and rejected |
 | GPU Simplex / GPU SparseLU / GPU B&B | Not implemented — GPU scoped to batched SpMV only |
-| Advanced cutting planes (Gomory, MIR) | Not implemented |
 | Distributed / multi-node execution | Not implemented |
 | ML-based algorithm selection | Not implemented — strategy is strictly deterministic |
 

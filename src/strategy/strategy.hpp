@@ -21,7 +21,7 @@ namespace kavach::strategy {
 // Enums & Classifications
 // ============================================================================
 
-enum class ProblemClass : std::uint8_t { LP, MILP, CONVEX_QP };
+enum class ProblemClass : std::uint8_t { LP, MILP, CONVEX_QP, CONVEX_MIQP };
 
 [[nodiscard]] constexpr const char* to_string(ProblemClass pc) noexcept {
     switch (pc) {
@@ -31,6 +31,8 @@ enum class ProblemClass : std::uint8_t { LP, MILP, CONVEX_QP };
             return "MILP";
         case ProblemClass::CONVEX_QP:
             return "CONVEX_QP";
+        case ProblemClass::CONVEX_MIQP:
+            return "CONVEX_MIQP";
     }
     return "UNKNOWN";
 }

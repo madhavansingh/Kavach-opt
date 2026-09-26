@@ -563,6 +563,23 @@ int handle_solve(const std::vector<std::string_view>& args) {
                 search["search_explanation"] = result.search_telemetry->search_explanation;
                 res["search"] = std::move(search);
             }
+            if (result.miqp_telemetry.has_value()) {
+                kavach::benchmark::JsonValue::Object miqp;
+                miqp["qp_relaxations_solved"] =
+                    static_cast<double>(result.miqp_telemetry->qp_relaxations_solved);
+                miqp["qp_relaxation_iterations"] =
+                    static_cast<double>(result.miqp_telemetry->qp_relaxation_iterations);
+                miqp["qp_relaxation_time_seconds"] =
+                    result.miqp_telemetry->qp_relaxation_time_seconds;
+                miqp["qp_kkt_residual"] = result.miqp_telemetry->qp_kkt_residual;
+                miqp["strong_qp_probes"] =
+                    static_cast<double>(result.miqp_telemetry->strong_qp_probes);
+                miqp["nodes_pruned_bound"] =
+                    static_cast<double>(result.miqp_telemetry->nodes_pruned_bound);
+                miqp["nodes_pruned_infeasible"] =
+                    static_cast<double>(result.miqp_telemetry->nodes_pruned_infeasible);
+                res["miqp"] = std::move(miqp);
+            }
             root["result"] = std::move(res);
 
             kavach::benchmark::JsonValue::Object ver;
@@ -593,15 +610,45 @@ int handle_solve(const std::vector<std::string_view>& args) {
                                  : 0.0;
             mod["is_milp"] = model->is_milp();
             mod["is_qp"] = model->is_qp();
+            mod["is_miqp"] = model->is_miqp();
             mod["problem_class"] =
-                model->is_qp() ? "CONVEX_QP" : (model->is_milp() ? "MILP" : "LP");
+                model->is_miqp()
+                    ? "CONVEX_MIQP"
+                    : (model->is_qp() ? "CONVEX_QP" : (model->is_milp() ? "MILP" : "LP"));
             root["model"] = std::move(mod);
 
             std::cout << kavach::benchmark::JsonValue(std::move(root)).dump() << "\n";
             return 0;
         }
 
-        if (model->is_qp()) {
+        if (model->is_miqp()) {
+            std::cout << "Solving Convex MIQP with Branch-and-Bound + QP Relaxations...\n"
+                      << "Problem Class: CONVEX_MIQP\n"
+                      << "Status: " << kavach::core::to_string(result.status) << "\n"
+                      << "Best Objective: " << result.objective_value << "\n"
+                      << "Optimality Gap: " << result.optimality_gap << "\n"
+                      << "Nodes Explored: " << result.nodes << "\n"
+                      << "QP Relaxations: " << result.iterations << "\n";
+            if (result.search_telemetry.has_value()) {
+                std::cout << "Search Engine: " << result.search_telemetry->branching_strategy_used
+                          << " (Pseudocosts: " << result.search_telemetry->pseudocost_updates
+                          << ", Strong branch: " << result.search_telemetry->strong_branching_calls
+                          << ", Heuristics: "
+                          << result.search_telemetry->heuristic_incumbent_updates
+                          << ", Incumbent: " << result.search_telemetry->incumbent_source << ")\n";
+            }
+            if (result.miqp_telemetry.has_value()) {
+                std::cout << "QP Probes: " << result.miqp_telemetry->strong_qp_probes
+                          << " (Bound pruned: " << result.miqp_telemetry->nodes_pruned_bound
+                          << ", Infeasible pruned: "
+                          << result.miqp_telemetry->nodes_pruned_infeasible << ")\n";
+            }
+            std::cout << "Verification: "
+                      << (result.verification_report.passed
+                              ? "VERIFIED_OPTIMAL (Certified by MIQPVerifier)"
+                              : "UNVERIFIED")
+                      << "\n";
+        } else if (model->is_qp()) {
             std::cout << "Solving Convex QP...\n"
                       << "Status: " << kavach::core::to_string(result.status) << "\n"
                       << "Objective: " << result.objective_value << "\n"

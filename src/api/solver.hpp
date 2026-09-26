@@ -8,6 +8,7 @@
 
 #include "algorithms/milp/cut_types.hpp"
 #include "algorithms/milp/search_types.hpp"
+#include "algorithms/miqp/miqp_types.hpp"
 #include "backend/execution_backend.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
@@ -17,7 +18,7 @@
 
 namespace kavach::api {
 
-enum class ProblemType { AUTO, LP, MILP, QP };
+enum class ProblemType { AUTO, LP, MILP, QP, MIQP };
 
 struct SolverOptions {
     ProblemType problem_type{ProblemType::AUTO};
@@ -53,6 +54,7 @@ struct SolverResult {
     strategy::StrategyDecision strategy_decision;
     std::optional<algorithms::milp::CutTelemetry> cut_telemetry{std::nullopt};
     std::optional<algorithms::milp::SearchTelemetry> search_telemetry{std::nullopt};
+    std::optional<algorithms::miqp::MIQPTelemetry> miqp_telemetry{std::nullopt};
 };
 
 /**

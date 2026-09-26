@@ -326,6 +326,7 @@ public:
     [[nodiscard]] bool is_lp() const noexcept;
     [[nodiscard]] bool is_milp() const noexcept;
     [[nodiscard]] bool is_qp() const noexcept;
+    [[nodiscard]] bool is_miqp() const noexcept;
 
     // --- Canonicalization & Validation ---
     void canonicalize();

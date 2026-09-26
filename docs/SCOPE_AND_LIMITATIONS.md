@@ -83,17 +83,15 @@ The following optimization paradigms and solver components are **NOT IMPLEMENTED
 
 | Capability | Status | Rationale / Behavior |
 |---|:---:|---|
-| **Mixed-Integer Quadratic Programming (MIQP)** | **NOT IMPLEMENTED** | Branch-and-Bound with quadratic objective relaxation is not supported. Models with both quadratic terms and integer variables are rejected. |
+| **Non-Convex MIQP / Indefinite QP** | **NOT IMPLEMENTED** | General non-convex quadratic objectives (indefinite Hessian) are detected via diagonal/Cholesky factorization and rejected. |
 | **Nonlinear Programming (NLP)** | **NOT IMPLEMENTED** | General nonlinear functions (trigonometric, exponential, logarithmic) are not supported. Only linear and quadratic objective terms are permitted. |
 | **Mixed-Integer Nonlinear Programming (MINLP)**| **NOT IMPLEMENTED** | Not supported. |
-| **General Non-Convex QP** | **NOT IMPLEMENTED** | The active-set QP solver strictly requires a positive semi-definite (PSD) Hessian matrix $Q \succeq 0$. Non-PSD Hessians are detected and rejected. |
 | **GPU Simplex Solver** | **NOT IMPLEMENTED** | The Revised Simplex algorithm executes entirely on CPU. The sequential nature of basis updates does not map efficiently to GPU architectures. |
 | **GPU SparseLU Factorization** | **NOT IMPLEMENTED** | Sparse LU factorization with Markowitz pivoting executes entirely on CPU. |
 | **GPU Branch-and-Bound Tree Search** | **NOT IMPLEMENTED** | Node exploration and tree management execute entirely on CPU. |
 | **GPU QP Solver** | **NOT IMPLEMENTED** | Active-set QP algorithm executes on CPU. GPU is utilized solely for batched SpMV kernels. |
 | **Distributed / Multi-Node Execution** | **NOT IMPLEMENTED** | Kavach-Opt runs within a single host process. MPI and cluster execution are not supported. |
 | **Multi-GPU Orchestration** | **NOT IMPLEMENTED** | GPU acceleration targets a single CUDA device (Device 0). |
-| **Advanced Cutting-Plane Suite** | **NOT IMPLEMENTED** | Advanced cutting planes (Gomory mixed-integer cuts, MIR, lift-and-project) are not yet integrated into the B&B loop. |
 | **Machine Learning / Learned Strategy** | **NOT IMPLEMENTED** | Strategy selection is strictly deterministic and rule-based (`R001`–`R018`). No neural networks or heuristic classifiers are employed. |
 
 ---

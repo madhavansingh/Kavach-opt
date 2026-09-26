@@ -48,7 +48,8 @@ Any check fails → VERIFICATION_FAILURE (result is flagged, not silently discar
 The verification layer checks: non-finite sanity, bound feasibility, primal constraint
 feasibility, dual feasibility / reduced-cost stationarity, complementary slackness,
 and objective consistency (LP). For MILP it additionally checks integrality violations.
-For QP it checks KKT stationarity and complementarity residuals.
+For QP it checks KKT stationarity and complementarity residuals. For MIQP it checks
+integrality, exact quadratic objective consistency, optimality gap, and independent Cholesky PSD convexity.
 
 ### 1.3 Reference Solver Isolation (HiGHS)
 

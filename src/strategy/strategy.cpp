@@ -255,7 +255,9 @@ ProblemCharacteristics StrategyEngine::characterize(const model::CanonicalModel&
     chars.num_constraints = model.num_constraints();
 
     // Check problem class
-    if (model.is_qp()) {
+    if (model.is_miqp()) {
+        chars.problem_class = ProblemClass::CONVEX_MIQP;
+    } else if (model.is_qp()) {
         chars.problem_class = ProblemClass::CONVEX_QP;
     } else if (model.is_milp()) {
         chars.problem_class = ProblemClass::MILP;
@@ -418,7 +420,21 @@ StrategyDecision StrategyEngine::decide(const ProblemCharacteristics& chars,
     std::ostringstream rationale;
 
     // --- RULE R001 / R002 / R003: Problem Classification & Target Solver ---
-    if (chars.problem_class == ProblemClass::CONVEX_QP) {
+    if (chars.problem_class == ProblemClass::CONVEX_MIQP) {
+        dec.rules_fired.emplace_back("R001b");
+        dec.rule_explanations.emplace_back(
+            "Convex MIQP model detected; targeted Convex MIQP Branch-and-Bound with Active-Set QP "
+            "relaxations.");
+        dec.milp_branching_strategy = MILPBranchingStrategy::MOST_FRACTIONAL;
+        dec.milp_node_strategy = MILPNodeStrategy::BEST_BOUND;
+        dec.prefer_dual_simplex_warm_start = false;
+        dec.enable_rounding_heuristic = true;
+        dec.pseudocost_available = false;
+        rationale << "Classified as Convex MIQP (" << chars.integer_variable_count << " integer, "
+                  << chars.binary_variable_count
+                  << " binary, quadratic objective). Routed to Convex MIQP Branch-and-Bound with "
+                     "Active-Set QP relaxations. ";
+    } else if (chars.problem_class == ProblemClass::CONVEX_QP) {
         dec.rules_fired.emplace_back("R001");
         dec.rule_explanations.emplace_back(
             "Convex QP model detected; targeted Primal Active-Set QP Solver.");
@@ -445,10 +461,12 @@ StrategyDecision StrategyEngine::decide(const ProblemCharacteristics& chars,
     }
 
     // --- RULE R004 / R005: Presolve Strategy ---
-    if (chars.problem_class == ProblemClass::CONVEX_QP) {
+    if (chars.problem_class == ProblemClass::CONVEX_QP ||
+        chars.problem_class == ProblemClass::CONVEX_MIQP) {
         dec.rules_fired.emplace_back("R005");
         dec.rule_explanations.emplace_back(
-            "Presolve skipped for QP: not supported for quadratic objectives.");
+            "Presolve skipped for quadratic objective models: disabled by default to preserve "
+            "quadratic objective mapping.");
         dec.presolve_policy = PresolvePolicy::NONE;
     } else {
         dec.rules_fired.emplace_back("R004");
@@ -546,7 +564,8 @@ StrategyDecision StrategyEngine::decide(const ProblemCharacteristics& chars,
     }
 
     // --- RULE R014: High Integrality Ratio Heuristics ---
-    if (chars.problem_class == ProblemClass::MILP &&
+    if ((chars.problem_class == ProblemClass::MILP ||
+         chars.problem_class == ProblemClass::CONVEX_MIQP) &&
         chars.integer_variable_ratio >= config.high_integer_ratio_threshold) {
         dec.rules_fired.emplace_back("R014");
         dec.rule_explanations.emplace_back(

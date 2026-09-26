@@ -15,6 +15,7 @@
 #include "model/model.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
+#include "verification/miqp_verifier.hpp"
 #include "verification/qp_verifier.hpp"
 
 namespace kavach::verification {
@@ -80,6 +81,21 @@ struct VerificationReport {
         r.summary = qp_report.summary;
         return r;
     }
+
+    /** Construct from a MIQPVerificationReport. */
+    static VerificationReport from_miqp(const MIQPVerificationReport& miqp_report) {
+        VerificationReport r;
+        r.passed = miqp_report.fully_verified();
+        r.recomputed_primal_residual = miqp_report.aggregate_primal_residual;
+        r.recomputed_dual_residual = 0.0;
+        r.recomputed_complementary_slackness = 0.0;
+        r.recomputed_integrality_violation = miqp_report.max_integrality_violation;
+        r.recomputed_kkt_residual = 0.0;
+        r.recomputed_objective = miqp_report.recomputed_objective;
+        r.certified_status = miqp_report.certified_status;
+        r.summary = miqp_report.summary;
+        return r;
+    }
 };
 
 /**
@@ -88,6 +104,7 @@ struct VerificationReport {
  * For production LP verification use LPVerifier directly.
  * For production MILP verification use MILPVerifier directly.
  * For production QP verification use QPVerifier directly.
+ * For production MIQP verification use MIQPVerifier directly.
  */
 class IndependentVerifier {
 public:
@@ -134,6 +151,25 @@ public:
         auto rpt = verifier.verify(original_model, primal_solution, dual_solution,
                                    reported_objective, core::SolverStatus::OPTIMAL);
         return VerificationReport::from_qp(rpt);
+    }
+
+    /**
+     * @brief Independent verification of a MIQP solution.
+     */
+    [[nodiscard]] virtual VerificationReport verify_miqp(
+        const model::CanonicalModel& original_model, const std::vector<double>& incumbent_solution,
+        double best_bound, double reported_objective,
+        const core::SolverTolerances& tolerances) const {
+        if (incumbent_solution.empty()) {
+            VerificationReport r;
+            r.certified_status = core::SolverStatus::UNKNOWN;
+            r.summary = "MIQP verification unavailable: no incumbent solution provided.";
+            return r;
+        }
+        MIQPVerifier verifier(MIQPVerifierTolerances::from_solver_tolerances(tolerances));
+        auto rpt = verifier.verify(original_model, incumbent_solution, best_bound,
+                                   reported_objective, core::SolverStatus::OPTIMAL);
+        return VerificationReport::from_miqp(rpt);
     }
 };
 

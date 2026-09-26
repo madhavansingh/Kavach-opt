@@ -63,7 +63,7 @@ flowchart LR
 - **LP Relaxation Bound**: $5891.36 k/day
 - **Optimality Gap**: 0.00%
 - **Nodes Explored**: 5
-- **Solve Runtime**: 0.0013 s
+- **Solve Runtime**: 0.0012 s
 
 ## 7. Blending plan
 
@@ -121,8 +121,8 @@ Independent mathematical certification performed by `MILPVerifier`:
 
 | Scenario | Kavach-Opt Obj | HiGHS Obj | Rel Error | Kavach Time | HiGHS Status |
 |---|---|---|---|---|---|
-| `baseline` | 5445.909091 | N/A | N/A | 0.0013 s | UNAVAILABLE |
-| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0015 s | UNAVAILABLE |
+| `baseline` | 5445.909091 | N/A | N/A | 0.0012 s | UNAVAILABLE |
+| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0014 s | UNAVAILABLE |
 | `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0012 s | UNAVAILABLE |
 | `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0012 s | UNAVAILABLE |
 | `scenario_d_infeasible` | N/A | N/A | N/A | 0.0000 s | UNAVAILABLE |

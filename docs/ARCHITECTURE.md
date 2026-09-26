@@ -301,7 +301,33 @@ The QP solver implements the Primal Active-Set method for convex quadratic progr
 
 ---
 
-### 4.8 Verification Layer
+### 4.8 Convex MIQP Solver
+
+**Path:** `src/algorithms/miqp/`
+
+| File | Responsibility |
+|---|---|
+| `miqp_solver.cpp/hpp` | Convex Mixed-Integer Quadratic Programming branch-and-bound solver |
+| `miqp_types.hpp` | MIQP options, telemetry, and solution representation |
+
+The Convex MIQP solver addresses optimization problems with mixed-integer variables and convex quadratic objectives:
+$$\min / \max \quad \frac{1}{2} x^T Q x + c^T x + c_0 \quad \text{s.t.} \quad A x \le b, \quad l \le x \le u, \quad x_j \in \mathbb{Z} \; (j \in I)$$
+where $Q$ is symmetric positive semidefinite (PSD).
+
+Key features:
+- **Convex Active-Set Relaxations:** Solves continuous convex QP relaxations at the root and child nodes using `PrimalActiveSetQPSolver`.
+- **Advanced Branching Policies:** Supports pseudocost branching, strong branching (evaluating candidate QP bounds), and reliability branching (default) to direct the search tree efficiently.
+- **True Quadratic Primal Heuristics:** Employs integer rounding and bounded continuous slack deficit repair, evaluating candidate solutions with full $\frac{1}{2} x^T Q x + c^T x + c_0$ objective calculations.
+- **Empty Integer Domain Elimination:** Early detection and pruning of integer variables whose restricted interval contains no integral points ($\lceil l_j \rceil > \lfloor u_j \rfloor$).
+- **Maximization Canonicalization:** Seamlessly transforms concave quadratic maximization ($\max f(x)$ with $-Q \succeq 0$) into canonical minimization ($\min -f(x)$) for branch-and-bound exploration, restoring original objective senses upon completion.
+- **Non-Convex Rejection:** Explicitly rejects non-convex/indefinite quadratic objectives via diagonal and complete pivoted Cholesky factorization checks with `NUMERICAL_FAILURE`.
+- **Zero-Q / Pure Continuous Bypasses:** Automatically routes $Q = 0$ instances to the MILP engine and purely continuous instances to the active-set QP solver.
+
+**Internal dependencies:** `src/model/`, `src/numerics/`, `src/algorithms/qp/`, `src/algorithms/milp/`, `src/verification/`.
+
+---
+
+### 4.9 Verification Layer
 
 **Path:** `src/verification/`
 
@@ -311,6 +337,7 @@ The QP solver implements the Primal Active-Set method for convex quadratic progr
 | `lp_verifier.cpp/hpp` | LP solution verification |
 | `milp_verifier.cpp/hpp` | MILP solution verification |
 | `qp_verifier.cpp/hpp` | QP solution verification |
+| `miqp_verifier.cpp/hpp` | Convex MIQP solution verification |
 
 Full description in [Section 8](#8-verification-architecture).
 
