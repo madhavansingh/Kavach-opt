@@ -90,11 +90,21 @@ Executes `./build-release/kavach-opt solve <path> --json [options]`.
   - `verification`: Recomputed primal residual, dual residual, complementary slackness, integrality violation, KKT residual, certificate summary.
   - `model`: Dimensions, density, problem class.
 
+### `GET /api/models/inspect` (or `POST /api/models/inspect`)
+Performs on-the-fly model characterization via `./build-release/kavach-opt inspect <path> --json`.
+- **Response**: Exact matrix dimensions, nonzeros, sparsity density, discrete variable breakdown, min/max coefficient magnitudes, dynamic range ratio, conditioning category, and scaling recommendations directly computed by the C++ Strategy Engine.
+
 ### `GET /api/benchmarks`
 Serves authentic recorded benchmark results from `benchmark_results/` across Netlib, MIPLIB, and QP suites.
 
+### `POST /api/benchmarks/run`
+Executes on-demand benchmark instances live via `./build-release/kavach-opt benchmark --instance <path>`. Returns live execution metrics (status, solve time, iterations, verification residuals).
+
 ### `GET /api/mrpl`
 Serves authentic baseline economics and operational scenario evaluations from `examples/mrpl/results/`.
+
+### `POST /api/mrpl/run`
+Solves a specific industrial what-if scenario on the fly via `./build-release/kavach-opt mrpl --scenario <id> --json`. Returns live solve status, net profit margin, mass balance verification residuals, and branch-and-bound node metrics.
 
 ---
 
@@ -109,10 +119,18 @@ Kavach-Opt adheres strictly to its CPU-first architecture:
 
 ## 5. Automated Verification & Testing
 
-The frontend integration is continuously verified through an automated integration suite (`frontend/test/integration.test.mjs`):
+The frontend integration is continuously verified through automated test suites:
 - Run command: `npm test` inside `frontend/`
-- Validates model discovery (19 models across LP, MILP, QP, MRPL).
-- Validates authentic solve runs on `afiro.mps`, `knapsack.lp`, `portfolio.lp`, and `infeasible_milp.lp`.
-- Validates path traversal rejections.
-- Validates benchmark artifact integrity.
-- Validates MRPL refinery scenario evaluations and mandatory synthetic data disclosures.
+- `frontend/test/integration.test.mjs`:
+  - Validates model discovery (19 models across LP, MILP, QP, MRPL).
+  - Validates authentic solve runs on `afiro.mps`, `knapsack.lp`, `portfolio.lp`, and `infeasible_milp.lp`.
+  - Validates path traversal rejections.
+  - Validates benchmark artifact integrity.
+  - Validates MRPL refinery scenario evaluations and mandatory synthetic data disclosures.
+- `frontend/test/zero_mock.test.mjs`:
+  - Proves zero mock files or imports exist in `frontend/src/`.
+  - Proves live model inspection returns exact C++ characteristics.
+  - Proves on-demand MRPL scenario solves.
+  - Proves on-demand live benchmark execution.
+  - Proves production build bundles (`dist/assets/*.js`) contain zero mock datasets.
+

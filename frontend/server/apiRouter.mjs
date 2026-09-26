@@ -6,8 +6,11 @@
 import {
   discoverModels,
   executeSolve,
+  inspectModel,
   loadBenchmarks,
   loadMRPLData,
+  runMRPLScenario,
+  runBenchmark,
   getSystemHealth,
 } from './solverAdapter.mjs';
 
@@ -113,6 +116,61 @@ export async function handleApiRequest(req, res) {
         verification: solveResult.raw_output?.verification || null,
         result: solveResult.raw_output?.result || null,
       });
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  // Model inspection endpoint
+  if ((req.method === 'GET' || req.method === 'POST') && pathname === '/api/models/inspect') {
+    try {
+      let modelPath = url.searchParams.get('path') || url.searchParams.get('model_path');
+      if (!modelPath && req.method === 'POST') {
+        const payload = await parseJsonBody(req);
+        modelPath = payload.model_path || payload.path;
+      }
+      if (!modelPath) {
+        sendJson(res, 400, { error: 'Missing required parameter: model_path' });
+        return true;
+      }
+      const inspection = await inspectModel(modelPath);
+      sendJson(res, 200, inspection);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  // Live MRPL Scenario Execution
+  if (req.method === 'POST' && pathname === '/api/mrpl/run') {
+    try {
+      const payload = await parseJsonBody(req);
+      const scenarioId = payload.scenario_id || payload.scenario || 'baseline';
+      const result = await runMRPLScenario(scenarioId);
+      sendJson(res, 200, {
+        success: true,
+        live: true,
+        scenario_id: scenarioId,
+        data: result,
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  // Live Benchmark Execution
+  if (req.method === 'POST' && pathname === '/api/benchmarks/run') {
+    try {
+      const payload = await parseJsonBody(req);
+      const instancePath = payload.instance_path || payload.path || 'benchmarks/netlib/afiro.mps';
+      const options = {
+        time_limit: payload.time_limit,
+        seed: payload.seed,
+      };
+      const result = await runBenchmark(instancePath, options);
+      sendJson(res, 200, result);
     } catch (err) {
       sendJson(res, 400, { error: err.message });
     }

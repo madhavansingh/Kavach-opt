@@ -42,6 +42,7 @@ void print_help() {
         << "Kavach-Opt — Sovereign GPU-Accelerated Optimization Solver Core\n\n"
         << "Usage:\n"
         << "  kavach-opt solve <model.mps|.lp> [options]\n"
+        << "  kavach-opt inspect <model.mps|.lp> [--json]\n"
         << "  kavach-opt mrpl [options]\n"
         << "  kavach-opt benchmark [options]\n"
         << "  kavach-opt verify <model.mps|.lp>\n"
@@ -60,6 +61,8 @@ void print_help() {
         << "  --time-limit <seconds>             Wall-clock time limit in seconds\n"
         << "  --json                             Output strategy and solve result as JSON\n\n"
         << "MRPL Case Study Options:\n"
+        << "  --scenario <name>                  Specific scenario to solve\n"
+        << "  --json                             Output result as JSON\n"
         << "  --output <dir>                     Directory for output artifacts (default: "
            "examples/mrpl/results)\n"
         << "  --report <path>                    Path for markdown report (default: "
@@ -227,15 +230,68 @@ int handle_benchmark(const std::vector<std::string_view>& args) {
 int handle_mrpl(const std::vector<std::string_view>& args) {
     std::string output_dir = "examples/mrpl/results";
     std::string report_path = "docs/MRPL_CASE_STUDY.md";
+    std::string scenario_arg;
     bool run_highs = true;
+    bool json_output = false;
 
     for (std::size_t i = 1; i < args.size(); ++i) {
         if (args[i] == "--output" && i + 1 < args.size()) {
             output_dir = std::string(args[++i]);
         } else if (args[i] == "--report" && i + 1 < args.size()) {
             report_path = std::string(args[++i]);
+        } else if (args[i] == "--scenario" && i + 1 < args.size()) {
+            scenario_arg = std::string(args[++i]);
+        } else if (args[i] == "--json") {
+            json_output = true;
         } else if (args[i] == "--no-highs") {
             run_highs = false;
+        }
+    }
+
+    kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
+
+    if (json_output) {
+        if (!scenario_arg.empty() && scenario_arg != "all") {
+            kavach::case_study::mrpl::MRPLParameters params =
+                kavach::case_study::mrpl::MRPLParameters::default_parameters();
+            std::string resolved_name = "baseline";
+
+            if (scenario_arg == "scenario_a_reduced_crude" || scenario_arg == "reduced_crude" ||
+                scenario_arg == "a") {
+                params = kavach::case_study::mrpl::MRPLParameters::scenario_reduced_crude();
+                resolved_name = "scenario_a_reduced_crude";
+            } else if (scenario_arg == "scenario_b_tight_quality" ||
+                       scenario_arg == "tight_quality" || scenario_arg == "b") {
+                params = kavach::case_study::mrpl::MRPLParameters::scenario_tight_quality();
+                resolved_name = "scenario_b_tight_quality";
+            } else if (scenario_arg == "scenario_c_reduced_capacity" ||
+                       scenario_arg == "reduced_capacity" || scenario_arg == "c") {
+                params = kavach::case_study::mrpl::MRPLParameters::scenario_reduced_capacity();
+                resolved_name = "scenario_c_reduced_capacity";
+            } else if (scenario_arg == "scenario_d_infeasible" || scenario_arg == "infeasible" ||
+                       scenario_arg == "d") {
+                params = kavach::case_study::mrpl::MRPLParameters::scenario_infeasible();
+                resolved_name = "scenario_d_infeasible";
+            } else if (scenario_arg == "baseline") {
+                params = kavach::case_study::mrpl::MRPLParameters::default_parameters();
+                resolved_name = "baseline";
+            } else {
+                std::cerr << "Unknown MRPL scenario: " << scenario_arg << "\n";
+                return 1;
+            }
+
+            auto breakdown = runner.solve_and_analyze(params, resolved_name, run_highs);
+            std::cout << breakdown.to_json().dump() << "\n";
+            return 0;
+        } else {
+            auto scenarios = runner.run_all_scenarios(run_highs);
+            kavach::benchmark::JsonValue::Array arr;
+            arr.reserve(scenarios.size());
+            for (const auto& s : scenarios) {
+                arr.push_back(s.to_json());
+            }
+            std::cout << kavach::benchmark::JsonValue(std::move(arr)).dump() << "\n";
+            return 0;
         }
     }
 
@@ -247,7 +303,6 @@ int handle_mrpl(const std::vector<std::string_view>& args) {
         << "==============================================================================\n\n"
         << "Executing baseline and what-if scenarios through production solver pipeline...\n";
 
-    kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
     auto scenarios = runner.run_all_scenarios(run_highs);
     runner.export_all_artifacts(output_dir, report_path);
 
@@ -433,11 +488,15 @@ int handle_solve(const std::vector<std::string_view>& args) {
 
             kavach::benchmark::JsonValue::Object ver;
             ver["passed"] = result.verification_report.passed;
-            ver["certified_status"] = kavach::core::to_string(result.verification_report.certified_status);
-            ver["recomputed_primal_residual"] = result.verification_report.recomputed_primal_residual;
+            ver["certified_status"] =
+                kavach::core::to_string(result.verification_report.certified_status);
+            ver["recomputed_primal_residual"] =
+                result.verification_report.recomputed_primal_residual;
             ver["recomputed_dual_residual"] = result.verification_report.recomputed_dual_residual;
-            ver["recomputed_complementary_slackness"] = result.verification_report.recomputed_complementary_slackness;
-            ver["recomputed_integrality_violation"] = result.verification_report.recomputed_integrality_violation;
+            ver["recomputed_complementary_slackness"] =
+                result.verification_report.recomputed_complementary_slackness;
+            ver["recomputed_integrality_violation"] =
+                result.verification_report.recomputed_integrality_violation;
             ver["recomputed_kkt_residual"] = result.verification_report.recomputed_kkt_residual;
             ver["recomputed_objective"] = result.verification_report.recomputed_objective;
             ver["summary"] = result.verification_report.summary;
@@ -448,11 +507,15 @@ int handle_solve(const std::vector<std::string_view>& args) {
             mod["num_variables"] = static_cast<double>(model->num_variables());
             mod["num_constraints"] = static_cast<double>(model->num_constraints());
             mod["num_nonzeros"] = static_cast<double>(model->num_nonzeros());
-            double total_entries = static_cast<double>(model->num_variables()) * static_cast<double>(model->num_constraints());
-            mod["density"] = total_entries > 0.0 ? (static_cast<double>(model->num_nonzeros()) / total_entries) : 0.0;
+            double total_entries = static_cast<double>(model->num_variables()) *
+                                   static_cast<double>(model->num_constraints());
+            mod["density"] = total_entries > 0.0
+                                 ? (static_cast<double>(model->num_nonzeros()) / total_entries)
+                                 : 0.0;
             mod["is_milp"] = model->is_milp();
             mod["is_qp"] = model->is_qp();
-            mod["problem_class"] = model->is_qp() ? "CONVEX_QP" : (model->is_milp() ? "MILP" : "LP");
+            mod["problem_class"] =
+                model->is_qp() ? "CONVEX_QP" : (model->is_milp() ? "MILP" : "LP");
             root["model"] = std::move(mod);
 
             std::cout << kavach::benchmark::JsonValue(std::move(root)).dump() << "\n";
@@ -605,6 +668,61 @@ int handle_verify(const std::vector<std::string_view>& args) {
     }
 }
 
+int handle_inspect(const std::vector<std::string_view>& args) {
+    if (args.size() < 2) {
+        std::cerr << "Usage: kavach-opt inspect <model.mps|.lp> [--json]\n";
+        return 1;
+    }
+    std::string file_path = std::string(args[1]);
+    bool json_output = false;
+    for (std::size_t i = 2; i < args.size(); ++i) {
+        if (args[i] == "--json") {
+            json_output = true;
+        }
+    }
+    try {
+        auto model = kavach::io::parse_model(file_path);
+        kavach::strategy::StrategyEngine engine;
+        auto chars = engine.characterize(*model);
+
+        if (json_output) {
+            kavach::benchmark::JsonValue::Object root;
+            root["name"] = model->name();
+            root["file_path"] = file_path;
+            root["problem_class"] = kavach::strategy::to_string(chars.problem_class);
+            root["is_milp"] = model->is_milp();
+            root["is_qp"] = model->is_qp();
+            root["num_variables"] = static_cast<double>(chars.num_variables);
+            root["num_constraints"] = static_cast<double>(chars.num_constraints);
+            root["num_nonzeros"] = static_cast<double>(chars.num_nonzeros);
+            root["density"] = chars.density;
+            root["average_row_sparsity"] = chars.average_row_sparsity;
+            root["integer_variables"] = static_cast<double>(chars.integer_variable_count);
+            root["binary_variables"] = static_cast<double>(chars.binary_variable_count);
+            root["continuous_variables"] =
+                static_cast<double>(chars.num_variables - chars.integer_variable_count);
+            root["min_abs_coefficient"] = chars.min_abs_nonzero_coeff;
+            root["max_abs_coefficient"] = chars.max_abs_nonzero_coeff;
+            root["coefficient_range_ratio"] = chars.coefficient_range_ratio;
+            root["conditioning_category"] =
+                kavach::numerics::to_string(chars.conditioning_category);
+            root["recommend_scaling"] = chars.recommend_scaling;
+            root["characterization_time_ms"] = chars.characterization_time_ms;
+            root["characteristics"] = chars.to_json();
+
+            std::cout << kavach::benchmark::JsonValue(std::move(root)).dump() << "\n";
+            return 0;
+        }
+
+        std::cout << "Model Inspection: " << model->name() << " (" << file_path << ")\n"
+                  << chars.to_string() << "\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Inspect error: " << e.what() << '\n';
+        return 1;
+    }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -630,6 +748,9 @@ int main(int argc, char* argv[]) {
         }
         if (command == "mrpl") {
             return handle_mrpl(args);
+        }
+        if (command == "inspect") {
+            return handle_inspect(args);
         }
         if (command == "presolve") {
             return handle_presolve(args);

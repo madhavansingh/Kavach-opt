@@ -4,21 +4,23 @@ import {
   AlertTriangle,
   CheckCircle2,
   Gauge,
+  Play,
+  Check,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { StatusBadge } from '../components/StatusBadge';
 import { Metric, MetricGroup } from '../components/Metric';
 import { DataTable } from '../components/DataTable';
-import { MOCK_MRPL_CASE } from '../data/mockData';
 import type { MRPLScenario, MRPLCaseData } from '../types/solver';
 import { solverBridge } from '../lib/solverBridge';
 
 export const MRPLPage: React.FC = () => {
-  const [mrplCase, setMrplCase] = useState<MRPLCaseData>(MOCK_MRPL_CASE);
-  const [selectedScenario, setSelectedScenario] = useState<MRPLScenario>(
-    MOCK_MRPL_CASE.scenarios[0]
-  );
+  const [mrplCase, setMrplCase] = useState<MRPLCaseData | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<MRPLScenario | null>(null);
+  const [isSolvingLive, setIsSolvingLive] = useState(false);
+  const [liveSolveResult, setLiveSolveResult] = useState<any | null>(null);
+  const [liveSolveError, setLiveSolveError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,13 +35,46 @@ export const MRPLPage: React.FC = () => {
         }
       })
       .catch((err) => {
-        console.warn('Failed to load authentic MRPL data:', err);
+        console.error('Failed to load authentic MRPL data:', err);
       });
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  const handleRunLiveScenario = async (scenarioId: string) => {
+    setIsSolvingLive(true);
+    setLiveSolveError(null);
+    try {
+      const res = await solverBridge.runMRPLScenario(scenarioId);
+      setLiveSolveResult(res.data);
+    } catch (err: any) {
+      console.error('Failed to run MRPL scenario live:', err);
+      setLiveSolveError(err?.message || 'Scenario solve failed');
+    } finally {
+      setIsSolvingLive(false);
+    }
+  };
+
+  if (!mrplCase) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="MRPL Refinery Optimization Subsystem"
+          subtitle="Industrial refinery blending and crude allocation case study."
+        />
+        <Panel title="Loading Authentic Case Study Data" subtitle="Fetching baseline and scenario artifacts from repository...">
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+            <Gauge className="w-8 h-8 text-blue-500 animate-spin" />
+            <p className="text-sm text-neutral-400 font-mono">
+              Loading authentic MRPL refinery artifacts...
+            </p>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
 
   const baseline = mrplCase.baseline;
 
@@ -195,7 +230,7 @@ export const MRPLPage: React.FC = () => {
         subtitle="Throughput distribution across primary distillation and secondary conversion units"
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {baseline.units.map((unit) => (
+          {baseline.units.map((unit: any) => (
             <div
               key={unit.unit}
               className="p-4 rounded-lg bg-[#0d1016] border border-[#202736] space-y-3"
@@ -268,13 +303,17 @@ export const MRPLPage: React.FC = () => {
       >
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {mrplCase.scenarios.map((sc) => {
-              const isSelected = selectedScenario.id === sc.id;
+            {mrplCase.scenarios.map((sc: MRPLScenario) => {
+              const isSelected = selectedScenario?.id === sc.id;
               return (
                 <button
                   key={sc.id}
                   type="button"
-                  onClick={() => setSelectedScenario(sc)}
+                  onClick={() => {
+                    setSelectedScenario(sc);
+                    setLiveSolveResult(null);
+                    setLiveSolveError(null);
+                  }}
                   className={`p-4 rounded-lg border text-left transition-all ${
                     isSelected
                       ? 'border-blue-500/80 bg-blue-950/20 shadow-lg'
@@ -304,63 +343,120 @@ export const MRPLPage: React.FC = () => {
           </div>
 
           {/* Selected Scenario Drill-down */}
-          <div className="p-4 rounded-lg bg-[#0a0d12] border border-[#1e2430] space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-semibold text-white">
-                  Scenario Focus: {selectedScenario.name}
-                </span>
+          {selectedScenario && (
+            <div className="p-4 rounded-lg bg-[#0a0d12] border border-[#1e2430] space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-semibold text-white">
+                    Scenario Focus: {selectedScenario.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={selectedScenario.status} size="sm" />
+                  <button
+                    type="button"
+                    disabled={isSolvingLive}
+                    onClick={() => handleRunLiveScenario(selectedScenario.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
+                  >
+                    <Play className={`w-3.5 h-3.5 ${isSolvingLive ? 'animate-spin' : ''}`} />
+                    <span>{isSolvingLive ? 'Solving on C++ Core...' : 'Run Scenario Live'}</span>
+                  </button>
+                </div>
               </div>
-              <StatusBadge status={selectedScenario.status} size="sm" />
-            </div>
 
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              {selectedScenario.description}.{' '}
-              {selectedScenario.status === 'INFEASIBLE'
-                ? 'Kavach-Opt mathematically proves that no feasible blending and scheduling plan exists that satisfies both demand commitments and strict physical crude conservation.'
-                : `Under this operating condition, the solver reroutes intermediate heavy gas oil fractions to maintain zero mass balance deviation while realizing $${selectedScenario.net_profit_k_usd?.toFixed(2)}k daily profit.`}
-            </p>
+              <p className="text-xs text-neutral-300 leading-relaxed">
+                {selectedScenario.description}.{' '}
+                {selectedScenario.status === 'INFEASIBLE'
+                  ? 'Kavach-Opt mathematically proves that no feasible blending and scheduling plan exists that satisfies both demand commitments and strict physical crude conservation.'
+                  : `Under this operating condition, the solver reroutes intermediate heavy gas oil fractions to maintain zero mass balance deviation while realizing $${selectedScenario.net_profit_k_usd?.toFixed(2)}k daily profit.`}
+              </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-mono">
-              <div>
-                <span className="text-neutral-400 block text-[10px]">Profit Delta vs Baseline:</span>
-                <span
-                  className={
-                    selectedScenario.profit_delta_k_usd && selectedScenario.profit_delta_k_usd < 0
-                      ? 'text-rose-400'
-                      : 'text-neutral-200'
-                  }
-                >
-                  {selectedScenario.profit_delta_k_usd
-                    ? `$${selectedScenario.profit_delta_k_usd.toFixed(2)}k`
-                    : '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-neutral-400 block text-[10px]">Refinery Throughput:</span>
-                <span className="text-neutral-200">
-                  {selectedScenario.throughput_kbpd
-                    ? `${selectedScenario.throughput_kbpd.toFixed(1)} kbpd`
-                    : '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-neutral-400 block text-[10px]">Mass Balance Invariant:</span>
-                <span
-                  className={
-                    selectedScenario.mass_balance_passed ? 'text-emerald-400' : 'text-rose-400'
-                  }
-                >
-                  {selectedScenario.mass_balance_passed ? 'PASS (0.0 residual)' : 'FAIL / INFEASIBLE'}
-                </span>
-              </div>
-              <div>
-                <span className="text-neutral-400 block text-[10px]">Dual Simplex Warm Start:</span>
-                <span className="text-blue-400">ENABLED (0.4ms)</span>
+              {liveSolveError && (
+                <div className="p-3 rounded bg-rose-950/40 border border-rose-800/60 text-xs font-mono text-rose-300">
+                  Live Solve Error: {liveSolveError}
+                </div>
+              )}
+
+              {liveSolveResult && (
+                <div className="p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-800/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 font-mono">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      LIVE SOLVE RESULT (kavach-opt mrpl --scenario {selectedScenario.id} --json)
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-300">
+                      {(liveSolveResult.solve_time_seconds * 1000).toFixed(2)} ms · {liveSolveResult.nodes_explored} nodes
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                    <div>
+                      <span className="text-neutral-400 block text-[10px]">Live Status:</span>
+                      <span className="text-white font-bold">{liveSolveResult.solver_status}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block text-[10px]">Net Margin:</span>
+                      <span className="text-emerald-400 font-bold">
+                        ${liveSolveResult.objective_net_margin_k_usd?.toFixed(2)} k/day
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block text-[10px]">Mass Balance Residual:</span>
+                      <span className="text-neutral-200">
+                        {liveSolveResult.mass_balance_validation?.max_absolute_residual?.toExponential(2) || '0.00e+00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block text-[10px]">Verification:</span>
+                      <span className="text-emerald-400">
+                        {liveSolveResult.verified_optimal ? 'CERTIFIED (PASS)' : 'UNVERIFIED'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-mono border-t border-[#1e2430]">
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Profit Delta vs Baseline:</span>
+                  <span
+                    className={
+                      selectedScenario.profit_delta_k_usd && selectedScenario.profit_delta_k_usd < 0
+                        ? 'text-rose-400'
+                        : 'text-neutral-200'
+                    }
+                  >
+                    {selectedScenario.profit_delta_k_usd
+                      ? `$${selectedScenario.profit_delta_k_usd.toFixed(2)}k`
+                      : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Refinery Throughput:</span>
+                  <span className="text-neutral-200">
+                    {selectedScenario.throughput_kbpd
+                      ? `${selectedScenario.throughput_kbpd.toFixed(1)} kbpd`
+                      : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Mass Balance Invariant:</span>
+                  <span
+                    className={
+                      selectedScenario.mass_balance_passed ? 'text-emerald-400' : 'text-rose-400'
+                    }
+                  >
+                    {selectedScenario.mass_balance_passed ? 'PASS (0.0 residual)' : 'FAIL / INFEASIBLE'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Dual Simplex Warm Start:</span>
+                  <span className="text-blue-400">ENABLED (0.4ms)</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </Panel>
     </div>

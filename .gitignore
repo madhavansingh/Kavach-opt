@@ -45,3 +45,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+# Frontend & runtime artifacts
+frontend/dist/
+frontend/node_modules/
+benchmark_results/.live_runs/

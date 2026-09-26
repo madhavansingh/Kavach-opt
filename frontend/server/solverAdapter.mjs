@@ -117,7 +117,138 @@ export async function discoverModels() {
     }
   }
 
-  return models;
+  // Enrich discovered models with exact characteristics from C++ Strategy engine
+  const enriched = await Promise.all(
+    models.map(async (m) => {
+      try {
+        const info = await inspectModel(m.path);
+        return {
+          ...m,
+          num_variables: info.num_variables ?? 0,
+          num_constraints: info.num_constraints ?? 0,
+          num_nonzeros: info.num_nonzeros ?? 0,
+          density: info.density ?? 0.0,
+          num_discrete_vars: (info.integer_variables ?? 0) + (info.binary_variables ?? 0),
+          problem_class: info.problem_class || m.problem_class,
+          dynamic_range: info.coefficient_range_ratio ?? 1.0,
+        };
+      } catch {
+        return m;
+      }
+    })
+  );
+
+  return enriched;
+}
+
+/**
+ * Inspects a model using kavach-opt inspect <path> --json.
+ */
+export async function inspectModel(modelPath) {
+  const binary = getSolverBinaryPath();
+  if (!fs.existsSync(binary)) {
+    throw new Error(`Kavach-Opt binary not found at ${binary}. Build the project with CMake first.`);
+  }
+
+  const { relativePath } = sanitizeModelPath(modelPath);
+  const args = ['inspect', relativePath, '--json'];
+
+  try {
+    const { stdout } = await execFileAsync(binary, args, {
+      cwd: REPO_ROOT,
+      timeout: 10000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return JSON.parse(stdout.trim());
+  } catch (err) {
+    if (err && typeof err === 'object' && 'stdout' in err && err.stdout) {
+      try {
+        return JSON.parse(String(err.stdout).trim());
+      } catch {
+        // Fall through
+      }
+    }
+    throw new Error(`Model inspection failed: ${err.message}\nStderr: ${err.stderr || ''}`);
+  }
+}
+
+/**
+ * Runs a specific MRPL scenario live using kavach-opt mrpl --scenario <id> --json.
+ */
+export async function runMRPLScenario(scenarioId) {
+  const binary = getSolverBinaryPath();
+  if (!fs.existsSync(binary)) {
+    throw new Error(`Kavach-Opt binary not found at ${binary}. Build the project with CMake first.`);
+  }
+
+  const args = ['mrpl', '--json'];
+  if (scenarioId && scenarioId !== 'all') {
+    args.push('--scenario', scenarioId);
+  }
+
+  try {
+    const { stdout } = await execFileAsync(binary, args, {
+      cwd: REPO_ROOT,
+      timeout: 30000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return JSON.parse(stdout.trim());
+  } catch (err) {
+    if (err && typeof err === 'object' && 'stdout' in err && err.stdout) {
+      try {
+        return JSON.parse(String(err.stdout).trim());
+      } catch {
+        // Fall through
+      }
+    }
+    throw new Error(`MRPL scenario execution failed: ${err.message}\nStderr: ${err.stderr || ''}`);
+  }
+}
+
+/**
+ * Runs a benchmark instance live using kavach-opt benchmark --instance <path>.
+ */
+export async function runBenchmark(instancePath, options = {}) {
+  const binary = getSolverBinaryPath();
+  if (!fs.existsSync(binary)) {
+    throw new Error(`Kavach-Opt binary not found at ${binary}. Build the project with CMake first.`);
+  }
+
+  const { relativePath } = sanitizeModelPath(instancePath);
+  const tempOutputDir = path.join(REPO_ROOT, 'benchmark_results', '.live_runs');
+  fs.mkdirSync(tempOutputDir, { recursive: true });
+
+  const args = ['benchmark', '--instance', relativePath, '--output', tempOutputDir];
+  if (options.time_limit && options.time_limit > 0) {
+    args.push('--time-limit', String(options.time_limit));
+  }
+  if (options.seed) {
+    args.push('--seed', String(options.seed));
+  }
+
+  try {
+    await execFileAsync(binary, args, {
+      cwd: REPO_ROOT,
+      timeout: (options.time_limit || 60) * 1000 + 5000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const jsonPath = path.join(tempOutputDir, 'benchmark_results.json');
+    if (fs.existsSync(jsonPath)) {
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+      if (data.results && data.results.length > 0) {
+        return {
+          success: true,
+          live: true,
+          result: data.results[0],
+          manifest: data.manifest,
+        };
+      }
+    }
+    throw new Error('Benchmark output artifact not found');
+  } catch (err) {
+    throw new Error(`Benchmark run failed: ${err.message}\nStderr: ${err.stderr || ''}`);
+  }
 }
 
 /**

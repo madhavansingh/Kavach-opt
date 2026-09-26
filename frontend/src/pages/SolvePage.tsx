@@ -15,11 +15,10 @@ import { Metric, MetricGroup } from '../components/Metric';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { EmptyState } from '../components/EmptyState';
 import type { ModelMetadata, SolveConfig, SolveResult } from '../types/solver';
-import { SAMPLE_MODELS } from '../data/mockData';
 import type { NavTab } from '../layouts/Sidebar';
 
 interface SolvePageProps {
-  activeModel: ModelMetadata;
+  activeModel: ModelMetadata | null;
   availableModels?: ModelMetadata[];
   onSelectModel: (model: ModelMetadata) => void;
   onNavigate: (tab: NavTab) => void;
@@ -31,7 +30,7 @@ interface SolvePageProps {
 
 export const SolvePage: React.FC<SolvePageProps> = ({
   activeModel,
-  availableModels = SAMPLE_MODELS,
+  availableModels = [],
   onSelectModel,
   onNavigate,
   currentResult,
@@ -41,7 +40,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [config, setConfig] = useState<SolveConfig>({
-    problem_class: activeModel.problem_class,
+    problem_class: activeModel?.problem_class || 'LP',
     presolve_policy: 'FULL',
     scaling_policy: 'AUTO',
     backend: 'CPU_SEQUENTIAL',
@@ -54,6 +53,22 @@ export const SolvePage: React.FC<SolvePageProps> = ({
     max_nodes: 50000,
     enable_independent_verification: true,
   });
+
+  if (!activeModel || availableModels.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Live Optimization Engine Dispatch"
+          subtitle="Select and execute mathematical optimization problems directly against the Kavach-Opt C++ core."
+        />
+        <EmptyState
+          icon={<Cpu className="w-5 h-5 text-blue-400" />}
+          title="Discovering Optimization Models"
+          description="Connecting to Kavach-Opt local solver adapter and parsing repository models..."
+        />
+      </div>
+    );
+  }
 
   const handleModelChange = (identifier: string) => {
     const selected = availableModels.find((m) => m.name === identifier || m.path === identifier);

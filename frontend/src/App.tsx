@@ -8,13 +8,12 @@ import { BenchmarksPage } from './pages/BenchmarksPage';
 import { MRPLPage } from './pages/MRPLPage';
 import { SystemPage } from './pages/SystemPage';
 import type { ModelMetadata, SolveConfig, SolveResult } from './types/solver';
-import { SAMPLE_MODELS } from './data/mockData';
 import { solverBridge } from './lib/solverBridge';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('overview');
-  const [availableModels, setAvailableModels] = useState<ModelMetadata[]>(SAMPLE_MODELS);
-  const [activeModel, setActiveModel] = useState<ModelMetadata>(SAMPLE_MODELS[0]);
+  const [availableModels, setAvailableModels] = useState<ModelMetadata[]>([]);
+  const [activeModel, setActiveModel] = useState<ModelMetadata | null>(null);
   const [currentResult, setCurrentResult] = useState<SolveResult | null>(null);
   const [isSolving, setIsSolving] = useState(false);
   const [solveError, setSolveError] = useState<string | null>(null);
@@ -33,7 +32,7 @@ export function App() {
         }
       })
       .catch((err) => {
-        console.warn('Failed to load discovered models from adapter:', err);
+        console.error('Failed to load discovered models from adapter:', err);
       });
 
     return () => {
@@ -41,8 +40,20 @@ export function App() {
     };
   }, []);
 
+  const handleSelectModel = (model: ModelMetadata) => {
+    if (activeModel?.path !== model.path) {
+      setActiveModel(model);
+      // STALE STATE PREVENTION: Immediately purge previous solve/verification results
+      setCurrentResult(null);
+      setSolveError(null);
+    }
+  };
+
   const handleRunSolve = async (config: SolveConfig) => {
+    if (!activeModel) return;
     setIsSolving(true);
+    // STALE STATE PREVENTION: Clear previous result when new solve begins
+    setCurrentResult(null);
     setSolveError(null);
     try {
       const targetPath = activeModel.path || activeModel.name;
@@ -91,14 +102,14 @@ export function App() {
     <AppShell
       currentTab={currentTab}
       onSelectTab={setCurrentTab}
-      currentModelName={activeModel.name}
+      currentModelName={activeModel?.name || 'Loading Models...'}
       backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
       solverStatus={currentResult?.status}
     >
       {currentTab === 'overview' && (
         <OverviewPage
           onNavigate={setCurrentTab}
-          activeModel={activeModel}
+          activeModel={activeModel ?? undefined}
           lastResult={currentResult ?? undefined}
         />
       )}
@@ -107,7 +118,7 @@ export function App() {
         <SolvePage
           activeModel={activeModel}
           availableModels={availableModels}
-          onSelectModel={setActiveModel}
+          onSelectModel={handleSelectModel}
           onNavigate={setCurrentTab}
           currentResult={currentResult}
           onRunSolve={handleRunSolve}

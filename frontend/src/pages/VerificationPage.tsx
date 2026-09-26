@@ -15,7 +15,7 @@ import type { SolveResult, ModelMetadata } from '../types/solver';
 import type { NavTab } from '../layouts/Sidebar';
 
 interface VerificationPageProps {
-  activeModel: ModelMetadata;
+  activeModel: ModelMetadata | null;
   result: SolveResult | null;
   onNavigate: (tab: NavTab) => void;
   onRunVerify?: () => Promise<void>;
@@ -120,7 +120,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           {/* Certificate Overview Card */}
           <Panel
             title="Verification Certificate Summary"
-            subtitle={`Target: ${activeModel.name} · Certified Status: ${report.certified_status}`}
+            subtitle={`Target: ${activeModel?.name || 'Selected Model'} · Certified Status: ${report.certified_status}`}
             badge={
               <div className="flex items-center gap-2">
                 {onRunVerify && (
@@ -158,7 +158,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                   subtext="Tolerance: 1.0e-06"
                   highlight={report.recomputed_primal_residual <= 1e-6 ? 'success' : 'danger'}
                 />
-                {activeModel.problem_class === 'LP' ? (
+                {activeModel?.problem_class === 'LP' ? (
                   <>
                     <Metric
                       label="Max Dual Residual"
@@ -173,7 +173,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                       highlight={report.recomputed_complementary_slackness <= 1e-6 ? 'success' : 'danger'}
                     />
                   </>
-                ) : activeModel.problem_class === 'MILP' ? (
+                ) : activeModel?.problem_class === 'MILP' ? (
                   <>
                     <Metric
                       label="Integrality Violation"
