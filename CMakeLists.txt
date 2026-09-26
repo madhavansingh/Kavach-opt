@@ -114,6 +114,9 @@ add_library(kavach_core
     src/algorithms/milp/gomory_separator.cpp
     src/algorithms/milp/mir_separator.cpp
     src/algorithms/milp/cutting_plane_engine.cpp
+    src/algorithms/milp/pseudocost.cpp
+    src/algorithms/milp/strong_branching.cpp
+    src/algorithms/milp/primal_heuristic.cpp
     src/algorithms/qp/active_set.cpp
     src/verification/lp_verifier.cpp
     src/verification/milp_verifier.cpp

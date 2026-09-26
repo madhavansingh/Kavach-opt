@@ -87,6 +87,10 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         milp_opts.enable_scaling = decision.scaling_enabled;
         milp_opts.enable_warm_starts = decision.prefer_dual_simplex_warm_start;
         milp_opts.cut_options = options.cut_options;
+        milp_opts.branching_strategy = options.branching_strategy;
+        milp_opts.strong_branching_candidates = options.strong_branching_candidates;
+        milp_opts.pseudocost_reliability_threshold = options.pseudocost_reliability_threshold;
+        milp_opts.enable_primal_heuristic = options.enable_primal_heuristic;
         milp_opts.time_limit_seconds = time_limit_sec;
         milp_opts.max_nodes = options.max_nodes;
 
@@ -103,6 +107,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         result.iterations =
             sol.telemetry.dual_simplex_iterations + sol.telemetry.cold_start_iterations;
         result.cut_telemetry = sol.telemetry.cut_telemetry;
+        result.search_telemetry = sol.telemetry.search_telemetry;
 
         if (sol.is_optimal() && sol.has_incumbent()) {
             verification::MILPVerifier verifier;

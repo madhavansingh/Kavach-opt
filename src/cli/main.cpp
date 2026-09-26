@@ -60,6 +60,9 @@ void print_help() {
         << "  --no-gpu                           Disable CUDA GPU execution (force CPU)\n"
         << "  --time-limit <seconds>             Wall-clock time limit in seconds\n"
         << "  --cuts <off|root|periodic>         Cutting-plane strategy for MILP (default: root)\n"
+        << "  --branching <rule>                 Branching rule: "
+           "most_fractional|pseudocost|strong|reliability|auto (default: reliability)\n"
+        << "  --heuristic <on|off>               Incumbent primal heuristic (default: on)\n"
         << "  --json                             Output strategy and solve result as JSON\n\n"
         << "MRPL Case Study Options:\n"
         << "  --scenario <name>                  Specific scenario to solve\n"
@@ -371,6 +374,8 @@ int handle_solve(const std::vector<std::string_view>& args) {
     bool json_output = false;
     double time_limit_sec = 0.0;
     std::optional<kavach::algorithms::milp::CutStrategy> cut_strategy_override;
+    std::optional<kavach::algorithms::milp::BranchingStrategy> branching_override;
+    std::optional<bool> heuristic_override;
     kavach::strategy::StrategyConfig config;
 
     for (std::size_t i = 2; i < args.size(); ++i) {
@@ -392,6 +397,26 @@ int handle_solve(const std::vector<std::string_view>& args) {
                 cut_strategy_override = kavach::algorithms::milp::CutStrategy::ROOT_ONLY;
             } else if (c_arg == "periodic") {
                 cut_strategy_override = kavach::algorithms::milp::CutStrategy::PERIODIC;
+            }
+        } else if (args[i] == "--branching" && i + 1 < args.size()) {
+            std::string_view b_arg = args[++i];
+            if (b_arg == "most_fractional" || b_arg == "fractional") {
+                branching_override = kavach::algorithms::milp::BranchingStrategy::MOST_FRACTIONAL;
+            } else if (b_arg == "pseudocost" || b_arg == "pseudo") {
+                branching_override = kavach::algorithms::milp::BranchingStrategy::PSEUDOCOST;
+            } else if (b_arg == "strong") {
+                branching_override = kavach::algorithms::milp::BranchingStrategy::STRONG;
+            } else if (b_arg == "reliability" || b_arg == "rel") {
+                branching_override = kavach::algorithms::milp::BranchingStrategy::RELIABILITY;
+            } else if (b_arg == "auto") {
+                branching_override = kavach::algorithms::milp::BranchingStrategy::AUTO;
+            }
+        } else if (args[i] == "--heuristic" && i + 1 < args.size()) {
+            std::string_view h_arg = args[++i];
+            if (h_arg == "on" || h_arg == "true" || h_arg == "1" || h_arg == "yes") {
+                heuristic_override = true;
+            } else if (h_arg == "off" || h_arg == "false" || h_arg == "0" || h_arg == "no") {
+                heuristic_override = false;
             }
         } else if (args[i] == "--strategy" && i + 1 < args.size()) {
             std::string_view strat_arg = args[++i];
@@ -474,6 +499,12 @@ int handle_solve(const std::vector<std::string_view>& args) {
         if (cut_strategy_override.has_value()) {
             opts.cut_options.strategy = *cut_strategy_override;
         }
+        if (branching_override.has_value()) {
+            opts.branching_strategy = *branching_override;
+        }
+        if (heuristic_override.has_value()) {
+            opts.enable_primal_heuristic = *heuristic_override;
+        }
 
         auto decision = solver.plan(*model, opts);
 
@@ -506,6 +537,31 @@ int handle_solve(const std::vector<std::string_view>& args) {
                 cuts["mir_cuts"] = static_cast<double>(result.cut_telemetry->mir_cuts);
                 cuts["root_rounds"] = static_cast<double>(result.cut_telemetry->cut_rounds);
                 res["cuts"] = std::move(cuts);
+            }
+            if (result.search_telemetry.has_value()) {
+                kavach::benchmark::JsonValue::Object search;
+                search["branching_strategy"] = result.search_telemetry->branching_strategy_used;
+                search["pseudocost_candidates"] =
+                    static_cast<double>(result.search_telemetry->pseudocost_candidates);
+                search["pseudocost_updates"] =
+                    static_cast<double>(result.search_telemetry->pseudocost_updates);
+                search["strong_branching_calls"] =
+                    static_cast<double>(result.search_telemetry->strong_branching_calls);
+                search["strong_branching_candidates"] =
+                    static_cast<double>(result.search_telemetry->strong_branching_candidates);
+                search["strong_branching_infeasible_children"] = static_cast<double>(
+                    result.search_telemetry->strong_branching_infeasible_children);
+                search["reliability_fallbacks"] =
+                    static_cast<double>(result.search_telemetry->reliability_fallbacks);
+                search["heuristic_calls"] =
+                    static_cast<double>(result.search_telemetry->heuristic_calls);
+                search["heuristic_feasible_candidates"] =
+                    static_cast<double>(result.search_telemetry->heuristic_feasible_candidates);
+                search["heuristic_incumbent_updates"] =
+                    static_cast<double>(result.search_telemetry->heuristic_incumbent_updates);
+                search["incumbent_source"] = result.search_telemetry->incumbent_source;
+                search["search_explanation"] = result.search_telemetry->search_explanation;
+                res["search"] = std::move(search);
             }
             root["result"] = std::move(res);
 
@@ -565,6 +621,14 @@ int handle_solve(const std::vector<std::string_view>& args) {
                           << " (Gomory: " << result.cut_telemetry->gomory_cuts
                           << ", MIR: " << result.cut_telemetry->mir_cuts
                           << ", Rounds: " << result.cut_telemetry->cut_rounds << ")\n";
+            }
+            if (result.search_telemetry.has_value()) {
+                std::cout << "Search Engine: " << result.search_telemetry->branching_strategy_used
+                          << " (Pseudocosts: " << result.search_telemetry->pseudocost_updates
+                          << ", Strong branch: " << result.search_telemetry->strong_branching_calls
+                          << ", Heuristics: "
+                          << result.search_telemetry->heuristic_incumbent_updates
+                          << ", Incumbent: " << result.search_telemetry->incumbent_source << ")\n";
             }
             std::cout << "Verification: "
                       << (result.verification_report.passed

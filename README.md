@@ -70,7 +70,7 @@ Kavach-Opt implements a complete, self-contained optimization engine:
 | Requirement ID | Capability | Implementation | Status |
 |---------------|-----------|---------------|--------|
 | R-LP-001 | Continuous LP solver | Two-Phase Revised Simplex (`src/algorithms/lp/`) | ✓ Verified |
-| R-MILP-001 | Mixed-Integer LP solver | Branch-and-Bound (`src/algorithms/milp/`) | ✓ Verified |
+| R-MILP-001 | Mixed-Integer LP solver | Branch-and-Cut (Gomory, MIR, Pseudocost, Strong Branching) (`src/algorithms/milp/`) | ✓ Verified |
 | R-QP-001 | Convex QP solver | Primal Active-Set (`src/algorithms/qp/`) | ✓ Verified |
 | R-NUM-001 | Sparse numerics | CSR/CSC, SparseLU, Ruiz scaling (`src/numerics/`) | ✓ Verified |
 | R-VER-001 | Independent verification | Zero-trust verifier (`src/verification/`) | ✓ Verified |
@@ -469,6 +469,8 @@ Usage:
 Solve Options:
   --strategy <auto|conservative|fast>   Strategy decision mode (default: auto)
   --cuts <off|root|periodic>            Cutting-plane strategy (default: root)
+  --branching <rule>                    Branching rule: most_fractional|pseudocost|strong|reliability|auto
+  --heuristic <on|off>                  Primal incumbent heuristic (default: on)
   --show-strategy                       Display concise strategy decision
   --explain-strategy                    Display comprehensive strategy explanation
   --presolve <full|none|auto>           Explicit presolve override

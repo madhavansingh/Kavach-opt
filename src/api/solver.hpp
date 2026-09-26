@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "algorithms/milp/cut_types.hpp"
+#include "algorithms/milp/search_types.hpp"
 #include "backend/execution_backend.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
@@ -30,6 +31,11 @@ struct SolverOptions {
     bool run_presolve{true};
     strategy::StrategyConfig strategy_config;
     algorithms::milp::CutOptions cut_options;
+    algorithms::milp::BranchingStrategy branching_strategy{
+        algorithms::milp::BranchingStrategy::RELIABILITY};
+    std::size_t strong_branching_candidates{5};
+    std::size_t pseudocost_reliability_threshold{4};
+    bool enable_primal_heuristic{true};
 };
 
 struct SolverResult {
@@ -46,6 +52,7 @@ struct SolverResult {
     backend::BackendType backend_used{backend::BackendType::CPU_SEQUENTIAL};
     strategy::StrategyDecision strategy_decision;
     std::optional<algorithms::milp::CutTelemetry> cut_telemetry{std::nullopt};
+    std::optional<algorithms::milp::SearchTelemetry> search_telemetry{std::nullopt};
 };
 
 /**

@@ -16,6 +16,7 @@ add_executable(kavach_unit_tests
     unit/test_phase13_mrpl.cpp
     unit/test_phase14_strategy.cpp
     unit/test_cutting_planes.cpp
+    unit/test_advanced_search.cpp
 )
 
 target_link_libraries(kavach_unit_tests PRIVATE kavach_core)

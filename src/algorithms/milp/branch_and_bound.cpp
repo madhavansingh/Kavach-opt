@@ -21,6 +21,10 @@
 #include "algorithms/lp/lp_types.hpp"
 #include "algorithms/lp/simplex.hpp"
 #include "algorithms/milp/cutting_plane_engine.hpp"
+#include "algorithms/milp/primal_heuristic.hpp"
+#include "algorithms/milp/pseudocost.hpp"
+#include "algorithms/milp/search_types.hpp"
+#include "algorithms/milp/strong_branching.hpp"
 #include "core/error.hpp"
 #include "core/logger.hpp"
 #include "core/status.hpp"
@@ -52,12 +56,20 @@ struct BranchNode {
     double lp_bound{0.0};  ///< LP relaxation objective at parent (used for queue priority)
     std::vector<BoundModification> mods;             ///< Bound mods relative to base model
     std::optional<lp::BasisState> warm_start_basis;  ///< Inherited basis from parent solve
+    model::VarId branch_var{model::INVALID_VAR_ID};  ///< Variable branched on to create this node
+    bool is_down_branch{true};  ///< True if left/down branch, false if right/up
+    double parent_obj{0.0};     ///< LP relaxation objective of parent node
+    double fractionality{0.0};  ///< Parent fractional value of branch_var
+    std::size_t depth{0};       ///< Tree depth (root = 0)
 };
 
 struct MinBestBound {
     bool operator()(const BranchNode& a, const BranchNode& b) const noexcept {
-        if (a.lp_bound != b.lp_bound) {
+        if (std::abs(a.lp_bound - b.lp_bound) > 1e-9) {
             return a.lp_bound > b.lp_bound;  // min-heap: smaller bound = higher priority
+        }
+        if (a.depth != b.depth) {
+            return a.depth < b.depth;  // secondary key: deeper nodes first (diving for incumbents)
         }
         return a.node_id > b.node_id;  // deterministic tie-break
     }
@@ -65,8 +77,11 @@ struct MinBestBound {
 
 struct MaxBestBound {
     bool operator()(const BranchNode& a, const BranchNode& b) const noexcept {
-        if (a.lp_bound != b.lp_bound) {
+        if (std::abs(a.lp_bound - b.lp_bound) > 1e-9) {
             return a.lp_bound < b.lp_bound;  // max-heap: larger bound = higher priority
+        }
+        if (a.depth != b.depth) {
+            return a.depth < b.depth;  // secondary key: deeper nodes first
         }
         return a.node_id > b.node_id;
     }
@@ -157,6 +172,209 @@ std::optional<model::VarId> select_branching_variable(const model::CanonicalMode
         }
     }
     return best_var;
+}
+
+struct BranchSelectionResult {
+    std::optional<model::VarId> var_id{std::nullopt};
+    bool node_proved_infeasible{false};
+};
+
+/**
+ * @brief Advanced branching variable selection.
+ *
+ * Implements:
+ *  - Pseudocost branching with Achterberg product scoring
+ *  - Strong branching for top-K candidates with child bound probes and infeasibility detection
+ *  - Reliability branching hybrid policy
+ *  - Deterministic tie-breaking hierarchy:
+ *      1. Score (descending)
+ *      2. Fractionality min(f, 1 - f) (descending)
+ *      3. Total observations N^- + N^+ (descending)
+ *      4. VarId (ascending)
+ *  - Deterministic fallback chain: Reliability -> Pseudocost -> Strong -> Most-Fractional.
+ */
+BranchSelectionResult select_branching_variable_advanced(
+    model::CanonicalModel& work_model, const model::CanonicalModel& orig_model,
+    const std::vector<double>& x, double parent_obj, model::ObjectiveSense sense,
+    const std::optional<lp::BasisState>& parent_basis,
+    const std::function<lp::LPSolution(model::CanonicalModel&,
+                                       const std::optional<lp::BasisState>&)>& solve_node_lp,
+    PseudocostTracker& pseudocost_tracker, StrongBrancher& strong_brancher,
+    const MILPSolverOptions& opts, MILPSolverTelemetry& tel) {
+    const std::size_t n = std::min(x.size(), orig_model.num_variables());
+    std::vector<BranchCandidate> candidates;
+
+    for (std::size_t j = 0; j < n; ++j) {
+        const auto& var = orig_model.variable(static_cast<model::VarId>(j));
+        if (!var.is_integer() && !var.is_binary()) {
+            continue;
+        }
+        double frac = x[j] - std::floor(x[j]);
+        if (frac <= opts.tolerances.integrality_tol ||
+            frac >= 1.0 - opts.tolerances.integrality_tol) {
+            continue;
+        }
+
+        BranchCandidate cand;
+        cand.var_id = static_cast<model::VarId>(j);
+        cand.fractionality = std::min(frac, 1.0 - frac);
+        cand.down_dist = frac;
+        cand.up_dist = 1.0 - frac;
+
+        const auto& p_entry = pseudocost_tracker.entry(cand.var_id);
+        cand.down_pseudocost = p_entry.down_pseudocost;
+        cand.up_pseudocost = p_entry.up_pseudocost;
+        cand.down_obs = p_entry.down_count;
+        cand.up_obs = p_entry.up_count;
+        cand.is_reliable = p_entry.is_reliable(opts.pseudocost_reliability_threshold);
+        cand.score = pseudocost_tracker.compute_score(cand.var_id, x[j]);
+
+        candidates.push_back(cand);
+    }
+
+    if (candidates.empty()) {
+        return {std::nullopt, false};
+    }
+    if (candidates.size() == 1) {
+        return {candidates[0].var_id, false};
+    }
+
+    BranchingStrategy strategy = opts.branching_strategy;
+    if (strategy == BranchingStrategy::AUTO) {
+        strategy = BranchingStrategy::RELIABILITY;
+    }
+
+    if (strategy == BranchingStrategy::MOST_FRACTIONAL) {
+        return {select_branching_variable(orig_model, x, opts.tolerances.integrality_tol), false};
+    }
+
+    if (strategy == BranchingStrategy::PSEUDOCOST) {
+        tel.search_telemetry.pseudocost_candidates += candidates.size();
+        std::stable_sort(candidates.begin(), candidates.end(),
+                         [](const BranchCandidate& a, const BranchCandidate& b) {
+                             if (std::abs(a.score - b.score) > 1e-9) {
+                                 return a.score > b.score;
+                             }
+                             if (std::abs(a.fractionality - b.fractionality) > 1e-9) {
+                                 return a.fractionality > b.fractionality;
+                             }
+                             std::size_t obs_a = a.down_obs + a.up_obs;
+                             std::size_t obs_b = b.down_obs + b.up_obs;
+                             if (obs_a != obs_b) {
+                                 return obs_a > obs_b;
+                             }
+                             return a.var_id < b.var_id;
+                         });
+        return {candidates[0].var_id, false};
+    }
+
+    if (strategy == BranchingStrategy::STRONG) {
+        std::stable_sort(candidates.begin(), candidates.end(),
+                         [](const BranchCandidate& a, const BranchCandidate& b) {
+                             if (std::abs(a.fractionality - b.fractionality) > 1e-9) {
+                                 return a.fractionality > b.fractionality;
+                             }
+                             return a.var_id < b.var_id;
+                         });
+
+        std::size_t k = std::min(opts.strong_branching_candidates, candidates.size());
+        std::vector<model::VarId> probe_vars;
+        probe_vars.reserve(k);
+        for (std::size_t i = 0; i < k; ++i) {
+            probe_vars.push_back(candidates[i].var_id);
+        }
+
+        tel.search_telemetry.strong_branching_calls += 1;
+        tel.search_telemetry.strong_branching_candidates += probe_vars.size();
+
+        auto probes = strong_brancher.evaluate_candidates(
+            work_model, probe_vars, x, parent_obj, sense, parent_basis, solve_node_lp,
+            pseudocost_tracker, tel.search_telemetry.strong_branching_infeasible_children);
+
+        for (const auto& pr : probes) {
+            if (pr.node_proved_infeasible) {
+                return {std::nullopt, true};
+            }
+        }
+
+        if (probes.empty()) {
+            tel.search_telemetry.reliability_fallbacks += 1;
+            return {candidates[0].var_id, false};
+        }
+
+        auto best_probe_it = std::max_element(
+            probes.begin(), probes.end(),
+            [](const StrongBranchProbeResult& a, const StrongBranchProbeResult& b) {
+                if (std::abs(a.score - b.score) > 1e-9) {
+                    return a.score < b.score;
+                }
+                return a.var_id > b.var_id;
+            });
+        return {best_probe_it->var_id, false};
+    }
+
+    // RELIABILITY (Hybrid)
+    tel.search_telemetry.pseudocost_candidates += candidates.size();
+
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [](const BranchCandidate& a, const BranchCandidate& b) {
+                         double eff_a = a.is_reliable ? a.score : (a.fractionality * 1000.0);
+                         double eff_b = b.is_reliable ? b.score : (b.fractionality * 1000.0);
+                         if (std::abs(eff_a - eff_b) > 1e-9) {
+                             return eff_a > eff_b;
+                         }
+                         return a.var_id < b.var_id;
+                     });
+
+    std::vector<model::VarId> probe_vars;
+    std::size_t k = std::min(opts.strong_branching_candidates, candidates.size());
+    for (std::size_t i = 0; i < k; ++i) {
+        if (!candidates[i].is_reliable) {
+            probe_vars.push_back(candidates[i].var_id);
+        }
+    }
+
+    if (!probe_vars.empty()) {
+        tel.search_telemetry.strong_branching_calls += 1;
+        tel.search_telemetry.strong_branching_candidates += probe_vars.size();
+
+        auto probes = strong_brancher.evaluate_candidates(
+            work_model, probe_vars, x, parent_obj, sense, parent_basis, solve_node_lp,
+            pseudocost_tracker, tel.search_telemetry.strong_branching_infeasible_children);
+
+        for (const auto& pr : probes) {
+            if (pr.node_proved_infeasible) {
+                return {std::nullopt, true};
+            }
+        }
+    }
+
+    // Re-score all candidates with updated pseudocosts
+    for (auto& cand : candidates) {
+        cand.score = pseudocost_tracker.compute_score(cand.var_id, x[cand.var_id]);
+        const auto& p_entry = pseudocost_tracker.entry(cand.var_id);
+        cand.down_obs = p_entry.down_count;
+        cand.up_obs = p_entry.up_count;
+        cand.is_reliable = p_entry.is_reliable(opts.pseudocost_reliability_threshold);
+    }
+
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [](const BranchCandidate& a, const BranchCandidate& b) {
+                         if (std::abs(a.score - b.score) > 1e-9) {
+                             return a.score > b.score;
+                         }
+                         if (std::abs(a.fractionality - b.fractionality) > 1e-9) {
+                             return a.fractionality > b.fractionality;
+                         }
+                         std::size_t obs_a = a.down_obs + a.up_obs;
+                         std::size_t obs_b = b.down_obs + b.up_obs;
+                         if (obs_a != obs_b) {
+                             return obs_a > obs_b;
+                         }
+                         return a.var_id < b.var_id;
+                     });
+
+    return {candidates[0].var_id, false};
 }
 
 /**
@@ -338,6 +556,12 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
     double incumbent_obj = worst_bound(sense);
     std::vector<double> incumbent;
 
+    // Advanced Branch-and-Cut Search Subsystems
+    PseudocostTracker pseudocost_tracker(orig_model.num_variables(), sense);
+    StrongBrancher strong_brancher(tols);
+    PrimalHeuristic primal_heuristic(tols, opts.heuristic_max_repair_rounds);
+    tel.search_telemetry.branching_strategy_used = to_string(opts.branching_strategy);
+
     auto elapsed = [&]() -> double {
         auto now = Clock::now();
         return std::chrono::duration<double>(now - start).count();
@@ -419,6 +643,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             incumbent = root_sol.primal_solution;
             tel.incumbent_updates = 1;
             tel.final_best_bound = incumbent_obj;
+            tel.search_telemetry.incumbent_source = "ROOT_LP";
             result.best_bound = incumbent_obj;
             result.best_objective = incumbent_obj;
             result.incumbent_solution = incumbent;
@@ -440,9 +665,29 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             return result;
         }
 
-        // Try rounding heuristic on root
+        // Try primal heuristic on root
+        if (opts.enable_primal_heuristic) {
+            ++tel.search_telemetry.heuristic_calls;
+            auto heur_res = primal_heuristic.search(orig_model, root_sol.primal_solution);
+            if (heur_res.found_feasible) {
+                ++tel.search_telemetry.heuristic_feasible_candidates;
+                if (incumbent.empty() || is_better(heur_res.objective, incumbent_obj, sense)) {
+                    incumbent_obj = heur_res.objective;
+                    incumbent = heur_res.solution;
+                    tel.search_telemetry.incumbent_source = "PRIMAL_HEURISTIC";
+                    ++tel.search_telemetry.heuristic_incumbent_updates;
+                    ++tel.incumbent_updates;
+                }
+            }
+        }
+
+        // Try fast rounding heuristic on root
         if (opts.enable_rounding_heuristic) {
-            try_update_incumbent_via_rounding(root_sol.primal_solution);
+            if (try_update_incumbent_via_rounding(root_sol.primal_solution)) {
+                if (tel.search_telemetry.incumbent_source == "NONE") {
+                    tel.search_telemetry.incumbent_source = "ROUNDING";
+                }
+            }
         }
 
         // -------------------------------------------------------------------
@@ -562,6 +807,17 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
 
                 double node_obj = node_sol.objective_value;
 
+                // Record observed degradation from parent branch into pseudocost tracker
+                if (node.branch_var != model::INVALID_VAR_ID) {
+                    if (node.is_down_branch) {
+                        pseudocost_tracker.update_down(node.branch_var, node.parent_obj, node_obj,
+                                                       node.fractionality, tols.integrality_tol);
+                    } else {
+                        pseudocost_tracker.update_up(node.branch_var, node.parent_obj, node_obj,
+                                                     node.fractionality, tols.integrality_tol);
+                    }
+                }
+
                 // Bound pruning after solve
                 if (!incumbent.empty() &&
                     dominated(node_obj, incumbent_obj, sense, tols.primal_feasibility_tol)) {
@@ -575,25 +831,55 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     if (incumbent.empty() || is_better(node_obj, incumbent_obj, sense)) {
                         incumbent_obj = node_obj;
                         incumbent = node_sol.primal_solution;
+                        tel.search_telemetry.incumbent_source = "INTEGER_LP_NODE";
                         ++tel.incumbent_updates;
                     }
                     continue;  // This node is done
                 }
 
+                // Primal heuristic
+                if (opts.enable_primal_heuristic &&
+                    (tel.nodes_explored % opts.rounding_interval == 0)) {
+                    ++tel.search_telemetry.heuristic_calls;
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution);
+                    if (heur_res.found_feasible) {
+                        ++tel.search_telemetry.heuristic_feasible_candidates;
+                        if (incumbent.empty() ||
+                            is_better(heur_res.objective, incumbent_obj, sense)) {
+                            incumbent_obj = heur_res.objective;
+                            incumbent = heur_res.solution;
+                            tel.search_telemetry.incumbent_source = "PRIMAL_HEURISTIC";
+                            ++tel.search_telemetry.heuristic_incumbent_updates;
+                            ++tel.incumbent_updates;
+                        }
+                    }
+                }
+
                 // Rounding heuristic
                 if (opts.enable_rounding_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
-                    try_update_incumbent_via_rounding(node_sol.primal_solution);
+                    if (try_update_incumbent_via_rounding(node_sol.primal_solution)) {
+                        if (tel.search_telemetry.incumbent_source == "NONE") {
+                            tel.search_telemetry.incumbent_source = "ROUNDING";
+                        }
+                    }
                 }
 
-                // Branch on most-fractional variable
-                auto branch_var = select_branching_variable(orig_model, node_sol.primal_solution,
-                                                            tols.integrality_tol);
-                if (!branch_var.has_value()) {
-                    continue;  // No branching variable found (shouldn't happen)
+                // Branching variable selection (Advanced Search Engine)
+                auto branch_decision = select_branching_variable_advanced(
+                    work_model, orig_model, node_sol.primal_solution, node_obj, sense,
+                    node_sol.basis, solve_node_lp, pseudocost_tracker, strong_brancher, opts, tel);
+
+                if (branch_decision.node_proved_infeasible) {
+                    ++tel.nodes_pruned_infeasible;
+                    continue;
                 }
 
-                model::VarId bv = *branch_var;
+                if (!branch_decision.var_id.has_value()) {
+                    continue;  // No fractional variable found or integer feasible
+                }
+
+                model::VarId bv = *branch_decision.var_id;
                 double bv_val = node_sol.primal_solution[bv];
                 double bv_floor = std::floor(bv_val);
                 double bv_ceil = std::ceil(bv_val);
@@ -618,6 +904,11 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     left.node_id = next_id++;
                     left.lp_bound = node_obj;
                     left.mods = node.mods;
+                    left.branch_var = bv;
+                    left.is_down_branch = true;
+                    left.parent_obj = node_obj;
+                    left.fractionality = bv_val;
+                    left.depth = node.depth + 1;
                     // Find and update existing UB mod if any, else add new
                     bool found_ub = false;
                     for (auto& m : left.mods) {
@@ -655,6 +946,11 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     right.node_id = next_id++;
                     right.lp_bound = node_obj;
                     right.mods = node.mods;
+                    right.branch_var = bv;
+                    right.is_down_branch = false;
+                    right.parent_obj = node_obj;
+                    right.fractionality = bv_val;
+                    right.depth = node.depth + 1;
                     bool found_lb = false;
                     for (auto& m : right.mods) {
                         if (m.var_id == bv && m.is_lower) {
@@ -733,6 +1029,17 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
 
                 double node_obj = node_sol.objective_value;
 
+                // Record observed degradation from parent branch into pseudocost tracker
+                if (node.branch_var != model::INVALID_VAR_ID) {
+                    if (node.is_down_branch) {
+                        pseudocost_tracker.update_down(node.branch_var, node.parent_obj, node_obj,
+                                                       node.fractionality, tols.integrality_tol);
+                    } else {
+                        pseudocost_tracker.update_up(node.branch_var, node.parent_obj, node_obj,
+                                                     node.fractionality, tols.integrality_tol);
+                    }
+                }
+
                 if (!incumbent.empty() &&
                     dominated(node_obj, incumbent_obj, sense, tols.primal_feasibility_tol)) {
                     ++tel.nodes_pruned_bound;
@@ -744,23 +1051,54 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     if (incumbent.empty() || is_better(node_obj, incumbent_obj, sense)) {
                         incumbent_obj = node_obj;
                         incumbent = node_sol.primal_solution;
+                        tel.search_telemetry.incumbent_source = "INTEGER_LP_NODE";
                         ++tel.incumbent_updates;
                     }
                     continue;
                 }
 
-                if (opts.enable_rounding_heuristic &&
+                // Primal heuristic
+                if (opts.enable_primal_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
-                    try_update_incumbent_via_rounding(node_sol.primal_solution);
+                    ++tel.search_telemetry.heuristic_calls;
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution);
+                    if (heur_res.found_feasible) {
+                        ++tel.search_telemetry.heuristic_feasible_candidates;
+                        if (incumbent.empty() ||
+                            is_better(heur_res.objective, incumbent_obj, sense)) {
+                            incumbent_obj = heur_res.objective;
+                            incumbent = heur_res.solution;
+                            tel.search_telemetry.incumbent_source = "PRIMAL_HEURISTIC";
+                            ++tel.search_telemetry.heuristic_incumbent_updates;
+                            ++tel.incumbent_updates;
+                        }
+                    }
                 }
 
-                auto branch_var = select_branching_variable(orig_model, node_sol.primal_solution,
-                                                            tols.integrality_tol);
-                if (!branch_var.has_value()) {
+                if (opts.enable_rounding_heuristic &&
+                    (tel.nodes_explored % opts.rounding_interval == 0)) {
+                    if (try_update_incumbent_via_rounding(node_sol.primal_solution)) {
+                        if (tel.search_telemetry.incumbent_source == "NONE") {
+                            tel.search_telemetry.incumbent_source = "ROUNDING";
+                        }
+                    }
+                }
+
+                // Branching variable selection (Advanced Search Engine)
+                auto branch_decision = select_branching_variable_advanced(
+                    work_model, orig_model, node_sol.primal_solution, node_obj, sense,
+                    node_sol.basis, solve_node_lp, pseudocost_tracker, strong_brancher, opts, tel);
+
+                if (branch_decision.node_proved_infeasible) {
+                    ++tel.nodes_pruned_infeasible;
                     continue;
                 }
 
-                model::VarId bv = *branch_var;
+                if (!branch_decision.var_id.has_value()) {
+                    continue;
+                }
+
+                model::VarId bv = *branch_decision.var_id;
                 double bv_val = node_sol.primal_solution[bv];
                 double bv_floor = std::floor(bv_val);
                 double bv_ceil = std::ceil(bv_val);
@@ -782,6 +1120,11 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     left.node_id = next_id++;
                     left.lp_bound = node_obj;
                     left.mods = node.mods;
+                    left.branch_var = bv;
+                    left.is_down_branch = true;
+                    left.parent_obj = node_obj;
+                    left.fractionality = bv_val;
+                    left.depth = node.depth + 1;
                     bool found = false;
                     for (auto& m : left.mods) {
                         if (m.var_id == bv && !m.is_lower) {
@@ -815,6 +1158,11 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                     right.node_id = next_id++;
                     right.lp_bound = node_obj;
                     right.mods = node.mods;
+                    right.branch_var = bv;
+                    right.is_down_branch = false;
+                    right.parent_obj = node_obj;
+                    right.fractionality = bv_val;
+                    right.depth = node.depth + 1;
                     bool found = false;
                     for (auto& m : right.mods) {
                         if (m.var_id == bv && m.is_lower) {
@@ -839,6 +1187,26 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
     }
 
     tel.solve_time_seconds = elapsed();
+    tel.search_telemetry.pseudocost_updates = pseudocost_tracker.total_updates();
+
+    // Construct search telemetry explanation
+    {
+        std::string expl = "Branching strategy: " + tel.search_telemetry.branching_strategy_used;
+        expl += "; pseudocost updates: " + std::to_string(tel.search_telemetry.pseudocost_updates);
+        expl += "; strong branching calls: " +
+                std::to_string(tel.search_telemetry.strong_branching_calls);
+        expl += " (probed " + std::to_string(tel.search_telemetry.strong_branching_candidates) +
+                " candidates, pruned " +
+                std::to_string(tel.search_telemetry.strong_branching_infeasible_children) +
+                " infeasible children)";
+        expl += "; heuristic calls: " + std::to_string(tel.search_telemetry.heuristic_calls) +
+                " (feasible found: " +
+                std::to_string(tel.search_telemetry.heuristic_feasible_candidates) +
+                ", incumbent updates: " +
+                std::to_string(tel.search_telemetry.heuristic_incumbent_updates) + ")";
+        expl += "; incumbent source: " + tel.search_telemetry.incumbent_source;
+        tel.search_telemetry.search_explanation = std::move(expl);
+    }
 
     // -----------------------------------------------------------------------
     // 2. Final status determination

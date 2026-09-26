@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "algorithms/milp/cut_types.hpp"
+#include "algorithms/milp/search_types.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
@@ -44,6 +45,17 @@ struct MILPSolverOptions {
     bool enable_scaling{true};             ///< Pass through to LP sub-solver
     bool enable_warm_starts{true};         ///< Enable dual simplex warm starts on child nodes
     CutOptions cut_options;                ///< Cutting plane engine configuration (Gomory + MIR)
+
+    // Advanced Branch-and-Cut Search Engine Options
+    BranchingStrategy branching_strategy{
+        BranchingStrategy::RELIABILITY};  ///< Variable branching rule
+    std::size_t strong_branching_candidates{
+        5};  ///< Max candidate variables probed by strong branching
+    std::size_t pseudocost_reliability_threshold{
+        4};                              ///< Minimum observations per direction for reliability
+    bool enable_primal_heuristic{true};  ///< Enable feasibility-oriented rounding and repair
+    std::size_t heuristic_max_repair_rounds{5};  ///< Maximum constraint deficit repair passes
+
     bool verbose{false};
 };
 
@@ -78,6 +90,9 @@ struct MILPSolverTelemetry {
 
     // Cutting Plane Telemetry
     CutTelemetry cut_telemetry;
+
+    // Advanced Search Telemetry
+    SearchTelemetry search_telemetry;
 };
 
 // ============================================================================

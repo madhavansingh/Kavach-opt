@@ -247,25 +247,30 @@ Each reduction step records an inverse operation. After the solver returns a sol
 
 ---
 
-### 4.6 MILP Solver & Cutting-Plane Subsystem
+### 4.6 MILP Solver, Search Engine & Cutting Planes
 
 **Path:** `src/algorithms/milp/`
 
 | File | Responsibility |
 |---|---|
-| `branch_and_bound.cpp/hpp` | Branch-and-Bound tree search, node queue, branch selection |
+| `branch_and_bound.cpp/hpp` | Branch-and-Cut tree search, node queue with depth diving, branch selection |
+| `search_types.hpp` | Search data structures (`BranchingStrategy`, `IncumbentSource`, `BranchCandidate`, `SearchTelemetry`) |
+| `pseudocost.hpp/cpp` | Directional unit degradation tracking ($\Psi^-, \Psi^+$), observation counts, Achterberg product scoring |
+| `strong_branching.hpp/cpp` | Top-$K$ candidate LP probing, dual simplex warm starts, exact bound restoration, child infeasibility detection |
+| `primal_heuristic.hpp/cpp` | Feasibility-oriented integer rounding and bounded continuous slack deficit repair with strict verification |
 | `cut_types.hpp` | Cut representation (`LinearCut`), `CutType`, `CutStrategy`, `CutOptions`, `CutTelemetry` |
 | `cut_pool.hpp/cpp` | Bounded candidate pool, cosine parallelism deduplication, Euclidean efficacy ranking |
 | `gomory_separator.hpp/cpp` | Gomory fractional / GMI cuts from simplex tableau rows ($B^T u = e_i$) |
 | `mir_separator.hpp/cpp` | Mixed-Integer Rounding (MIR) cuts from mixed-integer constraints with multi-scaling |
 | `cutting_plane_engine.hpp/cpp` | Separation loop orchestration, tail-off detection, constraint injection, LP re-solving |
 
-#### Branch-and-Bound Tree Search
-The MILP solver implements a Branch-and-Bound algorithm augmented with cutting-plane separation (Branch-and-Cut). The LP relaxation at each node is solved using the Dual Simplex with a warm-started basis, dramatically reducing node solve times relative to cold-start LP.
-
-Branching variable selection applies a configurable strategy (default: most-infeasible fractional variable). Bound propagation is applied at each node to tighten integer variable domains. The solver maintains an incumbent solution and prunes nodes whose LP relaxation bound cannot improve upon it.
-
-Termination is governed by integrality tolerance, optimality gap tolerance, and the user-supplied `--time-limit`.
+#### Advanced Branch-and-Cut Search Engine
+The MILP solver implements a high-performance Branch-and-Cut search architecture:
+- **Pseudocost Branching:** Accumulates directional objective degradation per unit of fractional change ($\Psi_j^- = \Delta z^- / f_j$, $\Psi_j^+ = \Delta z^+ / (1 - f_j)$) from both tree solves and candidate probes. Computes candidate priority using the Achterberg product score $\text{score}_j = \max(\Psi_j^- f_j, 10^{-6}) \cdot \max(\Psi_j^+ (1 - f_j), 10^{-6})$.
+- **Strong Branching:** Probes top-$K$ fractional candidates by executing speculative dual simplex warm starts on temporary child bounds ($\lfloor x_j^* \rfloor$ and $\lceil x_j^* \rceil$). Caches true dual degradations directly into pseudocost history and prunes nodes proved infeasible in both directions. Restores model state with zero side-effects.
+- **Reliability Branching (Default):** Hybrid branching policy that applies strong branching only to unreliably observed variables ($N_j < \eta_{\text{rel}}$, default $\eta_{\text{rel}} = 4$), transitioning seamlessly to zero-solve pseudocosts once reliable statistics are established.
+- **Deterministic Node Prioritization:** Min/Max-heap node selection with a secondary diving key: when multiple unexplored nodes have identical LP relaxation bounds, the search prioritizes deeper nodes (`depth`) to discover integer-feasible incumbents faster, tie-breaking deterministically on ascending node ID.
+- **Feasibility-Oriented Primal Heuristics:** Executes periodic rounding passes and bounded continuous slack deficit repair to satisfy equality and inequality constraints without waiting for tree exhaustion. All heuristic candidates undergo strict independent feasibility checks before updating the incumbent.
 
 #### Cutting-Plane Separation Engine
 To tighten the polyhedral relaxation before and during tree search, Kavach-Opt provides an indigenous cutting-plane engine supporting:

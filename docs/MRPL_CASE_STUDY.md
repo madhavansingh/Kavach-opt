@@ -63,7 +63,7 @@ flowchart LR
 - **LP Relaxation Bound**: $5891.36 k/day
 - **Optimality Gap**: 0.00%
 - **Nodes Explored**: 5
-- **Solve Runtime**: 0.0011 s
+- **Solve Runtime**: 0.0013 s
 
 ## 7. Blending plan
 
@@ -103,7 +103,7 @@ flowchart LR
 Independent mathematical certification performed by `MILPVerifier`:
 - **Aggregate Primal Residual**: 2.84e-14
 - **Max Bound Violation**: 2.84e-14
-- **Max Integrality Violation**: 0.00e+00
+- **Max Integrality Violation**: 2.22e-16
 - **Domain Mass Balance Residual**: 2.84e-14 (Status: PASSED)
 - **Certified Status**: `OPTIMAL`
 
@@ -112,7 +112,7 @@ Independent mathematical certification performed by `MILPVerifier`:
 | Scenario ID | Description | Status | Net Margin ($k/day) | $\Delta$ Objective | Nodes | Primary Operational Impact |
 |---|---|---|---|---|---|---|
 | `baseline` | baseline | `OPTIMAL` | 5445.909091 | +0.000000 | 5 | Optimal baseline dispatch |
-| `scenario_a_reduced_crude` | scenario_a_reduced_crude | `OPTIMAL` | 3750.000000 | -1695.909091 | 9 | Sweet crude shortfall drops Gasoline production |
+| `scenario_a_reduced_crude` | scenario_a_reduced_crude | `OPTIMAL` | 3750.000000 | -1695.909091 | 7 | Sweet crude shortfall drops Gasoline production |
 | `scenario_b_tight_quality` | scenario_b_tight_quality | `OPTIMAL` | 4975.000000 | -470.909091 | 5 | Tightened diesel sulfur specs shift crudes to hydrotreater |
 | `scenario_c_reduced_capacity` | scenario_c_reduced_capacity | `OPTIMAL` | 5445.909091 | -0.000000 | 5 | HDS bottleneck limits clean fuel output |
 | `scenario_d_infeasible` | scenario_d_infeasible | `INFEASIBLE` | N/A | N/A | 0 | Feedstock starvation causes integer infeasibility |
@@ -121,10 +121,10 @@ Independent mathematical certification performed by `MILPVerifier`:
 
 | Scenario | Kavach-Opt Obj | HiGHS Obj | Rel Error | Kavach Time | HiGHS Status |
 |---|---|---|---|---|---|
-| `baseline` | 5445.909091 | N/A | N/A | 0.0011 s | UNAVAILABLE |
-| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0011 s | UNAVAILABLE |
-| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0010 s | UNAVAILABLE |
-| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0009 s | UNAVAILABLE |
+| `baseline` | 5445.909091 | N/A | N/A | 0.0013 s | UNAVAILABLE |
+| `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0015 s | UNAVAILABLE |
+| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0012 s | UNAVAILABLE |
+| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0012 s | UNAVAILABLE |
 | `scenario_d_infeasible` | N/A | N/A | N/A | 0.0000 s | UNAVAILABLE |
 
 ## 14. Limitations
