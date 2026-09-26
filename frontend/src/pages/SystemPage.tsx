@@ -4,6 +4,8 @@ import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { solverBridge, type SystemHealth } from '../lib/solverBridge';
 
+import { SkeletonPanel, SkeletonMetric } from '../components/Skeleton';
+
 interface StrategyRule {
   id: string;
   category: 'ROUTING' | 'PRESOLVE' | 'NUMERICS' | 'BACKEND' | 'LIMITS';
@@ -67,7 +69,7 @@ export const SystemPage: React.FC = () => {
       />
 
       {/* Live Host Runtime Status */}
-      {health && (
+      {health ? (
         <Panel
           title="Authoritative Solver Binary & Host Telemetry"
           subtitle="Direct inspection of active C++ solver binary executable"
@@ -122,6 +124,15 @@ export const SystemPage: React.FC = () => {
             </div>
           </div>
         </Panel>
+      ) : (
+        <SkeletonPanel titleWidth="w-64" subtitleWidth="w-80">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SkeletonMetric />
+            <SkeletonMetric />
+            <SkeletonMetric />
+            <SkeletonMetric />
+          </div>
+        </SkeletonPanel>
       )}
 
       {/* Core Subsystem Cards */}

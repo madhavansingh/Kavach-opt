@@ -66,8 +66,10 @@ export const AppShell: React.FC<AppShellProps> = ({
           onToggleMobileMenu={() => setMobileMenuOpen((o) => !o)}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">{children}</div>
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div key={currentTab} className="max-w-7xl mx-auto animate-fade-in">
+            {children}
+          </div>
         </main>
       </div>
     </div>

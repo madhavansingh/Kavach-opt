@@ -3,6 +3,9 @@ import {
   Copy,
   Lock,
   RefreshCw,
+  ShieldAlert,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -11,8 +14,10 @@ import { Metric, MetricGroup } from '../components/Metric';
 import { VerificationCheck } from '../components/VerificationCheck';
 import { PrimaryButton, GhostButton } from '../components/Buttons';
 import { EmptyState } from '../components/EmptyState';
+import { SkeletonPanel, SkeletonMetric, SkeletonCard } from '../components/Skeleton';
 import type { SolveResult, ModelMetadata } from '../types/solver';
 import type { NavTab } from '../layouts/Sidebar';
+import { useToast } from '../context/useToast';
 
 interface VerificationPageProps {
   activeModel: ModelMetadata | null;
@@ -31,6 +36,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const { showToast } = useToast();
 
   const report = result?.verification_report;
 
@@ -38,6 +44,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     if (!report) return;
     navigator.clipboard.writeText(JSON.stringify(report, null, 2));
     setCopied(true);
+    showToast('success', 'Copied Certificate', 'Verification certificate JSON copied to clipboard.');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -47,9 +54,14 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         title="Independent Mathematical Verification"
         subtitle="Zero-trust post-solve validation. Recomputes all residuals from raw model input data without trusting internal solver state."
         badge={
-          report ? (
+          isVerifying ? (
+            <span className="text-xs font-mono font-bold text-blue-400 px-2.5 py-1 rounded bg-blue-950/60 border border-blue-800/60 flex items-center gap-1.5 animate-pulse">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              AUDIT RUNNING
+            </span>
+          ) : report ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-400 font-mono">STATUS:</span>
+              <span className="text-xs text-neutral-400 font-sans">Status:</span>
               <StatusBadge status={report.passed ? 'VERIFIED_OPTIMAL' : 'VERIFICATION_FAILED'} size="md" />
             </div>
           ) : undefined
@@ -96,16 +108,33 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             </p>
           </div>
 
-          <div className="p-4 rounded-lg bg-blue-950/20 border border-blue-800/40 relative">
-            <div className="text-[10px] font-mono text-blue-400 mb-1">STAGE 3</div>
+          <div
+            className={`p-4 rounded-lg border relative transition-colors ${
+              isVerifying
+                ? 'bg-blue-950/40 border-blue-500/60 ring-1 ring-blue-500/30'
+                : 'bg-blue-950/20 border-blue-800/40'
+            }`}
+          >
+            <div className="text-[10px] font-mono text-blue-400 mb-1 flex items-center justify-between">
+              <span>STAGE 3</span>
+              {isVerifying && <Loader2 className="w-3 h-3 animate-spin text-blue-400" />}
+            </div>
             <div className="text-xs font-semibold text-white mb-2 font-sans">Independent Verifier</div>
             <p className="text-[11px] text-neutral-300 font-sans">
               Independent SpMV re-multiplication without internal solver scaling factors.
             </p>
           </div>
 
-          <div className="p-4 rounded-lg bg-emerald-950/20 border border-emerald-800/40 relative">
-            <div className="text-[10px] font-mono text-emerald-400 mb-1">STAGE 4</div>
+          <div
+            className={`p-4 rounded-lg border relative transition-colors ${
+              report?.passed
+                ? 'bg-emerald-950/20 border-emerald-800/40'
+                : report && !report.passed
+                ? 'bg-rose-950/20 border-rose-800/40'
+                : 'bg-[#141926] border-[#1f283a]'
+            }`}
+          >
+            <div className="text-[10px] font-mono mb-1 text-emerald-400">STAGE 4</div>
             <div className="text-xs font-semibold text-white mb-2 font-sans">Certified Certificate</div>
             <p className="text-[11px] text-neutral-300 font-sans">
               Immutable certificate confirming feasibility within strictly bounded tolerances.
@@ -114,9 +143,38 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         </div>
       </Panel>
 
-      {/* Main Verification Content */}
-      {report ? (
-        <div className="space-y-6">
+      {/* Main Verification Content or Loading Skeleton */}
+      {isVerifying ? (
+        <div className="space-y-6 animate-fade-in" role="status" aria-busy="true">
+          <Panel
+            title="Independent Verification in Progress"
+            subtitle={`Recomputing exact residuals for ${activeModel?.name || 'Current Solution'}...`}
+            badge={
+              <span className="text-xs font-mono text-blue-400 flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Computing ||Ax - b||
+              </span>
+            }
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <SkeletonMetric />
+                <SkeletonMetric />
+                <SkeletonMetric />
+                <SkeletonMetric />
+              </div>
+              <SkeletonCard />
+            </div>
+          </Panel>
+          <SkeletonPanel titleWidth="w-64" subtitleWidth="w-96">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          </SkeletonPanel>
+        </div>
+      ) : report ? (
+        <div className="space-y-6 animate-fade-in">
           {/* Certificate Overview Card */}
           <Panel
             title="Verification Certificate Summary"
@@ -131,7 +189,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
-                    <span>{isVerifying ? 'Verifying...' : 'Re-run Verifier'}</span>
+                    <span>Re-run Verifier</span>
                   </button>
                 )}
                 <button
@@ -146,6 +204,23 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             }
           >
             <div className="space-y-6">
+              {/* Failure Alert Banner if verification failed */}
+              {!report.passed && (
+                <div className="p-4 rounded-xl border border-rose-800/60 bg-rose-950/30 text-rose-200 text-xs flex items-start gap-3">
+                  <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-semibold text-rose-300 font-sans text-xs">
+                      Zero-Trust Verification Detected Invariant Violation
+                    </div>
+                    <p className="text-neutral-300 font-sans text-xs leading-relaxed">
+                      The candidate solution generated by the optimization algorithm does not satisfy the independent
+                      feasibility tolerances. The solver&apos;s internal status has been overridden to{' '}
+                      <span className="font-mono text-rose-400 font-bold">VERIFICATION_FAILED</span>.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <MetricGroup columns={4}>
                 <Metric
                   label="Certified Feasibility"
@@ -252,7 +327,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
           title="No Solution To Verify"
           description="Independent verification requires a candidate solution. Go to the Solve page, execute an optimization model, and inspect the resulting verification certificate here."
           action={
-            <PrimaryButton onClick={() => onNavigate('solve')}>
+            <PrimaryButton onClick={() => onNavigate('solve')} icon={<ArrowRight className="w-4 h-4" />}>
               Go to Solve Control
             </PrimaryButton>
           }

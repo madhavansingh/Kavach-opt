@@ -6,14 +6,17 @@ import {
   Gauge,
   Play,
   Check,
+  Loader2,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { StatusBadge } from '../components/StatusBadge';
 import { Metric, MetricGroup } from '../components/Metric';
 import { DataTable } from '../components/DataTable';
+import { SkeletonPanel, SkeletonMetric, SkeletonCard } from '../components/Skeleton';
 import type { MRPLScenario, MRPLCaseData } from '../types/solver';
 import { solverBridge } from '../lib/solverBridge';
+import { useToast } from '../context/useToast';
 
 export const MRPLPage: React.FC = () => {
   const [mrplCase, setMrplCase] = useState<MRPLCaseData | null>(null);
@@ -21,6 +24,8 @@ export const MRPLPage: React.FC = () => {
   const [isSolvingLive, setIsSolvingLive] = useState(false);
   const [liveSolveResult, setLiveSolveResult] = useState<any | null>(null);
   const [liveSolveError, setLiveSolveError] = useState<string | null>(null);
+
+  const { showToast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -43,35 +48,58 @@ export const MRPLPage: React.FC = () => {
     };
   }, []);
 
-  const handleRunLiveScenario = async (scenarioId: string) => {
+  const handleRunLiveScenario = (scenarioId: string) => {
+    if (isSolvingLive) return;
     setIsSolvingLive(true);
     setLiveSolveError(null);
-    try {
-      const res = await solverBridge.runMRPLScenario(scenarioId);
-      setLiveSolveResult(res.data);
-    } catch (err: any) {
-      console.error('Failed to run MRPL scenario live:', err);
-      setLiveSolveError(err?.message || 'Scenario solve failed');
-    } finally {
-      setIsSolvingLive(false);
-    }
+    showToast(
+      'info',
+      'Solving Refinery Scenario',
+      `Executing C++ solve for ${selectedScenario?.name || scenarioId}...`
+    );
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        try {
+          const res = await solverBridge.runMRPLScenario(scenarioId);
+          setLiveSolveResult(res.data);
+          showToast(
+            'success',
+            'Refinery Scenario Solved',
+            `${selectedScenario?.name} status: ${res.data.solver_status} (${(res.data.solve_time_seconds * 1000).toFixed(2)} ms)`
+          );
+        } catch (err: any) {
+          console.error('Failed to run MRPL scenario live:', err);
+          const msg = err?.message || 'Scenario solve failed';
+          setLiveSolveError(msg);
+          showToast('error', 'Scenario Solve Failed', msg);
+        } finally {
+          setIsSolvingLive(false);
+        }
+      });
+    });
   };
 
   if (!mrplCase) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in" aria-busy="true">
         <PageHeader
           title="MRPL Refinery Optimization Subsystem"
           subtitle="Industrial refinery blending and crude allocation case study."
         />
-        <Panel title="Loading Authentic Case Study Data" subtitle="Fetching baseline and scenario artifacts from repository...">
-          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-            <Gauge className="w-8 h-8 text-blue-500 animate-spin" />
-            <p className="text-sm text-neutral-400 font-mono">
-              Loading authentic MRPL refinery artifacts...
-            </p>
+        <SkeletonPanel titleWidth="w-72" subtitleWidth="w-96">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <SkeletonMetric />
+            <SkeletonMetric />
+            <SkeletonMetric />
+            <SkeletonMetric />
+            <SkeletonMetric />
           </div>
-        </Panel>
+        </SkeletonPanel>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </div>
     );
   }
@@ -540,8 +568,23 @@ export const MRPLPage: React.FC = () => {
                 </div>
               )}
 
-              {liveSolveResult && (
-                <div className="p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-800/60 space-y-2">
+              {isSolvingLive && (
+                <div className="p-4 rounded-lg bg-[#141926] border border-blue-500/40 space-y-3 animate-fade-in" aria-busy="true">
+                  <div className="flex items-center gap-2 text-xs font-mono text-blue-400">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                    <span>Executing C++ MILP Refinery Solver on {selectedScenario.name}...</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <SkeletonMetric />
+                    <SkeletonMetric />
+                    <SkeletonMetric />
+                    <SkeletonMetric />
+                  </div>
+                </div>
+              )}
+
+              {liveSolveResult && !isSolvingLive && (
+                <div className="p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-800/60 space-y-2 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 font-mono">
                       <Check className="w-4 h-4 text-emerald-400" />

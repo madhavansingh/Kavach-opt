@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppShell } from './layouts/AppShell';
 import type { NavTab } from './layouts/Sidebar';
 import { OverviewPage } from './pages/OverviewPage';
@@ -9,52 +9,96 @@ import { MRPLPage } from './pages/MRPLPage';
 import { SystemPage } from './pages/SystemPage';
 import type { ModelMetadata, SolveConfig, SolveResult } from './types/solver';
 import { solverBridge } from './lib/solverBridge';
+import { ToastProvider } from './context/ToastContext';
+import { useToast } from './context/useToast';
 
-export function App() {
+function AppInner() {
   const [currentTab, setCurrentTab] = useState<NavTab>('overview');
   const [availableModels, setAvailableModels] = useState<ModelMetadata[]>([]);
   const [activeModel, setActiveModel] = useState<ModelMetadata | null>(null);
   const [currentResult, setCurrentResult] = useState<SolveResult | null>(null);
   const [isSolving, setIsSolving] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [solveError, setSolveError] = useState<string | null>(null);
+  const [isDiscoveringModels, setIsDiscoveringModels] = useState(true);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryAttempt, setDiscoveryAttempt] = useState<number>(0);
+
+  const { showToast } = useToast();
+
+  // Mathematical race condition & stale data protection token
+  const solveRequestIdRef = useRef<number>(0);
 
   // Discover all authentic models from repository
   useEffect(() => {
     let isMounted = true;
+
     solverBridge
       .getAvailableModels()
       .then((models) => {
-        if (isMounted && models && models.length > 0) {
+        if (!isMounted) return;
+        if (models && models.length > 0) {
           setAvailableModels(models);
-          // Set afiro.mps as default active model if present
-          const afiro = models.find((m) => m.name === 'afiro.mps') || models[0];
-          setActiveModel(afiro);
+          setActiveModel((prev) => prev || models.find((m) => m.name === 'afiro.mps') || models[0]);
+        } else {
+          setDiscoveryError('No optimization models found in repository');
         }
       })
       .catch((err) => {
-        console.error('Failed to load discovered models from adapter:', err);
+        if (!isMounted) return;
+        const msg = err?.message || 'Failed to connect to solver adapter';
+        setDiscoveryError(msg);
+        showToast('error', 'Discovery Failed', msg);
+      })
+      .finally(() => {
+        if (isMounted) setIsDiscoveringModels(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [discoveryAttempt, showToast]);
+
+  const handleRetryDiscovery = () => {
+    setIsDiscoveringModels(true);
+    setDiscoveryAttempt((prev) => prev + 1);
+  };
+
+  const handleSelectTab = (tab: NavTab) => {
+    setCurrentTab(tab);
+    const mainElem = document.getElementById('main-content');
+    if (mainElem) {
+      mainElem.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
 
   const handleSelectModel = (model: ModelMetadata) => {
     if (activeModel?.path !== model.path) {
+      // Invalidate any in-flight solve on previous model
+      solveRequestIdRef.current++;
+      setIsSolving(false);
+      setIsVerifying(false);
       setActiveModel(model);
       // STALE STATE PREVENTION: Immediately purge previous solve/verification results
       setCurrentResult(null);
       setSolveError(null);
+      showToast('info', 'Model Selected', `Active model set to ${model.name}`);
     }
   };
 
   const handleRunSolve = async (config: SolveConfig) => {
     if (!activeModel) return;
+
+    // Increment request token for race condition immunity
+    const thisRequestId = ++solveRequestIdRef.current;
+
     setIsSolving(true);
     // STALE STATE PREVENTION: Clear previous result when new solve begins
     setCurrentResult(null);
     setSolveError(null);
+
+    showToast('info', 'Starting Optimization', `Executing Kavach-Opt core for ${activeModel.name}...`);
+
     try {
       const targetPath = activeModel.path || activeModel.name;
       const result = await solverBridge.solveModel(targetPath, {
@@ -67,22 +111,54 @@ export function App() {
         time_limit_seconds: config.time_limit_seconds,
         cpu_threads: config.cpu_threads,
       });
+
+      // RACE CONDITION CHECK: Drop response if a newer solve was dispatched or model was changed
+      if (thisRequestId !== solveRequestIdRef.current) {
+        return;
+      }
+
       setCurrentResult(result);
+
+      if (result.status === 'OPTIMAL') {
+        const objStr = typeof result.objective_value === 'number' ? result.objective_value.toFixed(4) : '';
+        showToast(
+          'success',
+          'Optimal Solution Found',
+          `${activeModel.name} solved in ${(result.solve_time_seconds * 1000).toFixed(2)} ms (z* = ${objStr})`
+        );
+      } else if (result.status === 'INFEASIBLE') {
+        showToast('warning', 'Problem Infeasible', `${activeModel.name} proven mathematically infeasible.`);
+      } else {
+        showToast('info', 'Solve Completed', `Status: ${result.status}`);
+      }
     } catch (err: any) {
+      if (thisRequestId !== solveRequestIdRef.current) return;
       console.error('Solve error:', err);
-      setSolveError(err?.message || 'Solver execution failed');
+      const msg = err?.message || 'Solver execution failed';
+      setSolveError(msg);
+      showToast('error', 'Execution Failed', msg);
+      throw err;
     } finally {
-      setIsSolving(false);
+      if (thisRequestId === solveRequestIdRef.current) {
+        setIsSolving(false);
+      }
     }
   };
 
   const handleVerifyCurrent = async () => {
     if (!activeModel) return;
-    setIsSolving(true);
+    const thisRequestId = ++solveRequestIdRef.current;
+
+    setIsVerifying(true);
     setSolveError(null);
+    showToast('info', 'Verification Started', `Computing zero-trust mathematical checks for ${activeModel.name}...`);
+
     try {
       const targetPath = activeModel.path || activeModel.name;
       const verReport = await solverBridge.verifyModel(targetPath);
+
+      if (thisRequestId !== solveRequestIdRef.current) return;
+
       if (currentResult) {
         setCurrentResult({
           ...currentResult,
@@ -90,28 +166,44 @@ export function App() {
           verified: verReport.passed,
         });
       }
+
+      if (verReport.passed) {
+        showToast(
+          'success',
+          'Verification Certified',
+          `Primal residual: ${verReport.recomputed_primal_residual.toExponential(2)} (within 1e-6 tol)`
+        );
+      } else {
+        showToast('error', 'Verification Failed', 'One or more mathematical invariant checks failed.');
+      }
     } catch (err: any) {
+      if (thisRequestId !== solveRequestIdRef.current) return;
       console.error('Verification error:', err);
-      setSolveError(err?.message || 'Verification execution failed');
+      const msg = err?.message || 'Verification execution failed';
+      setSolveError(msg);
+      showToast('error', 'Verification Error', msg);
     } finally {
-      setIsSolving(false);
+      if (thisRequestId === solveRequestIdRef.current) {
+        setIsVerifying(false);
+      }
     }
   };
 
   return (
     <AppShell
       currentTab={currentTab}
-      onSelectTab={setCurrentTab}
-      currentModelName={activeModel?.name || 'Loading Models...'}
+      onSelectTab={handleSelectTab}
+      currentModelName={activeModel?.name || (isDiscoveringModels ? 'Discovering Models...' : 'No Model')}
       hasActiveRun={currentResult !== null}
       backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
       solverStatus={currentResult?.status}
     >
       {currentTab === 'overview' && (
         <OverviewPage
-          onNavigate={setCurrentTab}
+          onNavigate={handleSelectTab}
           activeModel={activeModel ?? undefined}
           lastResult={currentResult ?? undefined}
+          isDiscoveringModels={isDiscoveringModels}
         />
       )}
 
@@ -119,8 +211,11 @@ export function App() {
         <SolvePage
           activeModel={activeModel}
           availableModels={availableModels}
+          isDiscoveringModels={isDiscoveringModels}
+          discoveryError={discoveryError}
+          onRetryDiscovery={handleRetryDiscovery}
           onSelectModel={handleSelectModel}
-          onNavigate={setCurrentTab}
+          onNavigate={handleSelectTab}
           currentResult={currentResult}
           onRunSolve={handleRunSolve}
           isSolving={isSolving}
@@ -132,9 +227,9 @@ export function App() {
         <VerificationPage
           activeModel={activeModel}
           result={currentResult}
-          onNavigate={setCurrentTab}
+          onNavigate={handleSelectTab}
           onRunVerify={handleVerifyCurrent}
-          isVerifying={isSolving}
+          isVerifying={isVerifying}
         />
       )}
 
@@ -147,5 +242,12 @@ export function App() {
   );
 }
 
-export default App;
+export function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
+  );
+}
 
+export default App;

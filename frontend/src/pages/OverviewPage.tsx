@@ -6,6 +6,7 @@ import { Pipeline } from '../components/Pipeline';
 import { StatusBadge } from '../components/StatusBadge';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { EmptyState } from '../components/EmptyState';
+import { SkeletonMetric, SkeletonCard, Skeleton } from '../components/Skeleton';
 import type { SolveResult, ModelMetadata } from '../types/solver';
 import type { NavTab } from '../layouts/Sidebar';
 
@@ -13,12 +14,14 @@ interface OverviewPageProps {
   onNavigate: (tab: NavTab) => void;
   activeModel?: ModelMetadata;
   lastResult?: SolveResult;
+  isDiscoveringModels?: boolean;
 }
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
   onNavigate,
   activeModel,
   lastResult,
+  isDiscoveringModels = false,
 }) => {
   return (
     <div className="space-y-8">
@@ -176,6 +179,22 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 subtext={`Dynamic range: ${activeModel.dynamic_range.toFixed(1)}x`}
               />
             </MetricGroup>
+          </div>
+        ) : isDiscoveringModels ? (
+          <div className="space-y-4 animate-fade-in" aria-busy="true">
+            <SkeletonCard>
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-44" />
+                <Skeleton className="h-7 w-28 rounded-lg" />
+              </div>
+              <Skeleton className="h-3 w-3/4 mt-2" />
+            </SkeletonCard>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <SkeletonMetric />
+              <SkeletonMetric />
+              <SkeletonMetric />
+              <SkeletonMetric />
+            </div>
           </div>
         ) : (
           <EmptyState
