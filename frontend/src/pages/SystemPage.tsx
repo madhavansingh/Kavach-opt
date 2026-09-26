@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Cpu, Terminal, CheckCircle2, ShieldCheck, HardDrive } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { solverBridge, type SystemHealth } from '../lib/solverBridge';
 
 interface StrategyRule {
   id: string;
@@ -33,6 +35,17 @@ const STRATEGY_RULES: StrategyRule[] = [
 
 export const SystemPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    solverBridge.getSystemHealth().then((h) => {
+      if (isMounted) setHealth(h);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredRules = STRATEGY_RULES.filter(
     (rule) => selectedCategory === 'ALL' || rule.category === selectedCategory
@@ -43,7 +56,73 @@ export const SystemPage: React.FC = () => {
       <PageHeader
         title="System Architecture & Strategy Engine"
         subtitle="Technical overview of Kavach-Opt core subsystems, determinism rules, numerical foundations, and quality gates."
+        badge={
+          health?.binary_present ? (
+            <span className="text-xs font-mono font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              SOLVER ENGINE LIVE
+            </span>
+          ) : undefined
+        }
       />
+
+      {/* Live Host Runtime Status */}
+      {health && (
+        <Panel
+          title="Authoritative Solver Binary & Host Telemetry"
+          subtitle="Direct inspection of active C++ solver binary executable"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
+                <HardDrive className="w-3.5 h-3.5" />
+                <span>ACTIVE BINARY PATH</span>
+              </div>
+              <div className="text-white font-semibold truncate" title={health.solver_binary}>
+                {health.solver_binary}
+              </div>
+              <div className="text-[10px] text-emerald-400">
+                {health.binary_present ? '● Verified Executable Present' : '○ Binary Not Found'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
+                <Terminal className="w-3.5 h-3.5" />
+                <span>VERSION & BUILD</span>
+              </div>
+              <div className="text-white font-semibold truncate">
+                {health.version_info}
+              </div>
+              <div className="text-[10px] text-neutral-400">C++20 Release Build (-Werror)</div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
+                <Cpu className="w-3.5 h-3.5" />
+                <span>HARDWARE BACKEND</span>
+              </div>
+              <div className="text-white font-semibold">
+                CPU-First Architecture
+              </div>
+              <div className="text-[10px] text-neutral-300">
+                {health.cuda_supported_build ? 'CUDA Enabled' : 'Scoped CPU Mode (Apple Silicon host)'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>ADAPTER STATE</span>
+              </div>
+              <div className="text-emerald-400 font-semibold uppercase">
+                {health.status === 'ok' ? 'Connected (Live)' : health.status}
+              </div>
+              <div className="text-[10px] text-neutral-400">HTTP Dispatcher via Node</div>
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {/* Core Subsystem Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

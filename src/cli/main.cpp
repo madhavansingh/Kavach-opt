@@ -428,7 +428,33 @@ int handle_solve(const std::vector<std::string_view>& args) {
             res["solve_time_seconds"] = result.solve_time_seconds;
             res["backend_used"] = kavach::backend::to_string(result.backend_used);
             res["verified"] = result.verification_report.passed;
+            res["optimality_gap"] = result.optimality_gap;
             root["result"] = std::move(res);
+
+            kavach::benchmark::JsonValue::Object ver;
+            ver["passed"] = result.verification_report.passed;
+            ver["certified_status"] = kavach::core::to_string(result.verification_report.certified_status);
+            ver["recomputed_primal_residual"] = result.verification_report.recomputed_primal_residual;
+            ver["recomputed_dual_residual"] = result.verification_report.recomputed_dual_residual;
+            ver["recomputed_complementary_slackness"] = result.verification_report.recomputed_complementary_slackness;
+            ver["recomputed_integrality_violation"] = result.verification_report.recomputed_integrality_violation;
+            ver["recomputed_kkt_residual"] = result.verification_report.recomputed_kkt_residual;
+            ver["recomputed_objective"] = result.verification_report.recomputed_objective;
+            ver["summary"] = result.verification_report.summary;
+            root["verification"] = std::move(ver);
+
+            kavach::benchmark::JsonValue::Object mod;
+            mod["name"] = model->name();
+            mod["num_variables"] = static_cast<double>(model->num_variables());
+            mod["num_constraints"] = static_cast<double>(model->num_constraints());
+            mod["num_nonzeros"] = static_cast<double>(model->num_nonzeros());
+            double total_entries = static_cast<double>(model->num_variables()) * static_cast<double>(model->num_constraints());
+            mod["density"] = total_entries > 0.0 ? (static_cast<double>(model->num_nonzeros()) / total_entries) : 0.0;
+            mod["is_milp"] = model->is_milp();
+            mod["is_qp"] = model->is_qp();
+            mod["problem_class"] = model->is_qp() ? "CONVEX_QP" : (model->is_milp() ? "MILP" : "LP");
+            root["model"] = std::move(mod);
+
             std::cout << kavach::benchmark::JsonValue(std::move(root)).dump() << "\n";
             return 0;
         }

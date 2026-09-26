@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Copy,
   Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -17,12 +18,16 @@ interface VerificationPageProps {
   activeModel: ModelMetadata;
   result: SolveResult | null;
   onNavigate: (tab: NavTab) => void;
+  onRunVerify?: () => Promise<void>;
+  isVerifying?: boolean;
 }
 
 export const VerificationPage: React.FC<VerificationPageProps> = ({
   activeModel,
   result,
   onNavigate,
+  onRunVerify,
+  isVerifying = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);
@@ -118,6 +123,17 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             subtitle={`Target: ${activeModel.name} · Certified Status: ${report.certified_status}`}
             badge={
               <div className="flex items-center gap-2">
+                {onRunVerify && (
+                  <button
+                    type="button"
+                    disabled={isVerifying}
+                    onClick={onRunVerify}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
+                    <span>{isVerifying ? 'Verifying...' : 'Re-run Verifier'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCopyJson}
@@ -139,21 +155,55 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                 <Metric
                   label="Max Primal Residual ||Ax - b||"
                   value={report.recomputed_primal_residual.toExponential(3)}
-                  subtext="Tolerance: 1.0e-08"
-                  highlight="success"
+                  subtext="Tolerance: 1.0e-06"
+                  highlight={report.recomputed_primal_residual <= 1e-6 ? 'success' : 'danger'}
                 />
-                <Metric
-                  label="Max Dual Residual"
-                  value={report.recomputed_dual_residual.toExponential(3)}
-                  subtext="Tolerance: 1.0e-08"
-                  highlight="success"
-                />
-                <Metric
-                  label="Complementary Slackness"
-                  value={report.recomputed_complementary_slackness.toExponential(3)}
-                  subtext="Condition: x_j * s_j == 0"
-                  highlight="success"
-                />
+                {activeModel.problem_class === 'LP' ? (
+                  <>
+                    <Metric
+                      label="Max Dual Residual"
+                      value={report.recomputed_dual_residual.toExponential(3)}
+                      subtext="Tolerance: 1.0e-06"
+                      highlight={report.recomputed_dual_residual <= 1e-6 ? 'success' : 'danger'}
+                    />
+                    <Metric
+                      label="Complementary Slackness"
+                      value={report.recomputed_complementary_slackness.toExponential(3)}
+                      subtext="Condition: x_j * s_j == 0"
+                      highlight={report.recomputed_complementary_slackness <= 1e-6 ? 'success' : 'danger'}
+                    />
+                  </>
+                ) : activeModel.problem_class === 'MILP' ? (
+                  <>
+                    <Metric
+                      label="Integrality Violation"
+                      value={(report.recomputed_integrality_violation ?? 0).toExponential(3)}
+                      subtext="Tolerance: 1.0e-05"
+                      highlight={(report.recomputed_integrality_violation ?? 0) <= 1e-5 ? 'success' : 'danger'}
+                    />
+                    <Metric
+                      label="Recomputed Objective"
+                      value={(report.recomputed_objective ?? 0).toFixed(4)}
+                      subtext="Direct c^T x* evaluation"
+                      highlight="normal"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Metric
+                      label="KKT Stationarity Residual"
+                      value={(report.recomputed_kkt_residual ?? 0).toExponential(3)}
+                      subtext="Tolerance: 1.0e-06"
+                      highlight={(report.recomputed_kkt_residual ?? 0) <= 1e-6 ? 'success' : 'danger'}
+                    />
+                    <Metric
+                      label="Recomputed Objective"
+                      value={(report.recomputed_objective ?? 0).toFixed(4)}
+                      subtext="Direct 0.5 x^T Q x + c^T x"
+                      highlight="normal"
+                    />
+                  </>
+                )}
               </MetricGroup>
 
               <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] font-mono text-xs text-neutral-300">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield,
   AlertTriangle,
@@ -11,14 +11,37 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Metric, MetricGroup } from '../components/Metric';
 import { DataTable } from '../components/DataTable';
 import { MOCK_MRPL_CASE } from '../data/mockData';
-import type { MRPLScenario } from '../types/solver';
+import type { MRPLScenario, MRPLCaseData } from '../types/solver';
+import { solverBridge } from '../lib/solverBridge';
 
 export const MRPLPage: React.FC = () => {
+  const [mrplCase, setMrplCase] = useState<MRPLCaseData>(MOCK_MRPL_CASE);
   const [selectedScenario, setSelectedScenario] = useState<MRPLScenario>(
     MOCK_MRPL_CASE.scenarios[0]
   );
 
-  const baseline = MOCK_MRPL_CASE.baseline;
+  useEffect(() => {
+    let isMounted = true;
+    solverBridge
+      .getMRPLCaseData()
+      .then((data) => {
+        if (isMounted && data) {
+          setMrplCase(data);
+          if (data.scenarios && data.scenarios.length > 0) {
+            setSelectedScenario(data.scenarios[0]);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load authentic MRPL data:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const baseline = mrplCase.baseline;
 
   // Quality table columns
   const qualityColumns = [
@@ -106,7 +129,7 @@ export const MRPLPage: React.FC = () => {
               Data Status Disclosure · Illustrative / Synthetic Industrial Dataset
             </h2>
             <p className="text-xs text-neutral-300 leading-relaxed max-w-4xl">
-              {MOCK_MRPL_CASE.data_status_disclosure}
+              {mrplCase.data_status_disclosure}
             </p>
           </div>
         </div>
@@ -245,7 +268,7 @@ export const MRPLPage: React.FC = () => {
       >
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {MOCK_MRPL_CASE.scenarios.map((sc) => {
+            {mrplCase.scenarios.map((sc) => {
               const isSelected = selectedScenario.id === sc.id;
               return (
                 <button
