@@ -103,6 +103,7 @@ export function App() {
       currentTab={currentTab}
       onSelectTab={setCurrentTab}
       currentModelName={activeModel?.name || 'Loading Models...'}
+      hasActiveRun={currentResult !== null}
       backend={currentResult?.backend_used || 'CPU_SEQUENTIAL'}
       solverStatus={currentResult?.status}
     >

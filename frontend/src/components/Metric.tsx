@@ -24,15 +24,15 @@ export const Metric: React.FC<MetricProps> = ({
   if (highlight === 'info') valColor = 'text-sky-400';
 
   return (
-    <div className={`flex flex-col gap-1 p-4 rounded-lg bg-[#11141a] border border-[#1e2430] ${className}`}>
-      <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+    <div className={`flex flex-col gap-1 p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] shadow-xs ${className}`}>
+      <span className="text-[11px] font-sans font-medium text-neutral-400">
         {label}
       </span>
-      <span className={`text-2xl font-semibold tracking-tight ${valColor} ${isMono ? 'font-mono' : 'font-sans'}`}>
+      <span className={`text-xl sm:text-2xl font-semibold tracking-tight ${valColor} ${isMono ? 'font-mono' : 'font-sans'}`}>
         {value}
       </span>
       {subtext && (
-        <span className="text-xs text-neutral-400 font-mono">
+        <span className="text-[11px] text-neutral-400 font-mono mt-0.5 truncate" title={subtext}>
           {subtext}
         </span>
       )}

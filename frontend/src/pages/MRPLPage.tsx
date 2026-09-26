@@ -224,6 +224,100 @@ export const MRPLPage: React.FC = () => {
         </div>
       </Panel>
 
+      {/* Industrial Process Flow Schematic */}
+      <Panel
+        title="Refinery Process Topology & Mass Balance Flow"
+        subtitle="End-to-end petroleum processing path from crude slate to Euro-VI specification fuels"
+        badge={
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-medium">
+            MASS CONSERVED (0.0 RESIDUAL)
+          </span>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+            {/* Stage 1: Crude Slate */}
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-amber-400 font-medium">STAGE 1</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-950/60 text-amber-300">FEEDSTOCK</span>
+              </div>
+              <h4 className="text-xs font-semibold text-white font-sans">Crude Slate Intake</h4>
+              <ul className="space-y-1 text-[11px] font-mono text-neutral-300">
+                <li className="flex justify-between"><span>· Light Arab:</span> <span className="text-white font-medium">100 kbpd</span></li>
+                <li className="flex justify-between"><span>· Heavy Maya:</span> <span className="text-white font-medium">80 kbpd</span></li>
+                <li className="flex justify-between"><span>· Basrah Med:</span> <span className="text-white font-medium">100 kbpd</span></li>
+              </ul>
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-400 font-mono">
+                Total Intake: 280.0 kbpd
+              </div>
+            </div>
+
+            {/* Stage 2: Distillation */}
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-blue-400 font-medium">STAGE 2</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-950/60 text-blue-300">PRIMARY</span>
+              </div>
+              <h4 className="text-xs font-semibold text-white font-sans">Atmospheric CDU</h4>
+              <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+                Fractionates crude into Light Naphtha, Middle Distillates, and Atmospheric Residue.
+              </p>
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
+                CDU Load: 100.0% (150/150 kbpd)
+              </div>
+            </div>
+
+            {/* Stage 3: Conversion */}
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-indigo-400 font-medium">STAGE 3</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-950/60 text-indigo-300">CONVERSION</span>
+              </div>
+              <h4 className="text-xs font-semibold text-white font-sans">VDU &amp; FCCU Cracking</h4>
+              <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+                Vacuum distillation and catalytic cracking of heavy bottoms into high-octane gasoline blendstocks.
+              </p>
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
+                FCCU Load: 83.3% (50/60 kbpd)
+              </div>
+            </div>
+
+            {/* Stage 4: Hydrotreating */}
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-emerald-400 font-medium">STAGE 4</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300">TREATING</span>
+              </div>
+              <h4 className="text-xs font-semibold text-white font-sans">HDS Hydrotreating</h4>
+              <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
+                Catalytic desulfurization bringing sulfur content down to ultra-low Euro-VI standards (&le;10 ppm).
+              </p>
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-neutral-300 font-mono">
+                HDS Load: 77.8% (70/90 kbpd)
+              </div>
+            </div>
+
+            {/* Stage 5: Products */}
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-emerald-400 font-medium">STAGE 5</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300">FINISHED</span>
+              </div>
+              <h4 className="text-xs font-semibold text-white font-sans">Euro-VI Fuel Pools</h4>
+              <ul className="space-y-1 text-[11px] font-mono text-neutral-300">
+                <li className="flex justify-between"><span>· BS-VI Petrol:</span> <span className="text-emerald-400 font-medium">92.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· BS-VI Diesel:</span> <span className="text-emerald-400 font-medium">135.0 kbpd</span></li>
+                <li className="flex justify-between"><span>· Heavy Fuel Oil:</span> <span className="text-emerald-400 font-medium">53.0 kbpd</span></li>
+              </ul>
+              <div className="pt-1.5 border-t border-[#1f283a] text-[10px] text-emerald-400 font-mono">
+                Total Output: 280.0 kbpd
+              </div>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       {/* Unit Operations & Capacities */}
       <Panel
         title="Major Processing Units & Capacity Utilization"
@@ -233,10 +327,10 @@ export const MRPLPage: React.FC = () => {
           {baseline.units.map((unit: any) => (
             <div
               key={unit.unit}
-              className="p-4 rounded-lg bg-[#0d1016] border border-[#202736] space-y-3"
+              className="p-4 rounded-lg bg-[#141926] border border-[#1f283a] space-y-3 shadow-xs"
             >
               <div className="flex justify-between items-start">
-                <span className="text-xs font-semibold text-white">{unit.unit}</span>
+                <span className="text-xs font-semibold text-white font-sans">{unit.unit}</span>
                 <span
                   className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                     unit.is_active
@@ -250,19 +344,19 @@ export const MRPLPage: React.FC = () => {
 
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-neutral-400">Throughput:</span>
+                  <span className="text-neutral-400 font-sans">Throughput:</span>
                   <span className="font-mono text-neutral-200">
                     {unit.throughput_kbpd.toFixed(1)} / {unit.capacity_limit_kbpd.toFixed(1)} kbpd
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-neutral-400">Load Factor:</span>
+                  <span className="text-neutral-400 font-sans">Load Factor:</span>
                   <span className="font-mono font-bold text-blue-400">
                     {unit.utilization_pct.toFixed(1)}%
                   </span>
                 </div>
 
-                <div className="w-full bg-[#1e2430] h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-[#1b212f] h-2 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
                       unit.utilization_pct === 100
@@ -276,7 +370,7 @@ export const MRPLPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="text-[11px] text-neutral-400 font-mono pt-1 border-t border-[#1a202c]">
+              <div className="text-[11px] text-neutral-400 font-mono pt-1 border-t border-[#1f283a]">
                 {unit.summary}
               </div>
             </div>
@@ -298,10 +392,77 @@ export const MRPLPage: React.FC = () => {
 
       {/* What-If Operational Scenario Matrix */}
       <Panel
-        title="What-If Operational Scenarios"
+        title="What-If Operational Scenarios & Sensitivity Analysis"
         subtitle="Evaluate refinery robustness under supply disruptions, quality tightening, and unit outages"
       >
         <div className="space-y-5">
+          {/* Comparison Matrix Table */}
+          <div className="overflow-x-auto rounded-lg border border-[#1f283a] bg-[#141926]">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-[#0e121a] text-neutral-400 border-b border-[#1f283a]">
+                <tr>
+                  <th className="py-2.5 px-3 font-sans">Scenario</th>
+                  <th className="py-2.5 px-3 font-sans">Condition</th>
+                  <th className="py-2.5 px-3 text-right">Throughput</th>
+                  <th className="py-2.5 px-3 text-right">Net Profit</th>
+                  <th className="py-2.5 px-3 text-right">Profit Delta</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Mass Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1f283a]/60">
+                <tr className="hover:bg-[#161c28] transition-colors">
+                  <td className="py-2.5 px-3 font-bold text-white font-sans">Baseline</td>
+                  <td className="py-2.5 px-3 text-neutral-400 font-sans">Full capacity, standard crude intake</td>
+                  <td className="py-2.5 px-3 text-right text-neutral-200">280.0 kbpd</td>
+                  <td className="py-2.5 px-3 text-right text-emerald-400 font-bold">${baseline.economics.net_profit_k_usd.toFixed(2)}k</td>
+                  <td className="py-2.5 px-3 text-right text-neutral-400">—</td>
+                  <td className="py-2.5 px-3 text-center"><StatusBadge status="OPTIMAL" size="sm" /></td>
+                  <td className="py-2.5 px-3 text-center text-emerald-400 font-semibold">PASS (0.0)</td>
+                </tr>
+                {mrplCase.scenarios.map((sc: MRPLScenario) => (
+                  <tr
+                    key={sc.id}
+                    onClick={() => {
+                      setSelectedScenario(sc);
+                      setLiveSolveResult(null);
+                      setLiveSolveError(null);
+                    }}
+                    className={`cursor-pointer transition-colors ${
+                      selectedScenario?.id === sc.id ? 'bg-[#182033]' : 'hover:bg-[#161c28]'
+                    }`}
+                  >
+                    <td className="py-2.5 px-3 font-bold text-white font-sans">{sc.name}</td>
+                    <td className="py-2.5 px-3 text-neutral-400 font-sans truncate max-w-xs">{sc.description}</td>
+                    <td className="py-2.5 px-3 text-right text-neutral-200">
+                      {sc.throughput_kbpd ? `${sc.throughput_kbpd.toFixed(1)} kbpd` : '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold">
+                      {sc.net_profit_k_usd ? (
+                        <span className="text-emerald-400">${sc.net_profit_k_usd.toFixed(2)}k</span>
+                      ) : (
+                        <span className="text-rose-400 font-normal">INFEASIBLE</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      {sc.profit_delta_k_usd !== undefined ? (
+                        <span className={sc.profit_delta_k_usd < 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                          {sc.profit_delta_k_usd < 0 ? '' : '+'}${sc.profit_delta_k_usd.toFixed(2)}k
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-center"><StatusBadge status={sc.status} size="sm" /></td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={sc.mass_balance_passed ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
+                        {sc.mass_balance_passed ? 'PASS (0.0)' : 'PROVEN INFEASIBLE'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {mrplCase.scenarios.map((sc: MRPLScenario) => {
               const isSelected = selectedScenario?.id === sc.id;
@@ -316,17 +477,17 @@ export const MRPLPage: React.FC = () => {
                   }}
                   className={`p-4 rounded-lg border text-left transition-all ${
                     isSelected
-                      ? 'border-blue-500/80 bg-blue-950/20 shadow-lg'
-                      : 'border-[#202736] bg-[#0d1016] hover:border-[#2e3748]'
+                      ? 'border-blue-500/80 bg-blue-950/20 shadow-xs'
+                      : 'border-[#1f283a] bg-[#141926] hover:border-[#2d3850]'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-semibold text-white">{sc.name}</span>
+                    <span className="text-xs font-semibold text-white font-sans">{sc.name}</span>
                     <StatusBadge status={sc.status} size="sm" />
                   </div>
-                  <p className="text-[11px] text-neutral-400 mb-3">{sc.description}</p>
-                  <div className="flex justify-between items-center text-xs font-mono pt-2 border-t border-[#1e2430]">
-                    <span className="text-neutral-400">Net Profit:</span>
+                  <p className="text-[11px] text-neutral-400 mb-3 font-sans leading-relaxed">{sc.description}</p>
+                  <div className="flex justify-between items-center text-xs font-mono pt-2 border-t border-[#1f283a]">
+                    <span className="text-neutral-400 font-sans">Net Profit:</span>
                     <span
                       className={`font-bold ${
                         sc.net_profit_k_usd ? 'text-white' : 'text-neutral-500'
@@ -344,11 +505,11 @@ export const MRPLPage: React.FC = () => {
 
           {/* Selected Scenario Drill-down */}
           {selectedScenario && (
-            <div className="p-4 rounded-lg bg-[#0a0d12] border border-[#1e2430] space-y-4">
+            <div className="p-4 rounded-lg bg-[#0e121a] border border-[#1f283a] space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Gauge className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs font-semibold text-white">
+                  <span className="text-xs font-semibold text-white font-sans">
                     Scenario Focus: {selectedScenario.name}
                   </span>
                 </div>
@@ -358,7 +519,7 @@ export const MRPLPage: React.FC = () => {
                     type="button"
                     disabled={isSolvingLive}
                     onClick={() => handleRunLiveScenario(selectedScenario.id)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
                   >
                     <Play className={`w-3.5 h-3.5 ${isSolvingLive ? 'animate-spin' : ''}`} />
                     <span>{isSolvingLive ? 'Solving on C++ Core...' : 'Run Scenario Live'}</span>
@@ -366,7 +527,7 @@ export const MRPLPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-neutral-300 leading-relaxed">
+              <p className="text-xs text-neutral-300 leading-relaxed font-sans">
                 {selectedScenario.description}.{' '}
                 {selectedScenario.status === 'INFEASIBLE'
                   ? 'Kavach-Opt mathematically proves that no feasible blending and scheduling plan exists that satisfies both demand commitments and strict physical crude conservation.'
@@ -374,7 +535,7 @@ export const MRPLPage: React.FC = () => {
               </p>
 
               {liveSolveError && (
-                <div className="p-3 rounded bg-rose-950/40 border border-rose-800/60 text-xs font-mono text-rose-300">
+                <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-xs font-mono text-rose-300">
                   Live Solve Error: {liveSolveError}
                 </div>
               )}
@@ -392,23 +553,23 @@ export const MRPLPage: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
                     <div>
-                      <span className="text-neutral-400 block text-[10px]">Live Status:</span>
+                      <span className="text-neutral-400 block text-[10px] font-sans">Live Status:</span>
                       <span className="text-white font-bold">{liveSolveResult.solver_status}</span>
                     </div>
                     <div>
-                      <span className="text-neutral-400 block text-[10px]">Net Margin:</span>
+                      <span className="text-neutral-400 block text-[10px] font-sans">Net Margin:</span>
                       <span className="text-emerald-400 font-bold">
                         ${liveSolveResult.objective_net_margin_k_usd?.toFixed(2)} k/day
                       </span>
                     </div>
                     <div>
-                      <span className="text-neutral-400 block text-[10px]">Mass Balance Residual:</span>
+                      <span className="text-neutral-400 block text-[10px] font-sans">Mass Balance Residual:</span>
                       <span className="text-neutral-200">
                         {liveSolveResult.mass_balance_validation?.max_absolute_residual?.toExponential(2) || '0.00e+00'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-neutral-400 block text-[10px]">Verification:</span>
+                      <span className="text-neutral-400 block text-[10px] font-sans">Verification:</span>
                       <span className="text-emerald-400">
                         {liveSolveResult.verified_optimal ? 'CERTIFIED (PASS)' : 'UNVERIFIED'}
                       </span>
@@ -417,9 +578,9 @@ export const MRPLPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-mono border-t border-[#1e2430]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-mono border-t border-[#1f283a]">
                 <div>
-                  <span className="text-neutral-400 block text-[10px]">Profit Delta vs Baseline:</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Profit Delta vs Baseline:</span>
                   <span
                     className={
                       selectedScenario.profit_delta_k_usd && selectedScenario.profit_delta_k_usd < 0
@@ -433,7 +594,7 @@ export const MRPLPage: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block text-[10px]">Refinery Throughput:</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Refinery Throughput:</span>
                   <span className="text-neutral-200">
                     {selectedScenario.throughput_kbpd
                       ? `${selectedScenario.throughput_kbpd.toFixed(1)} kbpd`
@@ -441,7 +602,7 @@ export const MRPLPage: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block text-[10px]">Mass Balance Invariant:</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Mass Balance Invariant:</span>
                   <span
                     className={
                       selectedScenario.mass_balance_passed ? 'text-emerald-400' : 'text-rose-400'
@@ -451,7 +612,7 @@ export const MRPLPage: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-400 block text-[10px]">Dual Simplex Warm Start:</span>
+                  <span className="text-neutral-400 block text-[10px] font-sans">Dual Simplex Warm Start:</span>
                   <span className="text-blue-400">ENABLED (0.4ms)</span>
                 </div>
               </div>

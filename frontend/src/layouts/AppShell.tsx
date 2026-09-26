@@ -8,6 +8,7 @@ interface AppShellProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   currentModelName?: string;
+  hasActiveRun?: boolean;
   backend?: BackendType;
   solverStatus?: SolverStatus;
   children: React.ReactNode;
@@ -17,6 +18,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   currentTab,
   onSelectTab,
   currentModelName,
+  hasActiveRun = false,
   backend,
   solverStatus,
   children,
@@ -29,7 +31,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0b0d11] text-neutral-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0a0d12] text-neutral-200">
       {/* Desktop Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -58,6 +60,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar
           currentModelName={currentModelName}
+          hasActiveRun={hasActiveRun}
           backend={backend}
           solverStatus={solverStatus}
           onToggleMobileMenu={() => setMobileMenuOpen((o) => !o)}

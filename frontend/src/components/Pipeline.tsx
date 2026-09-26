@@ -28,16 +28,16 @@ export const Pipeline: React.FC<PipelineProps> = ({
 }) => {
   return (
     <div className={`w-full overflow-x-auto ${className}`}>
-      <div className="flex flex-col lg:flex-row items-stretch gap-2 min-w-[700px]">
+      <div className="flex flex-col lg:flex-row items-stretch gap-2.5 min-w-[700px]">
         {steps.map((step, idx) => {
           const isCompleted = step.status === 'completed';
           const isActive = step.status === 'active';
 
-          let borderClass = 'border-[#1e2430] bg-[#11141a] text-neutral-400';
+          let borderClass = 'border-[#1b212f] bg-[#0e121a] text-neutral-400';
           if (isActive) {
-            borderClass = 'border-emerald-500/60 bg-emerald-950/20 text-emerald-200 shadow-sm';
+            borderClass = 'border-emerald-500/50 bg-emerald-950/20 text-emerald-200 shadow-xs';
           } else if (isCompleted) {
-            borderClass = 'border-[#273142] bg-[#131720] text-neutral-200';
+            borderClass = 'border-[#263143] bg-[#131722] text-neutral-200';
           }
 
           return (
@@ -46,7 +46,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
                 className={`flex-1 flex flex-col p-3 rounded-lg border transition-all ${borderClass}`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-mono tracking-wider uppercase text-neutral-400">
+                  <span className="text-[10px] font-mono tracking-normal text-neutral-400">
                     {step.category}
                   </span>
                   {isCompleted && (
@@ -56,7 +56,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   )}
                 </div>
-                <span className="text-xs font-semibold tracking-tight text-neutral-100">
+                <span className="text-xs font-semibold tracking-normal text-neutral-100 font-sans">
                   {step.name}
                 </span>
                 {step.detail && (
@@ -66,7 +66,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
                 )}
               </div>
               {idx < steps.length - 1 && (
-                <div className="hidden lg:flex items-center justify-center text-neutral-400">
+                <div className="hidden lg:flex items-center justify-center text-neutral-600">
                   <ChevronRight className="w-4 h-4" />
                 </div>
               )}

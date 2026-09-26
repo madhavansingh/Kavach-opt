@@ -72,53 +72,53 @@ export const SystemPage: React.FC = () => {
           title="Authoritative Solver Binary & Host Telemetry"
           subtitle="Direct inspection of active C++ solver binary executable"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
-                <HardDrive className="w-3.5 h-3.5" />
-                <span>ACTIVE BINARY PATH</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-xs">
+                <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-sans font-medium text-neutral-300">Active Binary Path</span>
               </div>
-              <div className="text-white font-semibold truncate" title={health.solver_binary}>
+              <div className="font-mono text-white text-[11px] font-medium truncate" title={health.solver_binary}>
                 {health.solver_binary}
               </div>
-              <div className="text-[10px] text-emerald-400">
+              <div className="text-[10px] text-emerald-400 font-mono">
                 {health.binary_present ? '● Verified Executable Present' : '○ Binary Not Found'}
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
-                <Terminal className="w-3.5 h-3.5" />
-                <span>VERSION & BUILD</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-xs">
+                <Terminal className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-sans font-medium text-neutral-300">Version & Build</span>
               </div>
-              <div className="text-white font-semibold truncate">
+              <div className="font-mono text-white text-[11px] font-medium truncate">
                 {health.version_info}
               </div>
-              <div className="text-[10px] text-neutral-400">C++20 Release Build (-Werror)</div>
+              <div className="text-[10px] text-neutral-400 font-sans">C++20 Release Build (-Werror)</div>
             </div>
 
-            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
-                <Cpu className="w-3.5 h-3.5" />
-                <span>HARDWARE BACKEND</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-xs">
+                <Cpu className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-sans font-medium text-neutral-300">Hardware Backend</span>
               </div>
-              <div className="text-white font-semibold">
+              <div className="font-sans text-white text-xs font-semibold">
                 CPU-First Architecture
               </div>
-              <div className="text-[10px] text-neutral-300">
-                {health.cuda_supported_build ? 'CUDA Enabled' : 'Scoped CPU Mode (Apple Silicon host)'}
+              <div className="text-[10px] text-neutral-300 font-sans">
+                {health.cuda_supported_build ? 'CUDA Enabled (with R012 CPU fallback)' : 'Scoped CPU Mode (Apple Silicon host)'}
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <div className="flex items-center gap-1.5 text-neutral-400 text-[10px]">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>ADAPTER STATE</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-neutral-400 text-xs">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-sans font-medium text-neutral-300">Adapter State</span>
               </div>
-              <div className="text-emerald-400 font-semibold uppercase">
+              <div className="text-emerald-400 font-sans text-xs font-semibold">
                 {health.status === 'ok' ? 'Connected (Live)' : health.status}
               </div>
-              <div className="text-[10px] text-neutral-400">HTTP Dispatcher via Node</div>
+              <div className="text-[10px] text-neutral-400 font-sans">HTTP Dispatcher via Node</div>
             </div>
           </div>
         </Panel>
@@ -210,29 +210,29 @@ export const SystemPage: React.FC = () => {
           </span>
         }
       >
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-          <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736]">
-            <span className="text-neutral-400 block text-[10px]">Test Suite:</span>
-            <span className="text-white font-bold text-sm">329 / 329 Passed</span>
-            <span className="text-emerald-400 text-[10px] block mt-0.5">100% test pass rate</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-sans">
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+            <span className="text-neutral-400 block text-[11px]">Test Suite</span>
+            <span className="text-white font-semibold font-mono text-sm">329 / 329 Passed</span>
+            <span className="text-emerald-400 text-[10px] block mt-0.5 font-sans">100% test pass rate</span>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736]">
-            <span className="text-neutral-400 block text-[10px]">Compiler Warnings:</span>
-            <span className="text-white font-bold text-sm">-Werror Enabled</span>
-            <span className="text-neutral-300 text-[10px] block mt-0.5">-Wall -Wextra -Wpedantic</span>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+            <span className="text-neutral-400 block text-[11px]">Compiler Warnings</span>
+            <span className="text-white font-semibold font-mono text-sm">-Werror Enabled</span>
+            <span className="text-neutral-400 text-[10px] block mt-0.5 font-sans">-Wall -Wextra -Wpedantic</span>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736]">
-            <span className="text-neutral-400 block text-[10px]">Memory Sanitizers:</span>
-            <span className="text-emerald-400 font-bold text-sm">ASan / UBSan Clean</span>
-            <span className="text-neutral-300 text-[10px] block mt-0.5">0 leaks, 0 undefined behavior</span>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+            <span className="text-neutral-400 block text-[11px]">Memory Sanitizers</span>
+            <span className="text-emerald-400 font-semibold font-mono text-sm">ASan / UBSan Clean</span>
+            <span className="text-neutral-400 text-[10px] block mt-0.5 font-sans">0 leaks, 0 undefined behavior</span>
           </div>
 
-          <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736]">
-            <span className="text-neutral-400 block text-[10px]">Code Formatting:</span>
-            <span className="text-white font-bold text-sm">clang-format Clean</span>
-            <span className="text-neutral-300 text-[10px] block mt-0.5">Google C++ style enforced</span>
+          <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
+            <span className="text-neutral-400 block text-[11px]">Code Formatting</span>
+            <span className="text-white font-semibold font-mono text-sm">clang-format Clean</span>
+            <span className="text-neutral-400 text-[10px] block mt-0.5 font-sans">Google C++ style enforced</span>
           </div>
         </div>
       </Panel>
@@ -243,8 +243,8 @@ export const SystemPage: React.FC = () => {
         subtitle="Rule definitions governing autonomous, deterministic solver decisions"
       >
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400 font-medium">Filter Category:</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs text-neutral-400 font-medium font-sans">Filter Category:</span>
             <div className="flex flex-wrap gap-1.5">
               {['ALL', 'ROUTING', 'PRESOLVE', 'NUMERICS', 'BACKEND', 'LIMITS'].map((cat) => (
                 <button
@@ -253,8 +253,8 @@ export const SystemPage: React.FC = () => {
                   onClick={() => setSelectedCategory(cat)}
                   className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
                     selectedCategory === cat
-                      ? 'bg-blue-600 text-white font-semibold'
-                      : 'bg-[#0d1016] text-neutral-400 hover:text-white border border-[#202736]'
+                      ? 'bg-blue-600 text-white font-medium shadow-xs'
+                      : 'bg-[#141926] text-neutral-400 hover:text-white border border-[#1f283a]'
                   }`}
                 >
                   {cat}
@@ -263,10 +263,10 @@ export const SystemPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-[#1d2332]">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-[#202736] text-[11px] font-mono text-neutral-400 uppercase tracking-wider">
+                <tr className="border-b border-[#1d2332] bg-[#141926] text-[11px] font-sans font-semibold text-neutral-400">
                   <th className="py-2.5 px-3">Rule ID</th>
                   <th className="py-2.5 px-3">Category</th>
                   <th className="py-2.5 px-3">Condition / Trigger</th>
@@ -274,14 +274,18 @@ export const SystemPage: React.FC = () => {
                   <th className="py-2.5 px-3">Engineering Rationale</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1a202c]">
+              <tbody className="divide-y divide-[#1d2332] bg-[#11151f]">
                 {filteredRules.map((rule) => (
-                  <tr key={rule.id} className="hover:bg-[#141923] transition-colors">
+                  <tr key={rule.id} className="hover:bg-[#141926] transition-colors">
                     <td className="py-2.5 px-3 font-mono font-bold text-blue-400">{rule.id}</td>
-                    <td className="py-2.5 px-3 font-mono text-[10px] text-neutral-300">{rule.category}</td>
-                    <td className="py-2.5 px-3 text-neutral-200">{rule.condition}</td>
-                    <td className="py-2.5 px-3 font-medium text-white">{rule.action}</td>
-                    <td className="py-2.5 px-3 text-neutral-400">{rule.rationale}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#161c28] text-slate-300 border border-[#232c3f]">
+                        {rule.category}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-neutral-200 font-sans">{rule.condition}</td>
+                    <td className="py-2.5 px-3 font-medium text-white font-sans">{rule.action}</td>
+                    <td className="py-2.5 px-3 text-neutral-400 font-sans">{rule.rationale}</td>
                   </tr>
                 ))}
               </tbody>

@@ -194,18 +194,18 @@ export const BenchmarksPage: React.FC = () => {
         title="Live Benchmark Execution"
         subtitle="Trigger on-demand benchmark execution directly through the Kavach-Opt C++ binary"
         badge={
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 border border-blue-800/60 text-blue-300">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 border border-blue-800/40 text-blue-300 font-medium">
             ON-DEMAND REAL-TIME
           </span>
         }
       >
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-[#0a0d12] border border-[#1e2430]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-[#141926] border border-[#1f283a]">
             <div className="flex items-center gap-3">
               <Activity className="w-5 h-5 text-blue-400 shrink-0" />
               <div>
-                <span className="text-xs font-semibold text-white block">Instance to Benchmark:</span>
-                <span className="text-[11px] text-neutral-400">Directly invokes `./build-release/kavach-opt benchmark --instance &lt;path&gt;`</span>
+                <span className="text-xs font-semibold text-white block font-sans">Instance to Benchmark:</span>
+                <span className="text-[11px] text-neutral-400 font-sans">Directly invokes `./build-release/kavach-opt benchmark --instance &lt;path&gt;`</span>
               </div>
             </div>
 
@@ -213,7 +213,7 @@ export const BenchmarksPage: React.FC = () => {
               <select
                 value={selectedInstanceToRun}
                 onChange={(e) => setSelectedInstanceToRun(e.target.value)}
-                className="bg-[#0d1016] border border-[#2a3140] rounded px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                className="bg-[#0e121a] border border-[#232c3f] rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="benchmarks/netlib/afiro.mps">netlib/afiro.mps (LP)</option>
                 <option value="benchmarks/netlib/beaconfd.mps">netlib/beaconfd.mps (LP)</option>
@@ -226,7 +226,7 @@ export const BenchmarksPage: React.FC = () => {
                 type="button"
                 disabled={isRunningLive}
                 onClick={handleRunLiveBenchmark}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs font-mono text-white transition-colors"
               >
                 <Play className={`w-3.5 h-3.5 ${isRunningLive ? 'animate-spin' : ''}`} />
                 <span>{isRunningLive ? 'Running...' : 'Run Live Benchmark'}</span>
@@ -235,19 +235,19 @@ export const BenchmarksPage: React.FC = () => {
           </div>
 
           {liveError && (
-            <div className="p-3 rounded bg-rose-950/40 border border-rose-800/60 text-xs font-mono text-rose-300">
+            <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-xs font-mono text-rose-300">
               Execution Error: {liveError}
             </div>
           )}
 
           {liveRuns.length > 0 && (
             <div className="space-y-2">
-              <span className="text-[11px] font-mono text-emerald-400 font-semibold uppercase tracking-wider">
+              <span className="text-[11px] font-mono text-emerald-400 font-semibold tracking-normal">
                 Live Session Execution Log ({liveRuns.length} runs executed)
               </span>
-              <div className="overflow-x-auto border border-[#202736] rounded-lg">
+              <div className="overflow-x-auto border border-[#1f283a] rounded-lg bg-[#0e121a]">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-[#0d1016] text-neutral-400 border-b border-[#202736]">
+                  <thead className="bg-[#141926] text-neutral-400 border-b border-[#1f283a]">
                     <tr>
                       <th className="p-2.5">Time</th>
                       <th className="p-2.5">Instance</th>
@@ -258,9 +258,9 @@ export const BenchmarksPage: React.FC = () => {
                       <th className="p-2.5 text-center">Verification</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1e2430]">
+                  <tbody className="divide-y divide-[#1f283a]/60">
                     {liveRuns.map((r: any, i: number) => (
-                      <tr key={i} className="hover:bg-[#131722]">
+                      <tr key={i} className="hover:bg-[#161c28] transition-colors">
                         <td className="p-2.5 text-neutral-400">{r.run_timestamp}</td>
                         <td className="p-2.5 font-bold text-white">{r.instance_name || r.case_id}</td>
                         <td className="p-2.5 text-neutral-300">{r.problem_type}</td>
@@ -294,31 +294,31 @@ export const BenchmarksPage: React.FC = () => {
         title="Multicore Batched SpMV Architecture & Strategy Routing"
         subtitle="Thread pool scaling and crossover dynamics enforced by Kavach-Opt Strategy Layer"
         badge={
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/60 text-emerald-300">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-medium">
             STRATEGY ROUTER ACTIVE
           </span>
         }
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <span className="text-[10px] font-mono text-neutral-400 block uppercase">Hardware Concurrency</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1">
+              <span className="text-[10px] font-mono text-neutral-400 block font-medium">HARDWARE CONCURRENCY</span>
               <span className="text-sm font-bold font-mono text-white">8 Worker Threads</span>
-              <p className="text-[11px] text-neutral-400">Detected host CPU core topology</p>
+              <p className="text-[11px] text-neutral-400 font-sans">Detected host CPU core topology</p>
             </div>
-            <div className="p-3.5 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <span className="text-[10px] font-mono text-neutral-400 block uppercase">Crossover Rule R010</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1">
+              <span className="text-[10px] font-mono text-neutral-400 block font-medium">CROSSOVER RULE R010</span>
               <span className="text-sm font-bold font-mono text-blue-400">Batch Size K ≥ 16</span>
-              <p className="text-[11px] text-neutral-400">Prevents synchronization overhead for K &lt; 16</p>
+              <p className="text-[11px] text-neutral-400 font-sans">Prevents synchronization overhead for K &lt; 16</p>
             </div>
-            <div className="p-3.5 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1">
-              <span className="text-[10px] font-mono text-neutral-400 block uppercase">Zero-Copy Numerics</span>
+            <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] space-y-1">
+              <span className="text-[10px] font-mono text-neutral-400 block font-medium">ZERO-COPY NUMERICS</span>
               <span className="text-sm font-bold font-mono text-emerald-400">CSR Compressed Sparse</span>
-              <p className="text-[11px] text-neutral-400">Continuous 64-byte aligned SIMD memory</p>
+              <p className="text-[11px] text-neutral-400 font-sans">Continuous 64-byte aligned SIMD memory</p>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-[#0a0d12] border border-[#1e2430] text-xs text-neutral-300 space-y-1.5 leading-relaxed">
+          <div className="p-4 rounded-lg bg-[#141926] border border-[#1f283a] text-xs text-neutral-300 space-y-1.5 leading-relaxed font-sans">
             <div className="font-semibold text-white flex items-center gap-2">
               <Cpu className="w-4 h-4 text-blue-400" />
               <span>C++ Core Strategy Engine Routing Guarantees</span>
@@ -340,13 +340,13 @@ export const BenchmarksPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 bg-[#0d1016] p-1 rounded-lg border border-[#202736]">
+            <div className="flex items-center gap-1.5 bg-[#141926] p-1 rounded-lg border border-[#1f283a]">
               <button
                 type="button"
                 onClick={() => setActiveSuite('all')}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors font-sans ${
                   activeSuite === 'all'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-neutral-400 hover:text-white'
                 }`}
               >
@@ -355,9 +355,9 @@ export const BenchmarksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveSuite('netlib')}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors font-sans ${
                   activeSuite === 'netlib'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-neutral-400 hover:text-white'
                 }`}
               >
@@ -366,9 +366,9 @@ export const BenchmarksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveSuite('miplib')}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors font-sans ${
                   activeSuite === 'miplib'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-neutral-400 hover:text-white'
                 }`}
               >
@@ -377,9 +377,9 @@ export const BenchmarksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveSuite('qp')}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors font-sans ${
                   activeSuite === 'qp'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-neutral-400 hover:text-white'
                 }`}
               >
@@ -395,7 +395,7 @@ export const BenchmarksPage: React.FC = () => {
                 placeholder="Search instance name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-[#0d1016] border border-[#2a3140] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-blue-500 w-full sm:w-56"
+                className="bg-[#141926] border border-[#232c3f] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 w-full sm:w-56 font-mono transition-colors"
               />
             </div>
           </div>
@@ -408,16 +408,16 @@ export const BenchmarksPage: React.FC = () => {
             onRowClick={(row) => setSelectedItem(row)}
           />
 
-          <p className="text-xs text-neutral-400 italic">
-            * All benchmark numbers reflect genuine release-build measurements run on reference hardware. Click any row to inspect metadata.
+          <p className="text-xs text-neutral-400 font-sans">
+            * All benchmark figures represent release-build measurements run on reference hardware. Click any row to inspect topology and verification status.
           </p>
         </div>
       </Panel>
 
       {/* Selected Benchmark Detail Modal / Panel */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111624] border border-[#2a3140] rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#11151f] border border-[#263143] rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
@@ -440,7 +440,7 @@ export const BenchmarksPage: React.FC = () => {
                 <Metric label="Solve Time" value={`${(selectedItem.solve_time_seconds * 1000).toFixed(3)} ms`} />
               </MetricGroup>
 
-              <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-200 flex items-center gap-2">
+              <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-200 flex items-center gap-2 font-sans">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Zero-trust independent mathematical verification passed. Residuals &lt; 1e-8.</span>
               </div>
@@ -450,7 +450,7 @@ export const BenchmarksPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedItem(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#1e2430] hover:bg-[#2a3140] text-xs font-medium text-white transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-[#161c28] hover:bg-[#20283a] border border-[#273245] text-xs font-medium text-white transition-colors"
               >
                 Close Inspector
               </button>

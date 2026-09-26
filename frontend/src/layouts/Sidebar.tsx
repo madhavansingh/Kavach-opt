@@ -70,12 +70,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`w-64 flex flex-col justify-between bg-[#0e1117] border-r border-[#1e2430] shrink-0 select-none ${className}`}
+      className={`w-64 flex flex-col justify-between bg-[#0c0f17] border-r border-[#1d2332] shrink-0 select-none ${className}`}
     >
       <div>
         {/* Brand Header */}
-        <div className="h-16 px-5 flex items-center gap-3 border-b border-[#1e2430]">
-          <div className="w-8 h-8 rounded-md bg-emerald-950/80 border border-emerald-600/40 flex items-center justify-center text-emerald-400">
+        <div className="h-16 px-5 flex items-center gap-3 border-b border-[#1d2332]">
+          <div className="w-8 h-8 rounded-md bg-emerald-950/60 border border-emerald-600/30 flex items-center justify-center text-emerald-400">
             <Shield className="w-4 h-4" />
           </div>
           <div>
@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="font-bold tracking-tight text-sm text-neutral-100 font-sans">
                 KAVACH-OPT
               </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-800/80 text-neutral-300 border border-neutral-700/50">
                 RC-1
               </span>
             </div>
@@ -95,8 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Section */}
         <nav className="p-3 space-y-1">
-          <div className="px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-medium">
-            Navigation
+          <div className="px-3 py-2 text-[10px] font-mono text-neutral-400 font-medium">
+            WORKSTATION VIEWS
           </div>
           {navItems.map((item) => {
             const isActive = currentTab === item.id;
@@ -106,8 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onSelectTab(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-all ${
                   isActive
-                    ? 'bg-[#181d26] text-emerald-400 border border-emerald-500/30 font-medium'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-[#13161d] border border-transparent'
+                    ? 'bg-[#161c28] text-neutral-100 border border-[#273245] shadow-xs'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-[#121622] border border-transparent'
                 }`}
               >
                 <div
@@ -118,10 +118,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {item.icon}
                 </div>
                 <div className="truncate">
-                  <div className="text-xs tracking-wide leading-tight">
+                  <div className={`text-xs tracking-normal leading-tight ${isActive ? 'font-semibold text-white' : 'font-medium'}`}>
                     {item.label}
                   </div>
-                  <div className="text-[10px] text-neutral-400 font-mono truncate">
+                  <div className="text-[10px] text-neutral-400 font-mono truncate mt-0.5">
                     {item.sublabel}
                   </div>
                 </div>
@@ -132,16 +132,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 border-t border-[#1e2430] bg-[#0b0d12]">
+      <div className="p-4 border-t border-[#1d2332] bg-[#090c12]">
         <div className="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
-          <span>Engine Status</span>
-          <span className="flex items-center gap-1.5 text-emerald-400">
+          <span>Engine Core</span>
+          <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             STANDALONE
           </span>
         </div>
-        <div className="mt-2 text-[10px] text-neutral-400 font-mono leading-tight">
-          Sovereign C++20 Core
+        <div className="mt-1 text-[10px] text-neutral-400 font-mono leading-tight">
+          Sovereign C++20 · Zero Dependencies
         </div>
       </div>
     </aside>

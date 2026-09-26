@@ -57,21 +57,21 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       />
 
       {/* Architecture Rationale Banner */}
-      <div className="rounded-xl border border-blue-900/40 bg-gradient-to-r from-blue-950/30 via-[#111624] to-[#0d1016] p-5">
+      <div className="rounded-xl border border-blue-900/40 bg-gradient-to-r from-blue-950/30 via-[#11151f] to-[#0a0d12] p-5 shadow-xs">
         <div className="flex items-start gap-4">
           <div className="p-2.5 rounded-lg bg-blue-900/30 border border-blue-700/50 text-blue-400 shrink-0">
             <Lock className="w-5 h-5" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-sm font-semibold text-white">
-              The Kavach-Opt Mathematical Trust Model
+            <h2 className="text-sm font-semibold text-white font-sans">
+              The Kavach-Opt Zero-Trust Mathematical Audit
             </h2>
-            <p className="text-xs text-neutral-300 leading-relaxed max-w-3xl">
-              Commercial solvers frequently report “OPTIMAL” based on internal convergence flags that can be fooled
-              by basis degradation or ill-conditioned refactorizations. Kavach-Opt introduces an independent,
-              unentangled verification subsystem that discards all solver internal variables and re-evaluates
-              primal feasibility \(\|Ax - b\|_\infty\), dual multipliers, bounds, complementary slackness, and integrality
-              using 64-bit IEEE-754 precision.
+            <p className="text-xs text-neutral-300 leading-relaxed max-w-3xl font-sans">
+              The solver is not trusted by itself. Solvers can report &ldquo;OPTIMAL&rdquo; based on internal
+              convergence flags that may be masked by ill-conditioned refactorizations. Kavach-Opt enforces an
+              air-gapped verification subsystem that completely discards internal solver flags and independently
+              re-multiplies primal feasibility \(\|Ax - b\|_\infty\), dual multipliers, complementary slackness,
+              and discrete integrality using 64-bit IEEE-754 precision directly against original raw inputs.
             </p>
           </div>
         </div>
@@ -80,34 +80,34 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       {/* Verification Pipeline Flow */}
       <Panel title="Verification Pipeline Architecture" subtitle="Four-stage air-gapped validation sequence">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-lg bg-[#0d1016] border border-[#202736] relative">
+          <div className="p-4 rounded-lg bg-[#141926] border border-[#1f283a] relative">
             <div className="text-[10px] font-mono text-neutral-400 mb-1">STAGE 1</div>
-            <div className="text-xs font-semibold text-white mb-2">Original Raw Model</div>
-            <p className="text-[11px] text-neutral-400">
+            <div className="text-xs font-semibold text-white mb-2 font-sans">Original Raw Model</div>
+            <p className="text-[11px] text-neutral-400 font-sans">
               Unaltered canonical sparse matrix A, right-hand side b, and objective vector c.
             </p>
           </div>
 
-          <div className="p-4 rounded-lg bg-[#0d1016] border border-[#202736] relative">
+          <div className="p-4 rounded-lg bg-[#141926] border border-[#1f283a] relative">
             <div className="text-[10px] font-mono text-neutral-400 mb-1">STAGE 2</div>
-            <div className="text-xs font-semibold text-white mb-2">Candidate Solution</div>
-            <p className="text-[11px] text-neutral-400">
+            <div className="text-xs font-semibold text-white mb-2 font-sans">Candidate Solution</div>
+            <p className="text-[11px] text-neutral-400 font-sans">
               Raw decision vector x* and dual multipliers y* exported by the optimization kernel.
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-blue-950/20 border border-blue-800/40 relative">
             <div className="text-[10px] font-mono text-blue-400 mb-1">STAGE 3</div>
-            <div className="text-xs font-semibold text-white mb-2">Independent Verifier</div>
-            <p className="text-[11px] text-neutral-300">
+            <div className="text-xs font-semibold text-white mb-2 font-sans">Independent Verifier</div>
+            <p className="text-[11px] text-neutral-300 font-sans">
               Independent SpMV re-multiplication without internal solver scaling factors.
             </p>
           </div>
 
           <div className="p-4 rounded-lg bg-emerald-950/20 border border-emerald-800/40 relative">
             <div className="text-[10px] font-mono text-emerald-400 mb-1">STAGE 4</div>
-            <div className="text-xs font-semibold text-white mb-2">Certified Certificate</div>
-            <p className="text-[11px] text-neutral-300">
+            <div className="text-xs font-semibold text-white mb-2 font-sans">Certified Certificate</div>
+            <p className="text-[11px] text-neutral-300 font-sans">
               Immutable certificate confirming feasibility within strictly bounded tolerances.
             </p>
           </div>
@@ -137,7 +137,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                 <button
                   type="button"
                   onClick={handleCopyJson}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1e2430] hover:bg-[#2a3140] text-xs font-mono text-neutral-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#161c28] hover:bg-[#20283a] border border-[#273245] text-xs font-mono text-neutral-200 transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   <span>{copied ? 'Copied JSON' : 'Copy JSON'}</span>
@@ -206,9 +206,9 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                 )}
               </MetricGroup>
 
-              <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] font-mono text-xs text-neutral-300">
-                <span className="text-neutral-400">Audit Trail: </span>
-                {report.summary}
+              <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] font-mono text-xs text-neutral-300">
+                <span className="text-neutral-400 font-sans">Audit Trail: </span>
+                <span>{report.summary}</span>
               </div>
             </div>
           </Panel>
@@ -235,12 +235,12 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             <div className="space-y-3">
               <div className="flex justify-end">
                 <GhostButton size="sm" onClick={() => setShowJson(!showJson)}>
-                  {showJson ? 'Collapse JSON' : 'Expand Full JSON Artifact'}
+                  {showJson ? 'Collapse JSON Artifact' : 'Expand Full JSON Artifact'}
                 </GhostButton>
               </div>
 
               {showJson && (
-                <pre className="p-4 rounded-lg bg-[#090b0e] border border-[#1e2430] font-mono text-xs text-neutral-300 overflow-x-auto max-h-96">
+                <pre className="p-4 rounded-lg bg-[#0c0f17] border border-[#1d2332] font-mono text-xs text-neutral-300 overflow-x-auto max-h-96">
                   {JSON.stringify(report, null, 2)}
                 </pre>
               )}

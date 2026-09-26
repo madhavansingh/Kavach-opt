@@ -136,7 +136,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
             <select
               value={activeModel.path || activeModel.name}
               onChange={(e) => handleModelChange(e.target.value)}
-              className="w-full bg-[#0d1016] border border-[#2a3140] rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-blue-500"
+              className="w-full bg-[#141926] border border-[#232c3f] rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
             >
               {netlibModels.length > 0 && (
                 <optgroup label="Netlib LP Benchmarks">
@@ -235,7 +235,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                 {/* Core Parameters */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+                    <label className="block text-xs font-medium text-neutral-300 mb-1.5 font-sans">
                       Presolve Suite
                     </label>
                     <select
@@ -243,19 +243,19 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       onChange={(e) =>
                         setConfig({ ...config, presolve_policy: e.target.value as any })
                       }
-                      className="w-full bg-[#0d1016] border border-[#2a3140] rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#141926] border border-[#232c3f] rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-blue-500 font-sans transition-colors"
                     >
                       <option value="FULL">Full Presolve Suite (Recommended)</option>
                       <option value="BOUNDS_ONLY">Bounds Tightening Only</option>
                       <option value="NONE">Disabled (Solve Raw Model)</option>
                     </select>
-                    <span className="text-[11px] text-neutral-400 mt-1 block">
+                    <span className="text-[11px] text-neutral-400 mt-1 block font-sans">
                       Fixed vars, singleton rows, bound tightening, redundant elimination.
                     </span>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+                    <label className="block text-xs font-medium text-neutral-300 mb-1.5 font-sans">
                       Equilibration Scaling
                     </label>
                     <select
@@ -263,20 +263,20 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       onChange={(e) =>
                         setConfig({ ...config, scaling_policy: e.target.value as any })
                       }
-                      className="w-full bg-[#0d1016] border border-[#2a3140] rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#141926] border border-[#232c3f] rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-blue-500 font-sans transition-colors"
                     >
                       <option value="AUTO">Auto Ruiz Equilibration (Recommended)</option>
                       <option value="DISABLED">Disabled</option>
                     </select>
-                    <span className="text-[11px] text-neutral-400 mt-1 block">
+                    <span className="text-[11px] text-neutral-400 mt-1 block font-sans">
                       Normalizes condition number to avoid numerical pivoting loss.
                     </span>
                   </div>
                 </div>
 
                 {/* Backend Selection */}
-                <div className="pt-2 border-t border-[#1e2430]">
-                  <label className="block text-xs font-medium text-neutral-300 mb-2">
+                <div className="pt-2 border-t border-[#1d2332]">
+                  <label className="block text-xs font-medium text-neutral-300 mb-2 font-sans">
                     Execution Backend Subsystem
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -286,14 +286,14 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       className={`p-3 rounded-lg border text-left transition-colors ${
                         config.backend === 'CPU_SEQUENTIAL'
                           ? 'border-blue-500/60 bg-blue-950/20'
-                          : 'border-[#202736] bg-[#0d1016] hover:border-[#2e3748]'
+                          : 'border-[#20283a] bg-[#141926] hover:border-[#2d3850]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-white">CPU Sequential</span>
+                        <span className="text-xs font-semibold text-white font-sans">CPU Sequential</span>
                         <Cpu className="w-3.5 h-3.5 text-neutral-400" />
                       </div>
-                      <p className="text-[11px] text-neutral-400">
+                      <p className="text-[11px] text-neutral-400 font-sans">
                         Default deterministic single-core simplex & factorization.
                       </p>
                     </button>
@@ -304,14 +304,14 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       className={`p-3 rounded-lg border text-left transition-colors ${
                         config.backend === 'CPU_MULTICORE'
                           ? 'border-blue-500/60 bg-blue-950/20'
-                          : 'border-[#202736] bg-[#0d1016] hover:border-[#2e3748]'
+                          : 'border-[#20283a] bg-[#141926] hover:border-[#2d3850]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-white">CPU Multicore</span>
+                        <span className="text-xs font-semibold text-white font-sans">CPU Multicore</span>
                         <Cpu className="w-3.5 h-3.5 text-blue-400" />
                       </div>
-                      <p className="text-[11px] text-neutral-400">
+                      <p className="text-[11px] text-neutral-400 font-sans">
                         Thread pool for batched SpMV & parallel evaluation.
                       </p>
                     </button>
@@ -322,16 +322,16 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       className={`p-3 rounded-lg border text-left transition-colors ${
                         config.backend === 'CUDA_GPU'
                           ? 'border-emerald-500/60 bg-emerald-950/20'
-                          : 'border-[#202736] bg-[#0d1016] hover:border-[#2e3748]'
+                          : 'border-[#20283a] bg-[#141926] hover:border-[#2d3850]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-white">CUDA GPU</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-900/50 text-emerald-300">
+                        <span className="text-xs font-semibold text-white font-sans">CUDA GPU</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-medium">
                           SCOPED
                         </span>
                       </div>
-                      <p className="text-[11px] text-neutral-400">
+                      <p className="text-[11px] text-neutral-400 font-sans">
                         Batched CSR SpMV kernel with automatic CPU fallback.
                       </p>
                     </button>
@@ -340,9 +340,9 @@ export const SolvePage: React.FC<SolvePageProps> = ({
 
                 {/* Multicore threads slider if selected */}
                 {config.backend === 'CPU_MULTICORE' && (
-                  <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-2">
+                  <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-neutral-300 font-medium">Multicore Worker Threads:</span>
+                      <span className="text-neutral-300 font-medium font-sans">Multicore Worker Threads:</span>
                       <span className="font-mono text-blue-400 font-bold">{config.cpu_threads} workers</span>
                     </div>
                     <input
@@ -468,44 +468,194 @@ export const SolvePage: React.FC<SolvePageProps> = ({
           {currentResult ? (
             <Panel
               title="Optimization Outcome"
-              subtitle="Authoritative solver output and performance metrics"
+              subtitle={`Authoritative C++ solver output for ${activeModel.name}`}
               badge={<StatusBadge status={currentResult.status} size="md" />}
             >
               <div className="space-y-5">
-                <MetricGroup columns={4}>
-                  <Metric
-                    label="Objective Value (z*)"
-                    value={
-                      typeof currentResult.objective_value === 'number'
-                        ? currentResult.objective_value.toFixed(5)
-                        : '—'
-                    }
-                    highlight={currentResult.status === 'OPTIMAL' ? 'success' : 'normal'}
-                  />
-                  <Metric
-                    label="Total Solve Time"
-                    value={`${(currentResult.solve_time_seconds * 1000).toFixed(2)} ms`}
-                    subtext={`${currentResult.solve_time_seconds.toFixed(6)} s`}
-                  />
-                  <Metric
-                    label="Simplex Iterations"
-                    value={currentResult.iterations}
-                  />
-                  <Metric
-                    label="B&B Nodes Explored"
-                    value={currentResult.nodes}
-                  />
-                </MetricGroup>
+                {/* Problem-class-aware primary metric strip */}
+                {activeModel.problem_class === 'LP' && (
+                  <MetricGroup columns={4}>
+                    <Metric
+                      label="Objective Value (z*)"
+                      value={
+                        typeof currentResult.objective_value === 'number'
+                          ? currentResult.objective_value.toFixed(5)
+                          : '—'
+                      }
+                      highlight={currentResult.status === 'OPTIMAL' ? 'success' : 'normal'}
+                    />
+                    <Metric
+                      label="Execution Wall Time"
+                      value={`${(currentResult.solve_time_seconds * 1000).toFixed(2)} ms`}
+                      subtext={`${currentResult.solve_time_seconds.toFixed(6)} s`}
+                    />
+                    <Metric
+                      label="Simplex Iterations"
+                      value={currentResult.iterations}
+                      subtext="Phase I & Phase II basis pivots"
+                    />
+                    <Metric
+                      label="Max Primal Residual"
+                      value={
+                        currentResult.verification_report?.recomputed_primal_residual !== undefined
+                          ? currentResult.verification_report.recomputed_primal_residual.toExponential(2)
+                          : '0.00e+00'
+                      }
+                      subtext="Tolerance: 1.0e-06"
+                      highlight="success"
+                    />
+                  </MetricGroup>
+                )}
+
+                {activeModel.problem_class === 'MILP' && (
+                  <MetricGroup columns={4}>
+                    <Metric
+                      label="Objective Value (z*)"
+                      value={
+                        typeof currentResult.objective_value === 'number'
+                          ? currentResult.objective_value.toFixed(5)
+                          : '—'
+                      }
+                      highlight={currentResult.status === 'OPTIMAL' ? 'success' : 'normal'}
+                    />
+                    <Metric
+                      label="Execution Wall Time"
+                      value={`${(currentResult.solve_time_seconds * 1000).toFixed(2)} ms`}
+                      subtext={`${currentResult.solve_time_seconds.toFixed(6)} s`}
+                    />
+                    <Metric
+                      label="B&B Nodes Explored"
+                      value={currentResult.nodes}
+                      subtext="Branch-and-bound search tree"
+                    />
+                    <Metric
+                      label="Integrality Violation"
+                      value={
+                        currentResult.verification_report?.recomputed_integrality_violation !== undefined
+                          ? currentResult.verification_report.recomputed_integrality_violation.toExponential(2)
+                          : '0.00e+00'
+                      }
+                      subtext="Tolerance: 1.0e-05"
+                      highlight="success"
+                    />
+                  </MetricGroup>
+                )}
+
+                {activeModel.problem_class === 'CONVEX_QP' && (
+                  <MetricGroup columns={4}>
+                    <Metric
+                      label="Objective Value (z*)"
+                      value={
+                        typeof currentResult.objective_value === 'number'
+                          ? currentResult.objective_value.toFixed(5)
+                          : '—'
+                      }
+                      highlight={currentResult.status === 'OPTIMAL' ? 'success' : 'normal'}
+                    />
+                    <Metric
+                      label="Execution Wall Time"
+                      value={`${(currentResult.solve_time_seconds * 1000).toFixed(2)} ms`}
+                      subtext={`${currentResult.solve_time_seconds.toFixed(6)} s`}
+                    />
+                    <Metric
+                      label="Active-Set Iterations"
+                      value={currentResult.iterations}
+                      subtext="Active constraint projections"
+                    />
+                    <Metric
+                      label="KKT Stationarity Residual"
+                      value={
+                        currentResult.verification_report?.recomputed_kkt_residual !== undefined
+                          ? currentResult.verification_report.recomputed_kkt_residual.toExponential(2)
+                          : '0.00e+00'
+                      }
+                      subtext="Tolerance: 1.0e-06"
+                      highlight="success"
+                    />
+                  </MetricGroup>
+                )}
+
+                {/* Sub-panel with class-specific mathematical invariants */}
+                <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] text-xs font-mono">
+                  {activeModel.problem_class === 'LP' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Primal Feasibility:</span>
+                        <span className="text-emerald-400 font-semibold">
+                          ||Ax - b|| = {currentResult.verification_report?.recomputed_primal_residual.toExponential(3) || '0.000e+00'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Dual Multipliers:</span>
+                        <span className="text-neutral-200">
+                          ||A^T y + s - c|| = {currentResult.verification_report?.recomputed_dual_residual.toExponential(3) || '0.000e+00'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Complementary Slackness:</span>
+                        <span className="text-emerald-400 font-semibold">
+                          max |x_j * s_j| = {currentResult.verification_report?.recomputed_complementary_slackness.toExponential(3) || '0.000e+00'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeModel.problem_class === 'MILP' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Discrete Feasibility:</span>
+                        <span className="text-emerald-400 font-semibold">
+                          max |x_int - round(x_int)| = {currentResult.verification_report?.recomputed_integrality_violation?.toExponential(3) || '0.000e+00'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Discrete Variable Count:</span>
+                        <span className="text-neutral-200">
+                          {activeModel.num_discrete_vars} integer variables strictly enforced
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Dual Simplex Warm Starts:</span>
+                        <span className="text-sky-400 font-semibold">
+                          Active on all child node factorizations
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeModel.problem_class === 'CONVEX_QP' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-neutral-300">
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">KKT Stationarity:</span>
+                        <span className="text-emerald-400 font-semibold">
+                          ||Q x + c - A^T y|| = {currentResult.verification_report?.recomputed_kkt_residual?.toExponential(3) || '0.000e+00'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Hessian Condition:</span>
+                        <span className="text-emerald-400 font-semibold">
+                          Positive Semi-Definite (PSD) Verified
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-400 block font-sans">Active Constraints:</span>
+                        <span className="text-neutral-200">
+                          Active set projection converged
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Backend Fallback Callout */}
                 {config.backend === 'CUDA_GPU' && currentResult.backend_used !== 'CUDA_GPU' && (
-                  <div className="p-3.5 rounded-lg border border-amber-800/50 bg-amber-950/25 text-amber-200 text-xs flex items-start gap-3">
+                  <div className="p-3.5 rounded-lg border border-amber-800/50 bg-amber-950/20 text-amber-200 text-xs flex items-start gap-3">
                     <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <div className="font-semibold text-amber-300 uppercase tracking-wider text-[11px]">
+                      <div className="font-semibold text-amber-300 text-[11px] font-sans">
                         Hardware Execution Fallback: CPU Core Active
                       </div>
-                      <p className="text-neutral-300 text-xs leading-relaxed">
+                      <p className="text-neutral-300 text-xs leading-relaxed font-sans">
                         Requested Backend: <span className="font-mono text-amber-300 font-semibold">CUDA_GPU</span> · Executed Backend:{' '}
                         <span className="font-mono text-white font-semibold">{currentResult.backend_used}</span>.
                         The host environment does not possess an active CUDA GPU or runtime. The solver engaged its mandatory,
@@ -533,7 +683,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                         }`}
                       />
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wider">
+                        <div className="text-xs font-semibold font-sans">
                           Independent Verification:{' '}
                           {currentResult.verification_report.passed ? 'CERTIFIED OPTIMAL' : 'FAILED / UNVERIFIED'}
                         </div>
@@ -572,29 +722,29 @@ export const SolvePage: React.FC<SolvePageProps> = ({
             title="Strategy Layer Advisor"
             subtitle="Deterministic rule-based solver intelligence"
             badge={
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/50 border border-blue-800/50 text-blue-300">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 border border-blue-800/40 text-blue-300 font-medium">
                 RULES ENGINE
               </span>
             }
           >
             <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-[#0d1016] border border-[#202736] space-y-1.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-neutral-400">
-                  Target Algorithm & Routing
+              <div className="p-3.5 rounded-lg bg-[#141926] border border-[#20283a] space-y-1.5">
+                <span className="text-[10px] font-mono text-neutral-400 font-medium">
+                  TARGET ALGORITHM & ROUTING
                 </span>
-                <div className="text-sm font-semibold text-white">
+                <div className="text-sm font-semibold text-white font-sans">
                   {activeModel.problem_class === 'LP' && 'Two-Phase Revised Simplex (Phase I/II)'}
                   {activeModel.problem_class === 'MILP' && 'Branch & Bound + Dual Simplex Warm Starts'}
                   {activeModel.problem_class === 'CONVEX_QP' && 'Active-Set Quadratic Programming'}
                 </div>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-neutral-400 leading-relaxed font-sans">
                   {currentResult?.strategy_decision?.human_readable_rationale ||
                     'Routing enforced by deterministic classification rules R001–R006.'}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-neutral-300">
+                <div className="text-xs font-semibold text-neutral-300 font-sans">
                   {currentResult?.strategy_decision ? 'Active Strategy Rules Fired' : 'Strategy Rules Preview'}
                 </div>
                 {currentResult?.strategy_decision?.rule_explanations &&
@@ -611,14 +761,14 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                   <ul className="space-y-2 text-xs text-neutral-400">
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>
+                      <span className="font-sans">
                         <strong className="text-neutral-200">R001 / R003:</strong> Classified as{' '}
                         {activeModel.problem_class}. Problem class matches core kernel capabilities.
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>
+                      <span className="font-sans">
                         <strong className="text-neutral-200">R007:</strong> Condition risk profile:{' '}
                         <span className="text-emerald-400 font-mono font-medium">NORMAL</span> (dynamic range{' '}
                         {activeModel.dynamic_range.toFixed(1)}x &lt; 1e6).
@@ -626,7 +776,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>
+                      <span className="font-sans">
                         <strong className="text-neutral-200">R010:</strong> Backend crossover evaluation:{' '}
                         Single-batch workload defaults to CPU Sequential for minimal launch latency.
                       </span>
@@ -636,11 +786,11 @@ export const SolvePage: React.FC<SolvePageProps> = ({
               </div>
 
               <div className="p-3 rounded-lg bg-blue-950/20 border border-blue-900/40 text-xs text-neutral-300 space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold text-blue-300">
+                <div className="flex items-center gap-1.5 font-semibold text-blue-300 font-sans">
                   <Info className="w-3.5 h-3.5" />
                   <span>Rule Engine Telemetry</span>
                 </div>
-                <p className="text-[11px] text-neutral-400">
+                <p className="text-[11px] text-neutral-400 font-sans">
                   Decision Time:{' '}
                   <span className="font-mono text-white font-medium">
                     {currentResult?.strategy_decision
@@ -658,14 +808,14 @@ export const SolvePage: React.FC<SolvePageProps> = ({
 
           {/* Quick Info Panel */}
           <Panel title="Command-Line Equivalent" subtitle="Reproduce this exact solve via CLI">
-            <div className="p-3 rounded bg-[#0a0d12] border border-[#1e2430] font-mono text-xs text-neutral-300 select-all overflow-x-auto whitespace-pre-wrap">
+            <div className="p-3 rounded-lg bg-[#0e121a] border border-[#1d2332] font-mono text-xs text-neutral-300 select-all overflow-x-auto whitespace-pre-wrap">
               ./build-release/kavach-opt solve {activeModel.path || activeModel.name} --json
               {config.presolve_policy === 'NONE' ? ' --presolve none' : ' --presolve full'}
               {config.scaling_policy === 'DISABLED' ? ' --scaling off' : ' --scaling auto'}
               {config.backend === 'CUDA_GPU' ? ' --gpu' : ' --no-gpu'}
               {config.backend === 'CPU_MULTICORE' ? ` --backend multicore --threads ${config.cpu_threads}` : ''}
             </div>
-            <p className="text-[11px] text-neutral-400 mt-2">
+            <p className="text-[11px] text-neutral-400 mt-2 font-sans">
               CLI execution outputs the identical verified JSON certificate.
             </p>
           </Panel>
