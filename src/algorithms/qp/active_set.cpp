@@ -508,18 +508,18 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
     const std::size_t num_total_constrs = all_constrs.size();
 
     // Helper: compute a_l^T v
-    auto dot_constr = [&](const NormalizedConstraint& c, const std::vector<double>& v) {
+    auto dot_constr = [&](const NormalizedConstraint& constraint, const std::vector<double>& v) {
         double val = 0.0;
-        for (const auto& [var_id, coeff] : c.terms) {
+        for (const auto& [var_id, coeff] : constraint.terms) {
             val += coeff * v[var_id];
         }
         return val;
     };
 
     // Helper: dense row extraction and Gram-Schmidt linear independence check
-    auto get_dense_a = [&](const NormalizedConstraint& c) {
+    auto get_dense_a = [&](const NormalizedConstraint& constraint) {
         std::vector<double> a(n, 0.0);
-        for (const auto& [var_id, coeff] : c.terms) {
+        for (const auto& [var_id, coeff] : constraint.terms) {
             if (var_id < n)
                 a[var_id] += coeff;
         }
