@@ -21,6 +21,7 @@
 #include "core/random.hpp"
 #include "core/version.hpp"
 #include "io/parser.hpp"
+#include "presolve/presolve.hpp"
 #include "strategy/strategy.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
@@ -38,23 +39,24 @@ void print_version() {
 
 void print_help() {
     std::cout
-        << "Kavach-Opt — Indigenous GPU-Accelerated Optimization Solver Core\n\n"
+        << "Kavach-Opt — Sovereign GPU-Accelerated Optimization Solver Core\n\n"
         << "Usage:\n"
         << "  kavach-opt solve <model.mps|.lp> [options]\n"
         << "  kavach-opt mrpl [options]\n"
         << "  kavach-opt benchmark [options]\n"
-        << "  kavach-opt verify <solution.json>\n"
-        << "  kavach-opt presolve <model.mps> --report\n"
+        << "  kavach-opt verify <model.mps|.lp>\n"
+        << "  kavach-opt presolve <model.mps|.lp> [--report]\n"
         << "  kavach-opt --version\n"
         << "  kavach-opt --help\n\n"
         << "Solve Options:\n"
-        << "  --strategy <auto|explicit>         Strategy decision mode (default: auto)\n"
+        << "  --strategy <auto|conservative|fast> Strategy decision mode (default: auto)\n"
         << "  --show-strategy                    Display concise strategy decision\n"
         << "  --explain-strategy                 Display comprehensive strategy explanation\n"
-        << "  --presolve <full|none>             Explicit presolve override\n"
-        << "  --scaling <on|off>                 Explicit scaling override\n"
+        << "  --presolve <full|none|auto>        Explicit presolve override\n"
+        << "  --scaling <on|off|auto>            Explicit scaling override\n"
         << "  --backend <cpu|multicore|cuda>     Explicit execution backend override\n"
-        << "  --no-gpu                           Disable CUDA GPU execution\n"
+        << "  --gpu                              Request CUDA GPU execution backend\n"
+        << "  --no-gpu                           Disable CUDA GPU execution (force CPU)\n"
         << "  --time-limit <seconds>             Wall-clock time limit in seconds\n"
         << "  --json                             Output strategy and solve result as JSON\n\n"
         << "MRPL Case Study Options:\n"
@@ -321,6 +323,8 @@ int handle_solve(const std::vector<std::string_view>& args) {
             explain_strategy = true;
         } else if (args[i] == "--json") {
             json_output = true;
+        } else if (args[i] == "--gpu") {
+            config.override_backend = kavach::backend::BackendType::CUDA_GPU;
         } else if (args[i] == "--no-gpu") {
             config.force_no_gpu = true;
         } else if (args[i] == "--strategy" && i + 1 < args.size()) {
@@ -328,32 +332,35 @@ int handle_solve(const std::vector<std::string_view>& args) {
             if (strat_arg == "auto") {
                 config.mode = kavach::strategy::StrategyMode::AUTO;
             } else if (strat_arg == "conservative") {
+                config.mode = kavach::strategy::StrategyMode::AUTO;
                 config.elevated_coeff_range_threshold = 1e3;
                 config.high_risk_coeff_range_threshold = 1e6;
                 config.normal_refactorization_interval = 20;
                 config.elevated_refactorization_interval = 10;
                 config.high_risk_refactorization_interval = 5;
             } else if (strat_arg == "fast") {
+                config.mode = kavach::strategy::StrategyMode::AUTO;
                 config.normal_refactorization_interval = 100;
             } else {
                 std::cerr << "Warning: Unknown strategy mode '" << strat_arg << "', using auto\n";
             }
+
         } else if (args[i] == "--presolve" && i + 1 < args.size()) {
             std::string_view p_arg = args[++i];
             if (p_arg == "auto") {
                 config.override_presolve = std::nullopt;
-            } else if (p_arg == "enabled") {
+            } else if (p_arg == "enabled" || p_arg == "full" || p_arg == "on") {
                 config.override_presolve = true;
-            } else if (p_arg == "disabled") {
+            } else if (p_arg == "disabled" || p_arg == "none" || p_arg == "off") {
                 config.override_presolve = false;
             }
         } else if (args[i] == "--scaling" && i + 1 < args.size()) {
             std::string_view s_arg = args[++i];
             if (s_arg == "auto") {
                 config.override_scaling = std::nullopt;
-            } else if (s_arg == "enabled") {
+            } else if (s_arg == "enabled" || s_arg == "on") {
                 config.override_scaling = true;
-            } else if (s_arg == "disabled") {
+            } else if (s_arg == "disabled" || s_arg == "off") {
                 config.override_scaling = false;
             }
         } else if (args[i] == "--backend" && i + 1 < args.size()) {
@@ -364,7 +371,7 @@ int handle_solve(const std::vector<std::string_view>& args) {
                 config.override_backend = kavach::backend::BackendType::CPU_SEQUENTIAL;
             } else if (b_arg == "multicore") {
                 config.override_backend = kavach::backend::BackendType::CPU_MULTICORE;
-            } else if (b_arg == "gpu") {
+            } else if (b_arg == "gpu" || b_arg == "cuda") {
                 config.override_backend = kavach::backend::BackendType::CUDA_GPU;
             }
         } else if (args[i] == "--time-limit" && i + 1 < args.size()) {
@@ -495,6 +502,83 @@ int handle_solve(const std::vector<std::string_view>& args) {
     }
 }
 
+int handle_presolve(const std::vector<std::string_view>& args) {
+    if (args.size() < 2) {
+        std::cerr << "Usage: kavach-opt presolve <model.mps|.lp> [--report]\n";
+        return 1;
+    }
+    std::string file_path = std::string(args[1]);
+    bool report = false;
+    for (std::size_t i = 2; i < args.size(); ++i) {
+        if (args[i] == "--report") {
+            report = true;
+        }
+    }
+    try {
+        auto model = kavach::io::parse_model(file_path);
+        std::cout << "Loaded model '" << model->name() << "': " << model->num_variables()
+                  << " vars, " << model->num_constraints() << " constrs, " << model->num_nonzeros()
+                  << " nonzeros\n";
+
+        kavach::presolve::PresolveOptions opts;
+        kavach::presolve::Presolver presolver;
+        auto presolve_result = presolver.apply(*model, opts);
+
+        std::cout << "\n=== Kavach-Opt Presolve Summary ===\n"
+                  << presolve_result.stats.to_string() << "\n";
+        if (report) {
+            std::cout << "Presolve Status: " << kavach::core::to_string(presolve_result.status)
+                      << "\n"
+                      << "Reduced Model:   " << presolve_result.reduced_model->num_variables()
+                      << " vars, " << presolve_result.reduced_model->num_constraints()
+                      << " constrs, " << presolve_result.reduced_model->num_nonzeros()
+                      << " nonzeros\n";
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Presolve error: " << e.what() << '\n';
+        return 1;
+    }
+}
+
+int handle_verify(const std::vector<std::string_view>& args) {
+    if (args.size() < 2) {
+        std::cerr << "Usage: kavach-opt verify <model.mps|.lp>\n";
+        return 1;
+    }
+    std::string file_path = std::string(args[1]);
+    try {
+        auto model = kavach::io::parse_model(file_path);
+        std::cout << "Loaded model '" << model->name() << "' for independent certification...\n";
+
+        kavach::api::KavachSolver solver;
+        auto result = solver.solve(*model);
+
+        std::cout << "\n=== Kavach-Opt Independent Verification Certificate ===\n"
+                  << "Model:                " << model->name() << "\n"
+                  << "Solver Status:        " << kavach::core::to_string(result.status) << "\n"
+                  << "Objective Value:      " << std::setprecision(8) << result.objective_value
+                  << "\n"
+                  << "Verification Outcome: "
+                  << (result.verification_report.passed ? "CERTIFIED (PASS)" : "REJECTED (FAIL)")
+                  << "\n"
+                  << "Primal Residual:      "
+                  << result.verification_report.recomputed_primal_residual << "\n"
+                  << "Dual Residual:        " << result.verification_report.recomputed_dual_residual
+                  << "\n"
+                  << "Summary:              " << result.verification_report.summary << "\n";
+
+        if (!result.verification_report.passed) {
+            std::cerr << "Verification check failed for model '" << model->name() << "'\n";
+            return 1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Verification error: " << e.what() << '\n';
+        return 1;
+    }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -521,10 +605,11 @@ int main(int argc, char* argv[]) {
         if (command == "mrpl") {
             return handle_mrpl(args);
         }
-        if (command == "verify" || command == "presolve") {
-            std::cout << "Command '" << command
-                      << "' is integrated into the core solver and benchmark runner pipeline.\n";
-            return 0;
+        if (command == "presolve") {
+            return handle_presolve(args);
+        }
+        if (command == "verify") {
+            return handle_verify(args);
         }
 
         std::cerr << "Unknown command: " << command << "\nRun 'kavach-opt --help' for usage.\n";

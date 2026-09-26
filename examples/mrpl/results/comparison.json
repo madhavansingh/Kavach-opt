@@ -4,35 +4,35 @@
     {
       "highs_status": "UNAVAILABLE",
       "kavach_objective": 5445.9090909090964,
-      "kavach_runtime_sec": 0.001384917,
+      "kavach_runtime_sec": 0.0018309999999999999,
       "kavach_status": "OPTIMAL",
       "scenario": "baseline"
     },
     {
       "highs_status": "UNAVAILABLE",
       "kavach_objective": 3750,
-      "kavach_runtime_sec": 0.001637917,
+      "kavach_runtime_sec": 0.002039875,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_a_reduced_crude"
     },
     {
       "highs_status": "UNAVAILABLE",
       "kavach_objective": 4975,
-      "kavach_runtime_sec": 0.0013821250000000001,
+      "kavach_runtime_sec": 0.001641792,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_b_tight_quality"
     },
     {
       "highs_status": "UNAVAILABLE",
       "kavach_objective": 5445.9090909090883,
-      "kavach_runtime_sec": 0.001328959,
+      "kavach_runtime_sec": 0.00150625,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_c_reduced_capacity"
     },
     {
       "highs_status": "UNAVAILABLE",
       "kavach_objective": 0,
-      "kavach_runtime_sec": 6.7909999999999999e-06,
+      "kavach_runtime_sec": 8.0830000000000004e-06,
       "kavach_status": "INFEASIBLE",
       "scenario": "scenario_d_infeasible"
     }

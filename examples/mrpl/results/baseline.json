@@ -28,7 +28,7 @@
     "y_U3 = 0.3182"
   ],
   "lp_relaxation_objective": 5891.3636363636424,
-  "lp_relaxation_time_seconds": 0.000360291,
+  "lp_relaxation_time_seconds": 0.00045358399999999999,
   "mass_balance_validation": {
     "crude_availability_residual": 0,
     "max_absolute_residual": 2.8421709430404007e-14,
@@ -85,7 +85,7 @@
     "status": "UNAVAILABLE"
   },
   "scenario": "baseline",
-  "solve_time_seconds": 0.001384917,
+  "solve_time_seconds": 0.0018309999999999999,
   "solver_status": "OPTIMAL",
   "unit_decisions": [
     {

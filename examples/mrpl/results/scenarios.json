@@ -29,7 +29,7 @@
       "y_U3 = 0.3182"
     ],
     "lp_relaxation_objective": 5891.3636363636424,
-    "lp_relaxation_time_seconds": 0.000360291,
+    "lp_relaxation_time_seconds": 0.00045358399999999999,
     "mass_balance_validation": {
       "crude_availability_residual": 0,
       "max_absolute_residual": 2.8421709430404007e-14,
@@ -86,7 +86,7 @@
       "status": "UNAVAILABLE"
     },
     "scenario": "baseline",
-    "solve_time_seconds": 0.001384917,
+    "solve_time_seconds": 0.0018309999999999999,
     "solver_status": "OPTIMAL",
     "unit_decisions": [
       {
@@ -147,7 +147,7 @@
       "y_U3 = 0.0758"
     ],
     "lp_relaxation_objective": 4359.848484848485,
-    "lp_relaxation_time_seconds": 0.00034383299999999999,
+    "lp_relaxation_time_seconds": 0.000395416,
     "mass_balance_validation": {
       "crude_availability_residual": 0,
       "max_absolute_residual": 0,
@@ -204,7 +204,7 @@
       "status": "UNAVAILABLE"
     },
     "scenario": "scenario_a_reduced_crude",
-    "solve_time_seconds": 0.001637917,
+    "solve_time_seconds": 0.002039875,
     "solver_status": "OPTIMAL",
     "unit_decisions": [
       {
@@ -264,7 +264,7 @@
       "y_U3 = 0.1000"
     ],
     "lp_relaxation_objective": 5359.0000000000018,
-    "lp_relaxation_time_seconds": 0.00036654199999999997,
+    "lp_relaxation_time_seconds": 0.00038241700000000002,
     "mass_balance_validation": {
       "crude_availability_residual": 0,
       "max_absolute_residual": 0,
@@ -321,7 +321,7 @@
       "status": "UNAVAILABLE"
     },
     "scenario": "scenario_b_tight_quality",
-    "solve_time_seconds": 0.0013821250000000001,
+    "solve_time_seconds": 0.001641792,
     "solver_status": "OPTIMAL",
     "unit_decisions": [
       {
@@ -381,7 +381,7 @@
       "y_U3 = 0.6818"
     ],
     "lp_relaxation_objective": 5647.7272727272757,
-    "lp_relaxation_time_seconds": 0.00034845900000000002,
+    "lp_relaxation_time_seconds": 0.00035754200000000003,
     "mass_balance_validation": {
       "crude_availability_residual": 0,
       "max_absolute_residual": 2.8421709430404007e-14,
@@ -438,7 +438,7 @@
       "status": "UNAVAILABLE"
     },
     "scenario": "scenario_c_reduced_capacity",
-    "solve_time_seconds": 0.001328959,
+    "solve_time_seconds": 0.00150625,
     "solver_status": "OPTIMAL",
     "unit_decisions": [
       {
@@ -473,7 +473,7 @@
     "data_status": "DATA STATUS:\nAll numeric values in this demonstration are illustrative/synthetic.\nThey are not proprietary MRPL operational data and must not be\ninterpreted as actual MRPL process parameters.",
     "lp_fractional_variables": [],
     "lp_relaxation_objective": 0,
-    "lp_relaxation_time_seconds": 6.584e-06,
+    "lp_relaxation_time_seconds": 7.1670000000000002e-06,
     "nodes_explored": 0,
     "objective_net_margin_k_usd": 0,
     "optimality_gap": 1,
@@ -482,7 +482,7 @@
       "status": "UNAVAILABLE"
     },
     "scenario": "scenario_d_infeasible",
-    "solve_time_seconds": 6.7909999999999999e-06,
+    "solve_time_seconds": 8.0830000000000004e-06,
     "solver_status": "INFEASIBLE",
     "verified_optimal": false
   }

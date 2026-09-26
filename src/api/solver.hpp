@@ -47,19 +47,48 @@ struct SolverResult {
 
 /**
  * @brief Abstract solver interface.
+ *
+ * Defines the contract for mathematical programming solvers in Kavach-Opt.
  */
 class Solver {
 public:
     virtual ~Solver() = default;
 
+    /**
+     * @brief Solves the given canonical model with the specified options.
+     *
+     * @param model Input canonical model. The caller retains ownership.
+     *              The model is accessed read-only and must remain valid for
+     *              the duration of the solve() call.
+     * @param options Solver configuration options.
+     * @return SolverResult Complete result including status, primal/dual solutions,
+     *                      and independent verification certification.
+     */
     [[nodiscard]] virtual SolverResult solve(const model::CanonicalModel& model,
                                              const SolverOptions& options) = 0;
 };
 
 /**
  * @brief Production programmatic solver implementation for Kavach-Opt.
- * Integrates strategy selection, core numerical algorithms, independent
- * verification, and telemetry.
+ *
+ * Integrates rule-based strategy selection, core numerical algorithms
+ * (Revised Simplex, Branch-and-Bound, Primal Active-Set QP), independent
+ * verification (LPVerifier, MILPVerifier, QPVerifier), and telemetry.
+ *
+ * ### Architectural Invariants & Guarantees:
+ * - **Memory & Lifetime**: Models are accepted by const reference and never
+ *   stored internally. SolverResult instances own all allocated vectors
+ *   (primal, dual, reduced costs) by value, allowing safe decoupling from the
+ *   originating solver instance.
+ * - **Thread Safety**: Distinct KavachSolver instances operating on separate
+ *   models are concurrently thread-safe. A single KavachSolver instance is
+ *   re-entrant for sequential calls on the same thread.
+ * - **Exceptions**: Throws std::invalid_argument for ill-formed models or
+ *   incompatible options; throws std::runtime_error for fatal numerical
+ *   breakdowns. Mathematical statuses (e.g. INFEASIBLE, UNBOUNDED, OPTIMAL)
+ *   are communicated via SolverResult::status without throwing exceptions.
+ * - **Platform Sovereignty**: Compiles and operates cleanly on CPU-only
+ *   architectures without requiring CUDA runtime libraries or GPU headers.
  */
 class KavachSolver : public Solver {
 public:

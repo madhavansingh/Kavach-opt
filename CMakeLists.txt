@@ -161,8 +161,13 @@ if(KAVACH_BUILD_CLI)
     target_link_libraries(kavach-opt PRIVATE kavach_core)
 endif()
 
+# API Example Target
+add_executable(kavach_api_example examples/api_example.cpp)
+target_link_libraries(kavach_api_example PRIVATE kavach_core)
+
 # Testing Target
 if(KAVACH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
