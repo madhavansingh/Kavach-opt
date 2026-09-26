@@ -14,6 +14,7 @@
 #include "benchmark/benchmark_manifest.hpp"
 #include "benchmark/benchmark_report.hpp"
 #include "benchmark/benchmark_runner.hpp"
+#include "case_study/mrpl/mrpl_model.hpp"
 #include "core/logger.hpp"
 #include "core/random.hpp"
 #include "core/version.hpp"
@@ -37,11 +38,18 @@ void print_help() {
         << "Kavach-Opt — Indigenous GPU-Accelerated Optimization Solver Core\n\n"
         << "Usage:\n"
         << "  kavach-opt solve <model.mps|.lp> [options]\n"
+        << "  kavach-opt mrpl [options]\n"
         << "  kavach-opt benchmark [options]\n"
         << "  kavach-opt verify <solution.json>\n"
         << "  kavach-opt presolve <model.mps> --report\n"
         << "  kavach-opt --version\n"
         << "  kavach-opt --help\n\n"
+        << "MRPL Case Study Options:\n"
+        << "  --output <dir>                     Directory for output artifacts (default: "
+           "examples/mrpl/results)\n"
+        << "  --report <path>                    Path for markdown report (default: "
+           "docs/MRPL_CASE_STUDY.md)\n"
+        << "  --no-highs                         Skip external HiGHS comparison\n\n"
         << "Benchmark Options:\n"
         << "  --suite <netlib|miplib_subset|qp>  Benchmark suite name\n"
         << "  --manifest <path>                  Direct path to manifest JSON\n"
@@ -201,6 +209,86 @@ int handle_benchmark(const std::vector<std::string_view>& args) {
     return 0;
 }
 
+int handle_mrpl(const std::vector<std::string_view>& args) {
+    std::string output_dir = "examples/mrpl/results";
+    std::string report_path = "docs/MRPL_CASE_STUDY.md";
+    bool run_highs = true;
+
+    for (std::size_t i = 1; i < args.size(); ++i) {
+        if (args[i] == "--output" && i + 1 < args.size()) {
+            output_dir = std::string(args[++i]);
+        } else if (args[i] == "--report" && i + 1 < args.size()) {
+            report_path = std::string(args[++i]);
+        } else if (args[i] == "--no-highs") {
+            run_highs = false;
+        }
+    }
+
+    std::cout
+        << "==============================================================================\n"
+        << "MRPL-STYLE REFINERY OPTIMIZATION INDUSTRIAL CASE STUDY\n"
+        << "==============================================================================\n"
+        << kavach::case_study::mrpl::SYNTHETIC_DATA_DISCLOSURE << "\n"
+        << "==============================================================================\n\n"
+        << "Executing baseline and what-if scenarios through production solver pipeline...\n";
+
+    kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
+    auto scenarios = runner.run_all_scenarios(run_highs);
+    runner.export_all_artifacts(output_dir, report_path);
+
+    const auto& base = scenarios[0];
+    std::cout << "\n==================================================\n"
+              << "BASELINE INDUSTRIAL SOLVE RESULTS\n"
+              << "==================================================\n"
+              << "Model:            " << base.scenario_name << " (21 vars, 22 constrs, 81 nnz)\n"
+              << "Solver:           Kavach-Opt MILP Branch-and-Bound\n"
+              << "Status:           " << kavach::core::to_string(base.status) << "\n"
+              << "Verification:     "
+              << (base.verified_optimal ? "VERIFIED_OPTIMAL (Certified by MILPVerifier)"
+                                        : "UNVERIFIED")
+              << "\n"
+              << "Net Margin:       $" << std::fixed << std::setprecision(2) << base.objective
+              << " k/day\n"
+              << "LP Bound:         $" << base.lp_relaxation_objective << " k/day\n"
+              << "Optimality Gap:   " << (base.optimality_gap * 100.0) << "%\n"
+              << "Nodes Explored:   " << base.nodes_explored << "\n"
+              << "Runtime:          " << std::setprecision(4) << base.solve_time_seconds << " s\n"
+              << "Mass Balance:     Max residual = " << base.mass_balance.max_absolute_residual
+              << " (" << (base.mass_balance.passed ? "PASSED" : "FAILED") << ")\n"
+              << "==================================================\n"
+              << "OPERATIONAL DECISIONS (Units & Blends)\n"
+              << "==================================================\n";
+
+    for (const auto& u : base.unit_decisions) {
+        std::cout << "  - " << u.operational_summary << "\n";
+    }
+
+    std::cout << "\nFinished Products:\n";
+    for (const auto& q : base.product_qualities) {
+        std::cout << "  - " << q.product_name << ": " << std::fixed << std::setprecision(1)
+                  << q.production_kbpd << " kbpd (Sulfur: " << std::setprecision(2)
+                  << q.calculated_sulfur_wt_pct << " wt%, Density: " << std::setprecision(1)
+                  << q.calculated_density_kg_m3 << " kg/m3)\n";
+    }
+
+    std::cout << "\nEconomic Summary:\n"
+              << "  - Gross Revenue:  $" << std::fixed << std::setprecision(2)
+              << base.economics.gross_revenue_k_usd << " k/day\n"
+              << "  - Feedstock Cost: -$" << base.economics.crude_purchase_cost_k_usd << " k/day\n"
+              << "  - Unit Op Cost:   -$"
+              << (base.economics.unit_variable_cost_k_usd + base.economics.unit_fixed_cost_k_usd)
+              << " k/day\n"
+              << "  - Net Profit:     $" << base.economics.net_profit_k_usd << " k/day\n\n"
+              << "Artifacts generated:\n"
+              << "  - " << output_dir << "/baseline.json\n"
+              << "  - " << output_dir << "/scenarios.json\n"
+              << "  - " << output_dir << "/comparison.json\n"
+              << "  - " << report_path << "\n"
+              << "==================================================\n";
+
+    return 0;
+}
+
 int handle_solve(const std::vector<std::string_view>& args) {
     if (args.size() < 2) {
         std::cerr << "Usage: kavach-opt solve <model.mps|.lp> [options]\n";
@@ -208,6 +296,17 @@ int handle_solve(const std::vector<std::string_view>& args) {
     }
     std::string file_path = std::string(args[1]);
     try {
+        if (file_path.find("mrpl") != std::string::npos) {
+            std::cout << "========================================================================="
+                         "=====\n"
+                      << "MRPL-STYLE REFINERY OPTIMIZATION INDUSTRIAL CASE STUDY\n"
+                      << "========================================================================="
+                         "=====\n"
+                      << kavach::case_study::mrpl::SYNTHETIC_DATA_DISCLOSURE << "\n"
+                      << "========================================================================="
+                         "=====\n\n";
+        }
+
         auto model = kavach::io::parse_model(file_path);
         std::cout << "Loaded model '" << model->name() << "': " << model->num_variables()
                   << " vars, " << model->num_constraints() << " constrs, " << model->num_nonzeros()
@@ -230,6 +329,48 @@ int handle_solve(const std::vector<std::string_view>& args) {
                       << "Best Bound: " << sol.best_bound << "\n"
                       << "Optimality Gap: " << sol.optimality_gap << "\n"
                       << "Nodes Explored: " << sol.telemetry.nodes_explored << "\n";
+
+            if (sol.is_optimal() && !sol.incumbent_solution.empty()) {
+                kavach::verification::MILPVerifier verifier;
+                auto vrep = verifier.verify(*model, sol.incumbent_solution, sol.best_bound,
+                                            sol.best_objective, sol.status,
+                                            kavach::core::SolverTolerances(), sol.optimality_gap);
+                std::cout << "Verification: "
+                          << (vrep.fully_verified() ? "VERIFIED_OPTIMAL (Certified by MILPVerifier)"
+                                                    : "UNVERIFIED")
+                          << "\n";
+
+                if (file_path.find("mrpl") != std::string::npos) {
+                    kavach::case_study::mrpl::MRPLCaseStudyRunner runner;
+                    auto breakdown = runner.solve_and_analyze(
+                        kavach::case_study::mrpl::MRPLParameters::default_parameters(), "baseline",
+                        false);
+                    std::cout << "\nOperational Decisions:\n";
+                    for (const auto& u : breakdown.unit_decisions) {
+                        std::cout << "  - " << u.operational_summary << "\n";
+                    }
+                    std::cout << "\nFinished Products:\n";
+                    for (const auto& q : breakdown.product_qualities) {
+                        std::cout << "  - " << q.product_name << ": " << std::fixed
+                                  << std::setprecision(1) << q.production_kbpd
+                                  << " kbpd (Sulfur: " << std::setprecision(2)
+                                  << q.calculated_sulfur_wt_pct
+                                  << " wt%, Density: " << std::setprecision(1)
+                                  << q.calculated_density_kg_m3 << " kg/m3)\n";
+                    }
+                    std::cout << "\nEconomic Summary:\n"
+                              << "  - Gross Revenue:  $" << std::fixed << std::setprecision(2)
+                              << breakdown.economics.gross_revenue_k_usd << " k/day\n"
+                              << "  - Feedstock Cost: -$"
+                              << breakdown.economics.crude_purchase_cost_k_usd << " k/day\n"
+                              << "  - Unit Op Cost:   -$"
+                              << (breakdown.economics.unit_variable_cost_k_usd +
+                                  breakdown.economics.unit_fixed_cost_k_usd)
+                              << " k/day\n"
+                              << "  - Net Profit:     $" << breakdown.economics.net_profit_k_usd
+                              << " k/day\n";
+                }
+            }
         } else {
             std::cout << "Solving LP with Revised Simplex...\n";
             kavach::algorithms::lp::RevisedSimplex solver;
@@ -267,6 +408,9 @@ int main(int argc, char* argv[]) {
         }
         if (command == "solve") {
             return handle_solve(args);
+        }
+        if (command == "mrpl") {
+            return handle_mrpl(args);
         }
         if (command == "verify" || command == "presolve") {
             std::cout << "Command '" << command

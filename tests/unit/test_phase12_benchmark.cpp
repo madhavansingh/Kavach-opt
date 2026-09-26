@@ -518,14 +518,27 @@ KAVACH_TEST(test_p_reference_solver_parsing) {
 // ============================================================================
 
 KAVACH_TEST(test_q_cli_benchmark_execution) {
-    // Run CLI benchmark on qp suite
-    int rc =
-        std::system("./kavach-opt benchmark --suite qp --output /tmp/cli_test_qp > /dev/null 2>&1");
-    if (rc != 0) {
-        rc = std::system(
-            "./build-release/kavach-opt benchmark --suite qp --output /tmp/cli_test_qp > /dev/null "
-            "2>&1");
+    std::string repo_root = ".";
+    for (const auto& p : {".", "..", "../.."}) {
+        if (std::filesystem::exists(std::filesystem::path(p) / "benchmarks" / "manifests" /
+                                    "qp.json")) {
+            repo_root = std::filesystem::canonical(p).string();
+            break;
+        }
     }
+
+    std::string bin_path = "./kavach-opt";
+    for (const auto& b : {"./kavach-opt", "./build-release/kavach-opt", "../kavach-opt",
+                          "../build-release/kavach-opt"}) {
+        if (std::filesystem::exists(b)) {
+            bin_path = std::filesystem::canonical(b).string();
+            break;
+        }
+    }
+
+    std::string cmd = "cd \"" + repo_root + "\" && \"" + bin_path +
+                      "\" benchmark --suite qp --output /tmp/cli_test_qp > /dev/null 2>&1";
+    int rc = std::system(cmd.c_str());
     KAVACH_ASSERT_EQUAL(rc, 0);
 
     KAVACH_ASSERT(std::filesystem::exists("/tmp/cli_test_qp/benchmark_results.json"));

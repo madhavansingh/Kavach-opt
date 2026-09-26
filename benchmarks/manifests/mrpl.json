@@ -1,0 +1,18 @@
+{
+  "suite": "mrpl",
+  "description": "MRPL-style refinery crude blending and unit-capacity allocation industrial case study",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "case_id": "mrpl-blending-capacity",
+      "instance_name": "mrpl_blending_capacity",
+      "instance_path": "examples/mrpl/mrpl_blending_capacity.lp",
+      "problem_type": "MILP",
+      "source": "Synthetic Industrial Case Study",
+      "tags": ["industrial", "refinery", "blending", "capacity_allocation", "milp"],
+      "timeout_seconds": 60.0,
+      "reference_status": "OPTIMAL",
+      "seed": 42
+    }
+  ]
+}

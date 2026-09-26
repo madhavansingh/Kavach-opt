@@ -126,6 +126,7 @@ add_library(kavach_core
     src/benchmark/benchmark_io.cpp
     src/benchmark/benchmark_runner.cpp
     src/benchmark/benchmark_report.cpp
+    src/case_study/mrpl/mrpl_model.cpp
 )
 
 if(KAVACH_ENABLE_CUDA)

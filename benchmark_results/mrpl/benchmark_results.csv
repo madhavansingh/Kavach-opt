@@ -1,0 +1,2 @@
+case_id,instance,suite,problem_type,status,verified_status,objective,reference_objective,rel_error,total_time_s,solve_time_s,iterations,nodes,primal_residual,dual_residual,kkt_residual,ref_status,ref_objective,ref_time_s
+mrpl-blending-capacity,mrpl_blending_capacity,mrpl,MILP,OPTIMAL,VERIFIED_OPTIMAL,5445.90909091,,,0.005024,0.002903,,5,3.3107e-14,,,,,
