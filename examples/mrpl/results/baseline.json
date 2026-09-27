@@ -28,7 +28,7 @@
     "y_U3 = 0.3182"
   ],
   "lp_relaxation_objective": 5891.3636363636397,
-  "lp_relaxation_time_seconds": 0.001087916,
+  "lp_relaxation_time_seconds": 0.0012953330000000001,
   "mass_balance_validation": {
     "crude_availability_residual": 1.4210854715202004e-14,
     "max_absolute_residual": 2.8421709430404007e-14,
@@ -82,11 +82,11 @@
   },
   "reference_highs": {
     "objective": 5445.9090909099996,
-    "runtime_seconds": 0.0041729999999999996,
+    "runtime_seconds": 0.0039779999999999998,
     "status": "OPTIMAL"
   },
   "scenario": "baseline",
-  "solve_time_seconds": 0.005446083,
+  "solve_time_seconds": 0.005189333,
   "solver_status": "OPTIMAL",
   "unit_decisions": [
     {
