@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <limits>
 
 namespace kavach::algorithms::lp {
@@ -456,6 +457,8 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
             if (basis.update_chain_length() > 0) {
                 const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
                 const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+                std::cout << "[PHASE2 OPT CHECK] p_res=" << p_res << ", d_res=" << d_res
+                          << ", chain=" << basis.update_chain_length() << std::endl;
                 if (p_res > 1e-11 || d_res > 1e-11) {
                     if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
                                          "PHASE2_OPTIMALITY_VERIFICATION")) {
