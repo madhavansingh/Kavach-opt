@@ -5,7 +5,7 @@
 **Language Standard:** ISO/IEC 14882:2020 (C++20)  
 **Supported Problem Classes:** Linear Programming (LP), Mixed-Integer Linear Programming (MILP), Convex Quadratic Programming (Convex QP), Convex Mixed-Integer Quadratic Programming (Convex MIQP)  
 **Verification Layer:** Air-Gapped, Zero-Trust Independent Mathematical Verifier  
-**Authoritative Verification Suite:** 387 / 387 Unit & Integration Tests Passing (100% Deterministic)  
+**Authoritative Verification Suite:** 412 / 412 Unit & Integration Tests Passing (100% Deterministic)  
 **Numerical Precision:** IEEE-754 FP64 (Double Precision, $\varepsilon_{\text{mach}} \approx 2.2204 \times 10^{-16}$)  
 **Hardware Engine:** Multicore CPU Execution Pool & Scoped FP64 CUDA Acceleration (7 Registered Sparse & BLAS Kernels)  
 
@@ -998,7 +998,7 @@ Upon completing execution, the sovereign verifier produces a cryptographic-grade
       "absolute_difference": 0.0
     }
   },
-  "authoritative_test_suite_status": "387/387 PASSED"
+  "authoritative_test_suite_status": "412/412 PASSED"
 }
 ```
 

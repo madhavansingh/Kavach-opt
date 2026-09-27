@@ -47,7 +47,7 @@ flowchart TD
 
 ### 2.3. Explicitly Out of Scope (Future Work)
 - **GPU Sparse LU Factorization**: LU factorization with dynamic Markowitz fill-in pivoting is inherently irregular and remains on the CPU.
-- **GPU Simplex Basis Inversion**: Basis updates via Forrest-Tomlin or eta-matrices are sequential and execute on the CPU.
+- **GPU Simplex Basis Inversion**: Basis updates via sparse eta-matrices are sequential and execute on the CPU.
 - **GPU Branch-and-Bound**: Tree search and node queue management execute on the CPU.
 
 ---

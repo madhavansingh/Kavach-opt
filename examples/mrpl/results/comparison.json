@@ -2,37 +2,47 @@
   "note": "Kavach-Opt vs Reference Solver Side-by-Side Comparison",
   "runs": [
     {
-      "highs_status": "UNAVAILABLE",
+      "highs_objective": 5445.9090909099996,
+      "highs_runtime_sec": 0.0041729999999999996,
+      "highs_status": "OPTIMAL",
       "kavach_objective": 5445.9090909090964,
-      "kavach_runtime_sec": 0.0018309999999999999,
+      "kavach_runtime_sec": 0.005446083,
       "kavach_status": "OPTIMAL",
       "scenario": "baseline"
     },
     {
-      "highs_status": "UNAVAILABLE",
-      "kavach_objective": 3750,
-      "kavach_runtime_sec": 0.002039875,
+      "highs_objective": 3750,
+      "highs_runtime_sec": 0.0047790000000000003,
+      "highs_status": "OPTIMAL",
+      "kavach_objective": 3750.0000000000018,
+      "kavach_runtime_sec": 0.0075272079999999996,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_a_reduced_crude"
     },
     {
-      "highs_status": "UNAVAILABLE",
-      "kavach_objective": 4975,
-      "kavach_runtime_sec": 0.001641792,
+      "highs_objective": 4975,
+      "highs_runtime_sec": 0.0033800000000000002,
+      "highs_status": "OPTIMAL",
+      "kavach_objective": 4975.0000000000018,
+      "kavach_runtime_sec": 0.0044272909999999999,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_b_tight_quality"
     },
     {
-      "highs_status": "UNAVAILABLE",
-      "kavach_objective": 5445.9090909090883,
-      "kavach_runtime_sec": 0.00150625,
+      "highs_objective": 5445.9090909099996,
+      "highs_runtime_sec": 0.0039899999999999996,
+      "highs_status": "OPTIMAL",
+      "kavach_objective": 5445.9090909090955,
+      "kavach_runtime_sec": 0.0051410420000000002,
       "kavach_status": "OPTIMAL",
       "scenario": "scenario_c_reduced_capacity"
     },
     {
-      "highs_status": "UNAVAILABLE",
+      "highs_objective": null,
+      "highs_runtime_sec": 0.00052099999999999998,
+      "highs_status": "INFEASIBLE",
       "kavach_objective": 0,
-      "kavach_runtime_sec": 8.0830000000000004e-06,
+      "kavach_runtime_sec": 8.3499999999999997e-05,
       "kavach_status": "INFEASIBLE",
       "scenario": "scenario_d_infeasible"
     }

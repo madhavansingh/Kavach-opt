@@ -5,7 +5,7 @@
 **Language Standard:** ISO/IEC 14882:2020 (C++20)  
 **Supported Problem Classes:** Linear Programming (LP), Mixed-Integer Linear Programming (MILP), Convex Quadratic Programming (Convex QP), Convex Mixed-Integer Quadratic Programming (Convex MIQP)  
 **Verification Layer:** Air-Gapped, Zero-Trust Independent Mathematical Verifier (`src/verification/`)  
-**Authoritative Verification Suite:** 387 / 387 Unit & Integration Tests Passing (100% Deterministic)  
+**Authoritative Verification Suite:** 412 / 412 Unit & Integration Tests Passing (100% Deterministic)  
 **Evaluation Platform:** Apple Silicon ARM64 (macOS Darwin 27.0.0, 8 Logical Cores)  
 **Compiler Standard:** AppleClang 21.0.0 (`-O3 -march=native -std=c++20`)  
 **Deterministic Random Seed:** 42  
@@ -633,7 +633,7 @@ flowchart TD
   "platform": "Darwin 27.0.0 (arm64)",
   "hardware_concurrency": 8,
   "timestamp_utc": "2026-09-26T08:28:36Z",
-  "authoritative_test_suite_status": "387/387 PASSED",
+  "authoritative_test_suite_status": "412/412 PASSED",
   "suites_evaluated": ["netlib", "miplib_subset", "qp", "mrpl"],
   "summary": {
     "total_attempted": 23,
@@ -678,7 +678,7 @@ All benchmarks in this report are 100% reproducible from a fresh clone using CMa
 cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release --parallel
 
-# 2. Run Authoritative Test Suite (387 Tests)
+# 2. Run Authoritative Test Suite (412 Tests)
 ./build-release/tests/kavach_unit_tests
 
 # 3. Execute Netlib LP Benchmark Suite
@@ -710,24 +710,23 @@ cmake --build build-release --parallel
 
 ---
 
-## 16. Authoritative Unit & Integration Test Suite Audit (387 / 387 Tests)
+## 16. Authoritative Unit & Integration Test Suite Audit (412 / 412 Tests)
 
 The core reliability of Kavach-Opt is anchored in an exhaustive 19-suite test framework executed via CTest (`tests/unit/`). Every single test has been executed and confirmed green in both Release and AddressSanitizer/UndefinedBehaviorSanitizer builds:
 
 ```mermaid
 flowchart TD
-    subgraph "19 Test Suites (387 Tests Total)"
-        TS1["Model & Parsing Suites<br/>(test_canonical_model, test_mps_parser, test_lp_parser)"]
-        TS2["Sparse Numerics Suites<br/>(test_sparse_matrix, test_sparse_lu, test_scaling)"]
-        TS3["Presolve Suite<br/>(test_presolve)"]
-        TS4["Linear Programming Suites<br/>(test_revised_simplex, test_dual_simplex)"]
-        TS5["Mixed-Integer Suites<br/>(test_branch_and_bound, test_cutting_planes, test_branching_search)"]
-        TS6["Quadratic Suites<br/>(test_qp_active_set, test_convex_miqp)"]
-        TS7["Verification Suites<br/>(test_phase6_verification, test_final_hardening)"]
-        TS8["Hardware & Execution Suites<br/>(test_cpu_parallel, test_cuda_backend, test_strategy)"]
-        TS9["Industrial Case Study Suite<br/>(test_mrpl_case_study)"]
+    subgraph "19 Test Suites (412 Tests Total)"
+        TS1["Model & Parsing Suites<br/>(test_phase0_foundation, test_phase1_canonical_model, test_phase2_parser)"]
+        TS2["Sparse Numerics Suites<br/>(test_phase3_numerics, test_presolve)"]
+        TS3["Linear Programming Suites<br/>(test_phase5_lp, test_phase8_dual_simplex)"]
+        TS4["Mixed-Integer Suites<br/>(test_phase7_milp, test_cutting_planes, test_advanced_search)"]
+        TS5["Quadratic Suites<br/>(test_phase9_qp, test_miqp)"]
+        TS6["Verification Suites<br/>(test_phase6_verification, test_final_hardening)"]
+        TS7["Hardware & Execution Suites<br/>(test_phase10_cpu_parallel, test_phase11_cuda, test_phase14_strategy)"]
+        TS8["Industrial & Benchmark Suites<br/>(test_phase12_benchmark, test_phase13_mrpl)"]
     end
-    TS1 --> PASS["Authoritative Result: 387 / 387 Passing (0 Failures)"]
+    TS1 --> PASS["Authoritative Result: 412 / 412 Passing (0 Failures)"]
     TS2 --> PASS
     TS3 --> PASS
     TS4 --> PASS
@@ -735,33 +734,32 @@ flowchart TD
     TS6 --> PASS
     TS7 --> PASS
     TS8 --> PASS
-    TS9 --> PASS
 ```
 
 ### 16.1 Test Suite Breakdown Table
 
 | Test Suite Identifier | Source File | Tests | Target Subsystem | Key Verification Focus |
 | :--- | :--- | :--- | :--- | :--- |
-| **TS-01** | `test_canonical_model.cpp` | 14 | Model Layer | Memory invariants, bound validation, term deduplication |
-| **TS-02** | `test_mps_parser.cpp` | 22 | Parser Layer | Fixed/free format, RANGES, BOUNDS, MARKER records |
-| **TS-03** | `test_lp_parser.cpp` | 18 | Parser Layer | Grammar lexer, quadratic objective syntax, bound tokens |
-| **TS-04** | `test_sparse_matrix.cpp` | 24 | Sparse Numerics | CSR/CSC construction, transpose SpMV, sparse dot products |
-| **TS-05** | `test_sparse_lu.cpp` | 28 | Linear Algebra | Markowitz threshold pivoting, Schur complement, iterative refinement |
-| **TS-06** | `test_scaling.cpp` | 16 | Numerics | Ruiz equilibration convergence, $\ell_\infty$-norm scaling, unscaling |
-| **TS-07** | `test_presolve.cpp` | 26 | Presolve Engine | Empty rows/cols, fixed variables, singleton bound tightening |
-| **TS-08** | `test_revised_simplex.cpp` | 32 | LP Solver | Phase I/II, Bland anti-cycling, $\eta$-vector PFI updates |
-| **TS-09** | `test_dual_simplex.cpp` | 20 | Dual Simplex | Dual ratio tests, warm-starting, dual unbounded ray |
-| **TS-10** | `test_branch_and_bound.cpp` | 24 | MILP Engine | LP relaxation, priority queue, incumbent bounding |
-| **TS-11** | `test_cutting_planes.cpp` | 18 | Polyhedral Cuts | GMI cut separation, MIR subadditivity, cut pool purging |
-| **TS-12** | `test_branching_search.cpp` | 20 | MILP Search | Pseudocosts, strong branching probes, reliability branching |
-| **TS-13** | `test_qp_active_set.cpp` | 22 | Convex QP | Working set transitions, KKT system solves, LICQ filtering |
-| **TS-14** | `test_convex_miqp.cpp` | 25 | Convex MIQP | Continuous QP relaxations, integer branching, PSD audit |
-| **TS-15** | `test_phase6_verification.cpp` | 18 | Verifier | Adversarial fault injection on LP, MILP, and QP |
-| **TS-16** | `test_cpu_parallel.cpp` | 17 | CPU Multicore | Thread pool partitioning, false sharing, barrier sync |
-| **TS-17** | `test_cuda_backend.cpp` | 26 | CUDA Accelerator | 7 FP64 kernels, device upload, automatic CPU fallback |
-| **TS-18** | `test_strategy.cpp` | 18 | Strategy Engine | Rule verification (R001–R018), JSON explainability |
-| **TS-19** | `test_final_hardening.cpp` | 19 | Hardening Pass | Fuzzing, numerical edge cases, status semantics, resource limits |
-| **TOTAL** | **19 Suites** | **387** | **Entire System** | **100.0% Pass Rate Across All Targets** |
+| **TS-01** | `test_phase0_foundation.cpp` | 6 | Foundation Types | Core status enums, precision, tolerances |
+| **TS-02** | `test_phase1_canonical_model.cpp` | 12 | Model Layer | Memory invariants, bound validation, term deduplication |
+| **TS-03** | `test_phase2_parser.cpp` | 24 | Parser Layer | Fixed/free format MPS, LP tokenizer, Netlib grammars |
+| **TS-04** | `test_phase3_numerics.cpp` | 28 | Sparse Numerics | CSR/CSC construction, transpose SpMV, SparseLU fact |
+| **TS-05** | `test_presolve.cpp` | 24 | Presolve Engine | Empty rows/cols, fixed variables, singleton bound tightening |
+| **TS-06** | `test_phase5_lp.cpp` | 25 | LP Solver | Phase I/II, Bland anti-cycling, $\eta$-vector PFI updates |
+| **TS-07** | `test_phase6_verification.cpp` | 31 | Verifier | Adversarial fault injection on LP, MILP, and QP |
+| **TS-08** | `test_phase7_milp.cpp` | 37 | MILP Engine | LP relaxation, priority queue, incumbent bounding |
+| **TS-09** | `test_phase8_dual_simplex.cpp` | 22 | Dual Simplex | Dual ratio tests, warm-starting, dual unbounded ray |
+| **TS-10** | `test_phase9_qp.cpp` | 33 | Convex QP | Working set transitions, KKT system solves, LICQ filtering |
+| **TS-11** | `test_cutting_planes.cpp` | 8 | Polyhedral Cuts | GMI cut separation, MIR subadditivity, cut pool purging |
+| **TS-12** | `test_advanced_search.cpp` | 9 | MILP Search | Pseudocosts, strong branching probes, reliability branching |
+| **TS-13** | `test_miqp.cpp` | 13 | Convex MIQP | Continuous QP relaxations, integer branching, PSD audit |
+| **TS-14** | `test_phase10_cpu_parallel.cpp` | 28 | CPU Multicore | Thread pool partitioning, false sharing, barrier sync |
+| **TS-15** | `test_phase11_cuda.cpp` | 33 | CUDA Accelerator | 7 FP64 kernels, device upload, automatic CPU fallback |
+| **TS-16** | `test_phase12_benchmark.cpp` | 21 | Benchmark Harness | Benchmark runner, CSV/JSON serialization, HiGHS adapter |
+| **TS-17** | `test_phase13_mrpl.cpp` | 20 | Industrial Case Study | Refinery crude selection, quality blending, scenario suite |
+| **TS-18** | `test_phase14_strategy.cpp` | 26 | Strategy Engine | Rule verification (R001–R018), JSON explainability |
+| **TS-19** | `test_final_hardening.cpp` | 12 | Hardening Pass | Fuzzing, numerical edge cases, status semantics, resource limits |
+| **TOTAL** | **19 Suites** | **412** | **Entire System** | **100.0% Pass Rate Across All Targets** |
 
 ---
 
@@ -1154,14 +1152,14 @@ This benchmark evaluation certifies the empirical performance of Kavach-Opt v0.1
 2. **Benchmark Integrity:** All timings represent monotonic wall-clock measurements with zero synthetic numbers.
 3. **Reference Equivalence:** Maximum relative deviation against public Netlib literature values is less than $6.40 \\times 10^{-10}$.
 4. **Dependency Sovereignty:** Zero third-party optimization engine libraries were linked or invoked during solving.
-5. **Authoritative Unit Test Suite:** All 387 / 387 unit tests are green and confirmed deterministic.
+5. **Authoritative Unit Test Suite:** All 412 / 412 unit tests are green and confirmed deterministic.
 
 ```
 ========================================================================================
                       KAVACH-OPT EMPIRICAL BENCHMARK CERTIFICATION
 ========================================================================================
   Software Version:           Kavach-Opt 0.1.0 (ISO C++20)
-  Authoritative Unit Tests:   387 / 387 PASSED (100.0%)
+  Authoritative Unit Tests:   412 / 412 PASSED (100.0%)
   Problem Classes Solved:     LP, MILP, Convex QP, Convex MIQP
   Netlib LP Corpus:           13 / 13 Certified VERIFIED_OPTIMAL
   MIPLIB Subset:              3 / 3 Verified (Including Infeasibility Proof)

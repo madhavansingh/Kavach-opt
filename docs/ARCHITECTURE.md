@@ -5,7 +5,7 @@
 **Language Standard:** ISO/IEC 14882:2020 (C++20)  
 **Supported Problem Classes:** Linear Programming (LP), Mixed-Integer Linear Programming (MILP), Convex Quadratic Programming (Convex QP), Convex Mixed-Integer Quadratic Programming (Convex MIQP)  
 **Verification Layer:** Air-Gapped, Zero-Trust Independent Mathematical Verifier  
-**Authoritative Verification Suite:** 387 / 387 Unit & Integration Tests Passing (100% Deterministic)  
+**Authoritative Verification Suite:** 412 / 412 Unit & Integration Tests Passing (100% Deterministic)  
 **Hardware Engine:** Multicore CPU Execution Pool & Scoped FP64 CUDA Acceleration (7 Registered Sparse & BLAS Kernels)  
 **Dependency Sovereignty:** Zero Forbidden Optimization-Engine Dependencies in the Solving Path  
 
@@ -72,7 +72,7 @@ flowchart TD
 - **Sovereign Implementation:** The core mathematical algorithms (LU factorization, Revised Simplex, Dual Simplex, Branch-and-Bound, Cutting Planes, Active-Set QP, and MIQP) contain zero third-party optimization library dependencies. Standard C++20 library and optional CUDA runtime are the sole runtime prerequisites.
 - **Air-Gapped Verification:** The solver does not certify its own solutions. Every output is independently evaluated by an air-gapped mathematical verifier that reads the original immutable model directly from memory.
 - **CPU-First Numerics with Scoped CUDA Acceleration:** Algorithm orchestration and direct sparse linear algebra reside entirely on the CPU. A scoped, transfer-inclusive CUDA FP64 layer accelerates high-dimensional batched matrix-vector operations when hardware thresholds are met.
-- **Deterministic Reproducibility:** Every branch decision, pivot choice, cut generation pass, and strategy routing rule is 100% deterministic, guaranteeing bit-exact solution repeatability across identical hardware architectures.
+- **Deterministic Reproducibility:** Every branch decision, pivot choice, cut generation pass, and strategy routing rule is 100% deterministic, guaranteeing identical node counts, iteration counts, and mathematically equivalent solutions across identical hardware architectures.
 
 ---
 
@@ -1134,7 +1134,7 @@ private:
 ### 20.1 Build Targets
 The build system is governed by CMake 3.20+ with strict C++20 standard enforcement:
 - `kavach-opt`: Standalone CLI executable.
-- `kavach_unit_tests`: 387-test authoritative unit suite.
+- `kavach_unit_tests`: 412-test authoritative unit suite.
 - `kavach_api_example`: Demonstration program for the public C++ API.
 
 ### 20.2 Sanitizer Profiles
@@ -1146,7 +1146,7 @@ cmake --build build-debug
 ctest --test-dir build-debug --output-on-failure
 ```
 
-All 387 unit tests execute cleanly under ASan/UBSan with zero memory leaks, buffer overflows, or undefined behavior.
+All 412 unit tests execute cleanly under ASan/UBSan with zero memory leaks, buffer overflows, or undefined behavior.
 
 ### 20.3 Annotated Repository Layout
 
@@ -1189,7 +1189,7 @@ SIH26119/
 │   ├── benchmark/              # Benchmark runner and reference adapter
 │   └── case_study/mrpl/        # Industrial operations model generator
 ├── tests/
-│   └── unit/                   # 387 unit tests across 19 test suites
+│   └── unit/                   # 412 unit tests across 19 test suites
 ├── benchmarks/                 # Netlib, MIPLIB, and QP model files
 └── tools/                      # Validation scripts and dependency checkers
 ```

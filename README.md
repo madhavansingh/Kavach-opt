@@ -1,7 +1,7 @@
 # Kavach-Opt — Sovereign Mathematical Optimization Engine
 
 [![Build Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg?style=flat-square&logo=c%2B%2B)](https://isocpp.org/)
-[![Test Suite](https://img.shields.io/badge/Unit%20Tests-387%2F387%20Passed-success.svg?style=flat-square)](tests/)
+[![Test Suite](https://img.shields.io/badge/Unit%20Tests-412%2F412%20Passed-success.svg?style=flat-square)](tests/)
 [![Verification](https://img.shields.io/badge/Verification-Air--Gapped%20Zero--Trust-green.svg?style=flat-square)](docs/VERIFICATION.md)
 [![Dependencies](https://img.shields.io/badge/Dependencies-Zero%20Foreign%20Solvers-brightgreen.svg?style=flat-square)](tools/check_dependencies.py)
 [![Precision](https://img.shields.io/badge/Precision-IEEE--754%20FP64-blueviolet.svg?style=flat-square)](docs/MATHEMATICS.md)
@@ -39,8 +39,8 @@
 26. [Comparative Analysis Against Reference Solvers (HiGHS Out-of-Process)](#26-comparative-analysis-against-reference-solvers-highs-out-of-process)
 27. [Comprehensive Command-Line Interface (`kavach-opt`) Reference](#27-comprehensive-command-line-interface-kavach-opt-reference)
 28. [Public C++ API Reference (`include/kavach/solver.hpp`)](#28-public-c-api-reference-includekavachsolverhpp)
-29. [Build Configuration, Prerequisites & Toolchains](#29-build-configuration-prerequisites--toolchains)
-30. [Complete 19-Suite Test Framework & Sanitizer Verification (387 Tests)](#30-complete-19-suite-test-framework--sanitizer-verification-387-tests)
+29: [Build Configuration, Prerequisites & Toolchains](#29-build-configuration-prerequisites--toolchains)
+30. [Complete 19-Suite Test Framework & Sanitizer Verification (412 Tests)](#30-complete-19-suite-test-framework--sanitizer-verification-412-tests)
 31. [Known Scope, Boundaries & Engineering Limitations](#31-known-scope-boundaries--engineering-limitations)
 32. [Comprehensive Mathematical Notation Guide](#32-comprehensive-mathematical-notation-guide)
 33. [Industrial Operations FAQ & Deployment Guide](#33-industrial-operations-faq--deployment-guide)
@@ -1770,7 +1770,7 @@ void solve_cardinality_constrained_miqp() {
 cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release --parallel
 
-# Execute Authoritative Unit Test Suite (387 Tests)
+# Execute Authoritative Unit Test Suite (412 Tests)
 ./build-release/tests/kavach_unit_tests
 
 # Execute AddressSanitizer Build
@@ -1789,7 +1789,7 @@ ctest --test-dir build-asan --output-on-failure
 | `CMAKE_BUILD_TYPE` | `Release`, `Debug`, `RelWithDebInfo` | `Release` | Controls optimization level (`-O3` vs `-O0 -g`) |
 | `KAVACH_ENABLE_CUDA` | `ON`, `OFF` | `OFF` | Enables NVIDIA NVCC compilation of 7 FP64 CUDA kernels |
 | `KAVACH_ENABLE_SANITIZERS` | `ON`, `OFF` | `OFF` | Compiles with AddressSanitizer and UndefinedBehaviorSanitizer (`-fsanitize=address,undefined`) |
-| `KAVACH_BUILD_TESTS` | `ON`, `OFF` | `ON` | Builds the 387-test unit and integration test suite executable |
+| `KAVACH_BUILD_TESTS` | `ON`, `OFF` | `ON` | Builds the 412-test unit and integration test suite executable |
 | `KAVACH_BUILD_BENCHMARKS` | `ON`, `OFF` | `ON` | Compiles automated Netlib, MIPLIB, and QP benchmark drivers |
 
 ```bash
@@ -1805,32 +1805,32 @@ ctest --test-dir build-sanitizers --output-on-failure
 
 ---
 
-## 30. Complete 19-Suite Test Framework & Sanitizer Verification (387 Tests)
+## 30. Complete 19-Suite Test Framework & Sanitizer Verification (412 Tests)
 
-Kavach-Opt is validated by an authoritative suite of **387 unit tests across 19 suites**:
+Kavach-Opt is validated by an authoritative suite of **412 unit tests across 19 suites**:
 
 | Suite ID | Source File | Test Count | Focus Subsystem | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **TS-01** | `test_canonical_model.cpp` | 14 | Model Validation & Bounds | 14 / 14 Passed |
-| **TS-02** | `test_mps_parser.cpp` | 22 | MPS Fixed & Free Tokenizer | 22 / 22 Passed |
-| **TS-03** | `test_lp_parser.cpp` | 18 | LP Grammar & Quadratic Syntax | 18 / 18 Passed |
-| **TS-04** | `test_sparse_matrix.cpp` | 24 | CSR/CSC SpMV & Matrix Algebra | 24 / 24 Passed |
-| **TS-05** | `test_sparse_lu.cpp` | 28 | SparseLU & Markowitz Pivoting | 28 / 28 Passed |
-| **TS-06** | `test_scaling.cpp` | 16 | Ruiz Equilibration & Conditioning | 16 / 16 Passed |
-| **TS-07** | `test_presolve.cpp` | 26 | 6-Pass Presolve & Reconstruction | 26 / 26 Passed |
-| **TS-08** | `test_revised_simplex.cpp` | 32 | Two-Phase Simplex & Bland Rule | 32 / 32 Passed |
-| **TS-09** | `test_dual_simplex.cpp` | 20 | Dual Simplex Warm Restarts | 20 / 20 Passed |
-| **TS-10** | `test_branch_and_bound.cpp`| 24 | MILP Node Queue & Incumbents | 24 / 24 Passed |
-| **TS-11** | `test_cutting_planes.cpp` | 18 | GMI & MIR Cut Separation | 18 / 18 Passed |
-| **TS-12** | `test_branching_search.cpp`| 20 | Reliability & Strong Branching | 20 / 20 Passed |
-| **TS-13** | `test_qp_active_set.cpp` | 22 | Primal Active-Set Convex QP | 22 / 22 Passed |
-| **TS-14** | `test_convex_miqp.cpp` | 25 | Convex MIQP & Continuous QPs | 25 / 25 Passed |
-| **TS-15** | `test_phase6_verification.cpp` | 18 | Adversarial Fault Injection | 18 / 18 Passed |
-| **TS-16** | `test_cpu_parallel.cpp` | 17 | Thread Pool Work Partitioning | 17 / 17 Passed |
-| **TS-17** | `test_cuda_backend.cpp` | 26 | 7 FP64 CUDA Kernels & Fallback | 26 / 26 Passed |
-| **TS-18** | `test_strategy.cpp` | 18 | Rules R001–R018 Verification | 18 / 18 Passed |
-| **TS-19** | `test_final_hardening.cpp` | 19 | Hardening & Resource Boundaries | 19 / 19 Passed |
-| **TOTAL** | **19 Test Suites** | **387** | **Authoritative Core Engine** | **387 / 387 PASSED (100.0%)** |
+| **TS-01** | `test_phase0_foundation.cpp` | 6 | Foundation Types & Tolerances | 6 / 6 Passed |
+| **TS-02** | `test_phase1_canonical_model.cpp` | 12 | Model Validation & Bounds | 12 / 12 Passed |
+| **TS-03** | `test_phase2_parser.cpp` | 24 | MPS/LP Parsing & Netlib Grammars | 24 / 24 Passed |
+| **TS-04** | `test_phase3_numerics.cpp` | 28 | CSR/CSC SpMV & SparseLU Fact | 28 / 28 Passed |
+| **TS-05** | `test_presolve.cpp` | 24 | 6-Pass Presolve & Reconstruction | 24 / 24 Passed |
+| **TS-06** | `test_phase5_lp.cpp` | 25 | Two-Phase Revised Simplex & Eta Updates | 25 / 25 Passed |
+| **TS-07** | `test_phase6_verification.cpp` | 31 | Air-Gapped Zero-Trust Verifiers | 31 / 31 Passed |
+| **TS-08** | `test_phase7_milp.cpp` | 37 | MILP Branch-and-Bound & Heuristics | 37 / 37 Passed |
+| **TS-09** | `test_phase8_dual_simplex.cpp` | 22 | Dual Simplex Warm Restarts | 22 / 22 Passed |
+| **TS-10** | `test_phase9_qp.cpp` | 33 | Convex Active-Set QP Engine | 33 / 33 Passed |
+| **TS-11** | `test_cutting_planes.cpp` | 8 | GMI & MIR Polyhedral Cuts | 8 / 8 Passed |
+| **TS-12** | `test_advanced_search.cpp` | 9 | Strong Branching & Pseudocosts | 9 / 9 Passed |
+| **TS-13** | `test_miqp.cpp` | 13 | Convex MIQP Branch-and-Bound | 13 / 13 Passed |
+| **TS-14** | `test_phase10_cpu_parallel.cpp` | 28 | Multicore SpMV & Thread Pool | 28 / 28 Passed |
+| **TS-15** | `test_phase11_cuda.cpp` | 33 | 7 FP64 CUDA Kernels & Fallback | 33 / 33 Passed |
+| **TS-16** | `test_phase12_benchmark.cpp` | 21 | Benchmark Harness & HiGHS Adapter | 21 / 21 Passed |
+| **TS-17** | `test_phase13_mrpl.cpp` | 20 | Industrial Refinery Case Study | 20 / 20 Passed |
+| **TS-18** | `test_phase14_strategy.cpp` | 26 | Rules R001–R018 & Adaptive Engine | 26 / 26 Passed |
+| **TS-19** | `test_final_hardening.cpp` | 12 | Hardening & Resource Boundaries | 12 / 12 Passed |
+| **TOTAL** | **19 Test Suites** | **412** | **Authoritative Core Engine** | **412 / 412 PASSED (100.0%)** |
 
 ---
 
@@ -1953,7 +1953,7 @@ Evaluates solver status semantics, parser fuzzing with corrupt characters, resou
 ## 33. Industrial Operations FAQ & Deployment Guide
 
 ### Q1: How does Kavach-Opt guarantee zero memory leaks in continuous 24/7 loops?
-Kavach-Opt enforces strict RAII (Resource Acquisition Is Initialization) throughout its memory layer. Iterative algorithms (`RevisedSimplexSolver`, `ActiveSetQpSolver`) pre-allocate workspace buffers (`activities`, `FTRAN vectors`, `dual direction buffers`) during initialization and reuse them across iterations. The entire 387-test suite runs cleanly under AddressSanitizer and LeakSanitizer with zero memory leaks.
+Kavach-Opt enforces strict RAII (Resource Acquisition Is Initialization) throughout its memory layer. Iterative algorithms (`RevisedSimplexSolver`, `ActiveSetQpSolver`) pre-allocate workspace buffers (`activities`, `FTRAN vectors`, `dual direction buffers`) during initialization and reuse them across iterations. The entire 412-test suite runs cleanly under AddressSanitizer and LeakSanitizer with zero memory leaks.
 
 ### Q2: How does the independent verifier handle floating-point tolerances?
 The independent verifier operates with conservative tolerances: $\epsilon_{\text{primal}} = 10^{-7}$, $\epsilon_{\text{dual}} = 10^{-7}$, $\epsilon_{\text{int}} = 10^{-6}$, and $\epsilon_{\text{comp}} = 10^{-7}$. These tolerances are at least 9 orders of magnitude larger than IEEE-754 double precision machine epsilon ($\approx 2.22 \times 10^{-16}$), ensuring that minor floating-point cancellation is tolerated while true constraint violations are intercepted.
@@ -1997,7 +1997,7 @@ Kavach-Opt is licensed under the permissive MIT Open Source License. See [LICENS
 ========================================================================================
              FINAL STATUS: KAVACH-OPT SOVEREIGN ENGINE OPERATIONAL
 ========================================================================================
-  387 / 387 UNIT TESTS PASSED  |  13 / 13 NETLIB LP OPTIMAL  |  ZERO FOREIGN SOLVER DEPS
+  412 / 412 UNIT TESTS PASSED  |  13 / 13 NETLIB LP OPTIMAL  |  ZERO FOREIGN SOLVER DEPS
 ========================================================================================
 ```
 
@@ -2103,7 +2103,7 @@ Every commit merged into the Kavach-Opt core repository must pass three strict, 
 ```mermaid
 flowchart LR
     A["Pull Request / Commit"] --> B["Gate 1: Dependency Audit<br/>(tools/check_dependencies.py)<br/>Assert 0 Foreign Solver Deps"]
-    B --> C["Gate 2: Unit Test Suite<br/>(ctest 387/387 Green)<br/>Assert 100% Pass Rate"]
+    B --> C["Gate 2: Unit Test Suite<br/>(ctest 412/412 Green)<br/>Assert 100% Pass Rate"]
     C --> D["Gate 3: Memory Safety<br/>AddressSanitizer + LeakSanitizer<br/>Assert 0 Leaks, 0 UB"]
     D --> E["Merge Approved into Mainline"]
 ```

@@ -5,7 +5,7 @@
 **Language Standard:** ISO/IEC 14882:2020 (C++20)  
 **Supported Problem Classes:** Linear Programming (LP), Mixed-Integer Linear Programming (MILP), Convex Quadratic Programming (Convex QP), Convex Mixed-Integer Quadratic Programming (Convex MIQP)  
 **Verification Layer:** Air-Gapped, Zero-Trust Independent Mathematical Verifier (`src/verification/`)  
-**Authoritative Verification Suite:** 387 / 387 Unit & Integration Tests Passing (100% Deterministic)  
+**Authoritative Verification Suite:** 412 / 412 Unit & Integration Tests Passing (100% Deterministic)  
 **Numerical Precision:** IEEE-754 FP64 (Double Precision, $\varepsilon_{\text{mach}} \approx 2.2204 \times 10^{-16}$)  
 **Verification Complexity:** $O(\text{nnz})$ Linear Time, Single-Pass Matrix Operations  
 
@@ -723,7 +723,7 @@ flowchart TD
 ```
 
 ### 10.1 Empirical Validation Results
-Across the **387 / 387 authoritative test suite**, 100% of injected adversarial corruptions are detected and properly downgraded. Zero false positives or false negatives occur.
+Across the **412 / 412 authoritative test suite**, 100% of injected adversarial corruptions are detected and properly downgraded. Zero false positives or false negatives occur.
 
 ---
 
@@ -746,7 +746,7 @@ flowchart LR
         T9["test_hardening_resource_limits_and_interruption"]
         T10["test_hardening_parser_fuzz_malformed_inputs"]
     end
-    T3 --> PASS["All 387 Tests Certified 100% Green"]
+    T3 --> PASS["All 412 Tests Certified 100% Green"]
     T4 --> PASS
     T5 --> PASS
 ```
@@ -833,7 +833,7 @@ Upon verification completion, the verifier emits a comprehensive, machine-readab
     "integrality_tolerance": 1e-6,
     "complementary_tolerance": 1e-7
   },
-  "authoritative_test_suite_status": "387/387 PASSED"
+  "authoritative_test_suite_status": "412/412 PASSED"
 }
 ```
 
@@ -1230,7 +1230,7 @@ flowchart TD
 ```
 
 > **Design Principle**
-> Mathematical verification is an active physical safeguard. In industrial actuation, a mathematical error can lead to hardware damage or regulatory violations. Kavach-Opt provides the formal verification barrier that guarantees physical safety.
+> Mathematical verification is an active physical safeguard. In industrial actuation, a mathematical error can lead to hardware damage or regulatory violations. Kavach-Opt provides the independent mathematical verification barrier that guarantees physical safety.
 
 ### 10.4 Presolve Original-Model Certificate Verification Invariant
 When presolve is active, `LPVerifier::verify` always evaluates the reconstructed primal vector $x \in \mathbb{R}^{n_{\text{orig}}}$, reconstructed dual multiplier vector $y \in \mathbb{R}^{m_{\text{orig}}}$, and reconstructed reduced-cost vector $r \in \mathbb{R}^{n_{\text{orig}}}$ directly against the original unpresolved `CanonicalModel`. No dual or complementary slackness checks are bypassed on presolved models, and `LPVerifier::check_dual_feasibility` explicitly enforces $|r_j - (c_j - (A^T y)_j)| \le \epsilon_{\text{dual}}$ as well as exact vector dimensions (`x.size() == n_orig`, `y.size() == m_orig`, `rc.size() == n_orig`).

@@ -772,7 +772,7 @@ The canonical development and CI host for Kavach-Opt is Apple Silicon (macOS, ar
 - `CudaDevice::is_available()` returns `false` on all Apple Silicon Macs.
 - The strategy engine always selects `CPU_SEQUENTIAL` or `CPU_MULTICORE`.
 - CUDA compilation is disabled (`KAVACH_ENABLE_CUDA=OFF`, default).
-- All 387 unit tests and benchmark suites run exclusively on CPU backends.
+- All 412 unit tests and benchmark suites run exclusively on CPU backends.
 
 The CUDA backend code is verified syntactically by the CMake build system when `KAVACH_ENABLE_CUDA=ON` and cross-compiled with NVCC. Full runtime validation of the CUDA kernel requires an NVIDIA GPU test environment.
 

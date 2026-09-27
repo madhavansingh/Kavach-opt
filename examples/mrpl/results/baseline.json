@@ -2,17 +2,17 @@
   "best_bound": 5445.9090909090964,
   "blending_matrix_kbpd": {
     "A_to_P1": 117.89473684210527,
-    "A_to_P2": 2.1052631578947234,
+    "A_to_P2": 2.1052631578947349,
     "A_to_P3": 0,
     "B_to_P1": 0,
     "B_to_P2": 80,
     "B_to_P3": 0,
-    "C_to_P1": 22.105263157894743,
-    "C_to_P2": 16.076555023923436,
-    "C_to_P3": 44.999999999999986,
+    "C_to_P1": 22.10526315789474,
+    "C_to_P2": 16.076555023923444,
+    "C_to_P3": 45.000000000000007,
     "D_to_P1": 0,
     "D_to_P2": 0,
-    "D_to_P3": 45.000000000000007
+    "D_to_P3": 45.000000000000014
   },
   "data_status": "DATA STATUS:\nAll numeric values in this demonstration are illustrative/synthetic.\nThey are not proprietary MRPL operational data and must not be\ninterpreted as actual MRPL process parameters.",
   "economics": {
@@ -27,10 +27,10 @@
     "y_U2 = 0.7121",
     "y_U3 = 0.3182"
   ],
-  "lp_relaxation_objective": 5891.3636363636424,
-  "lp_relaxation_time_seconds": 0.00045358399999999999,
+  "lp_relaxation_objective": 5891.3636363636397,
+  "lp_relaxation_time_seconds": 0.001087916,
   "mass_balance_validation": {
-    "crude_availability_residual": 0,
+    "crude_availability_residual": 1.4210854715202004e-14,
     "max_absolute_residual": 2.8421709430404007e-14,
     "passed": true,
     "product_balance_residual": 2.8421709430404007e-14,
@@ -53,26 +53,26 @@
       "sulfur_margin_wt_pct": 1.1102230246251565e-16
     },
     {
-      "calculated_density_kg_m3": 853.45029239766063,
-      "calculated_sulfur_wt_pct": 1.2999999999999996,
+      "calculated_density_kg_m3": 853.45029239766075,
+      "calculated_sulfur_wt_pct": 1.2999999999999998,
       "density_limit_kg_m3": 865,
-      "density_margin_kg_m3": 11.549707602339367,
+      "density_margin_kg_m3": 11.549707602339254,
       "product": "P2 (High-Speed Diesel (HSD))",
       "production_kbpd": 98.181818181818187,
       "quality_satisfied": true,
       "sulfur_limit_wt_pct": 1.3,
-      "sulfur_margin_wt_pct": 4.4408920985006262e-16
+      "sulfur_margin_wt_pct": 2.2204460492503131e-16
     },
     {
-      "calculated_density_kg_m3": 892.49999999999989,
-      "calculated_sulfur_wt_pct": 3,
+      "calculated_density_kg_m3": 892.50000000000011,
+      "calculated_sulfur_wt_pct": 3.0000000000000004,
       "density_limit_kg_m3": 875,
-      "density_margin_kg_m3": 17.499999999999886,
+      "density_margin_kg_m3": 17.500000000000114,
       "product": "P3 (Heavy Fuel Oil (HFO))",
       "production_kbpd": 90,
       "quality_satisfied": true,
       "sulfur_limit_wt_pct": 3,
-      "sulfur_margin_wt_pct": 0
+      "sulfur_margin_wt_pct": -4.4408920985006262e-16
     }
   ],
   "production_kbpd": {
@@ -81,11 +81,12 @@
     "P3": 90
   },
   "reference_highs": {
-    "message": "HiGHS binary not found on host system",
-    "status": "UNAVAILABLE"
+    "objective": 5445.9090909099996,
+    "runtime_seconds": 0.0041729999999999996,
+    "status": "OPTIMAL"
   },
   "scenario": "baseline",
-  "solve_time_seconds": 0.0018309999999999999,
+  "solve_time_seconds": 0.005446083,
   "solver_status": "OPTIMAL",
   "unit_decisions": [
     {
@@ -100,17 +101,17 @@
       "description": "Vacuum Distillation & Conversion Unit (VDU/FCCU)",
       "is_active": true,
       "summary": "U2 ACTIVE: throughput 128.2 kbpd (71.2% load)",
-      "throughput_kbpd": 128.18181818181816,
+      "throughput_kbpd": 128.18181818181819,
       "unit": "U2",
-      "utilization_pct": 71.212121212121204
+      "utilization_pct": 71.212121212121218
     },
     {
       "description": "Hydrodesulfurization Unit (HDS)",
       "is_active": true,
       "summary": "U3 ACTIVE: throughput 38.2 kbpd (31.8% load)",
-      "throughput_kbpd": 38.18181818181818,
+      "throughput_kbpd": 38.181818181818187,
       "unit": "U3",
-      "utilization_pct": 31.818181818181817
+      "utilization_pct": 31.818181818181824
     }
   ],
   "verified_optimal": true

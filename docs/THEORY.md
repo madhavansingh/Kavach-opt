@@ -678,7 +678,7 @@ sequenceDiagram
     loop Dual Pivots (Few Iterations: typically < 5)
         Child->>Child: Select leaving variable x_i < 0 (Primal Infeasible)
         Child->>Child: Dual ratio test: select entering variable
-        Child->>Child: Update basis factors via Forrest-Tomlin
+        Child->>Child: Update basis factors via sparse Eta update
     end
     Child-->>Parent: New Dual Optimal Solution (Bounded in < 0.5 ms)
 ```
@@ -704,19 +704,19 @@ $$
 
 The entering non-basic variable $q$ attains this minimum. When multiple variables tie for the minimum ratio $\theta$, Bland's smallest-subscript rule breaks the tie deterministically, algebraically ruling out dual cycling.
 
-### 8.3 Basis Inverse Representation: PFI vs. Forrest-Tomlin Updating
+### 8.3 Basis Inverse Representation: Sparse Product Form of Inverse (Eta Updates)
 
-Repeatedly refactorizing the basis matrix $A_B = L U$ costs $O(m \cdot \text{nnz} + \text{fill})$ operations. During dual simplex iterations, replacing column $p$ with non-basic column $a_q$ produces a rank-one update:
+Repeatedly refactorizing the basis matrix $A_B = L U$ costs $O(m \cdot \text{nnz} + \text{fill})$ operations. During dual and primal simplex iterations, replacing column $p$ with non-basic column $a_q$ produces a rank-one update:
 
 $$
 A_{\bar{B}} = A_B + (a_q - A_{\cdot, B(p)}) e_p^T
 $$
 
-In Kavach-Opt, updating is managed via:
-1. **Product Form of the Inverse (PFI):** Maintaining elementary Frobenius matrices $E_k = I + (\eta_k - e_p) e_p^T$ such that $A_{B_k}^{-1} = E_k E_{k-1} \dots E_1 A_{B_0}^{-1}$.
-2. **Forrest-Tomlin Row Permutation:** Permuting row $p$ of the upper triangular factor $U$ to the bottom position $m$, transforming the spike into an upper Hessenberg matrix, and eliminating subdiagonal fill-in with elementary row rotations.
+In Kavach-Opt, basis updating is implemented via:
+1. **Sparse Product Form of the Inverse (PFI / Eta Updates):** Maintaining elementary Frobenius matrices $E_k = I + (\eta_k - e_p) e_p^T$ such that $A_{B_k}^{-1} = E_k E_{k-1} \dots E_1 A_{B_0}^{-1}$ with sparse vector representation (`SparseEtaFactor`).
+2. **Forrest-Tomlin Row Permutation (Future Roadmap):** Permuting row $p$ of the upper triangular factor $U$ to the bottom position $m$ to maintain a triangular factor is planned for a future release; current production relies on the sparse PFI Eta-update chain.
 
-To prevent numerical drift and growth in $\eta$-vector length, Rule R007 triggers a complete `SparseLU` Markowitz refactorization every 50 simplex pivots (or every 10 pivots under high numerical risk Rule R009).
+To prevent numerical drift and growth in $\eta$-vector length, Rule R007 triggers a complete `SparseLU` Markowitz refactorization every 50 simplex pivots (or every 20 pivots under elevated risk Rule R008, 10 pivots under high risk Rule R009).
 
 The choice of which fractional variable $x_j$ to branch on fundamentally alters the size of the search tree.
 
@@ -1201,10 +1201,10 @@ Compared to dense storage ($8mn$ bytes), for an industrial refinery model with $
 | :--- | :--- | :--- | :--- |
 | **SpMV ($y = Ax$)** | $O(\text{nnz})$ | Inner loop vector multiply-accumulate | `src/numerics/sparse_matrix.cpp` |
 | **Batched SpMV ($K$ vectors)** | $O(K \cdot \text{nnz})$ | Parallel chunked memory-bandwidth bound | `src/backend/cpu/cpu_backend.cpp` |
-| **Ruiz Equilibration** | $O(T \cdot \text{nnz})$ | $T$ passes of row/col Euclidean scaling ($T \le 20$) | `src/numerics/scaling.cpp` |
+| **Geometric-Mean Scaling** | $O(T \cdot \text{nnz})$ | $T$ passes of row/col geometric equilibration ($T \le 4$) | `src/numerics/scaling.cpp` |
 | **SparseLU Factorization** | $O(m \cdot \text{nnz} + \text{fill})$ | Markowitz outer-product pivot updates | `src/numerics/lu_factorization.cpp` |
 | **Simplex Iteration** | $O(\text{nnz}(L) + \text{nnz}(U))$ | Forward/backward triangular solves | `src/algorithms/lp/revised_simplex.cpp` |
-| **Forrest-Tomlin Update** | $O(m)$ | Row permutation and elementary elimination | `src/algorithms/lp/basis.cpp` |
+| **Sparse PFI (Eta Update)** | $O(\text{nnz}(\eta))$ | Sparse Eta vector application and chain maintenance | `src/algorithms/lp/basis.cpp` |
 | **GMI Cut Separation** | $O(|N|)$ per row | Fractional decomposition of tableau row | `src/algorithms/milp/gomory_separator.cpp` |
 | **Active-Set QP Step** | $O(n^3)$ worst-case | Dense/sparse KKT subproblem solve | `src/algorithms/qp/active_set.cpp` |
 | **Branch-and-Bound** | $O(2^{|I|} \cdot \text{LP})$ | Tree exploration in worst-case combinatorial | `src/algorithms/milp/branch_and_bound.cpp` |

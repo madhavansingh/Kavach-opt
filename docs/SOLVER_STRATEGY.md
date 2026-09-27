@@ -265,7 +265,7 @@ $$r_i = \frac{1}{\sqrt{\min_{j} |A_{ij}| \cdot \max_{j} |A_{ij}|}}, \quad c_j = 
 | **ELEVATED** | $10^4 \le \kappa < 10^8$ | $0$ | 20 | Inactive (fallback only) | $10^{-9}$ |
 | **HIGH** | $\ge 10^8$ | $> 0$ | 10 | **Active from iter 1** | $10^{-8}$ |
 
-Under `HIGH` risk, basis updates via Forrest-Tomlin / eta-updates accumulate numerical error rapidly. Rule `R009` and Rule `R018` mandate complete SparseLU refactorization every 10 iterations to prevent pivot breakdown and cycling.
+Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical error rapidly. Rule `R009` and Rule `R018` mandate complete SparseLU refactorization every 10 iterations to prevent pivot breakdown and cycling.
 
 ---
 
