@@ -49,6 +49,12 @@ struct QPTelemetry {
     double max_dual_residual{0.0};
     double max_complementarity_residual{0.0};
     double solve_time_ms{0.0};
+    std::size_t dense_equivalent_hessian_bytes{0};
+    std::size_t sparse_hessian_bytes{0};
+    std::size_t sparse_psd_working_bytes{0};
+    std::size_t sparse_licq_basis_bytes{0};
+    std::size_t sparse_kkt_peak_bytes{0};
+    std::size_t peak_working_memory_bytes{0};
     std::string error_message;
 };
 
@@ -143,9 +149,10 @@ public:
     /// Build symmetric sparse Hessian Q from CanonicalModel quadratic terms: 1/2 x^T Q x
     [[nodiscard]] static numerics::CsrMatrix build_hessian(const model::CanonicalModel& model);
 
-    /// Verify positive semidefiniteness of Q via diagonal-pivoted Cholesky factorization
+    /// Verify positive semidefiniteness of Q via sparse structural and component-pivoted Cholesky
     [[nodiscard]] static bool check_psd(const numerics::CsrMatrix& Q, double tol,
-                                        std::string* error_msg = nullptr);
+                                        std::string* error_msg = nullptr,
+                                        std::size_t* peak_working_bytes = nullptr);
 
     /// Evaluate quadratic objective f(x) = 1/2 x^T Q x + c^T x + c0
     [[nodiscard]] static double evaluate_objective(const model::CanonicalModel& model,

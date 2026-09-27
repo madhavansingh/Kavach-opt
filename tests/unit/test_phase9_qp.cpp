@@ -964,3 +964,146 @@ KAVACH_TEST(test_qp_unified_verifier) {
                                      res.objective_value, core::SolverTolerances{});
     KAVACH_ASSERT(report.passed);
 }
+
+// ============================================================================
+// Test Z1: Sparse PSD & Memory Bounds (No O(n^2) Dense Allocation)
+// ============================================================================
+KAVACH_TEST(test_qp_sparse_psd_and_memory_bounds) {
+    // 1. Sparse diagonal QP with n = 500: dense Hessian would be 500 * 500 * 8 = 2,000,000 bytes
+    const std::size_t n = 500;
+    auto diag_model = make_simple_model("qp_sparse_diag_500");
+    for (std::size_t j = 0; j < n; ++j) {
+        VarId v =
+            diag_model.add_variable("x" + std::to_string(j), VariableType::CONTINUOUS, -10.0, 10.0);
+        diag_model.add_objective_quadratic_term(v, v, 1.0 + 0.01 * static_cast<double>(j));
+        diag_model.set_objective_linear_coefficient(v, -2.0);
+    }
+    diag_model.canonicalize();
+
+    PrimalActiveSetQPSolver solver;
+    auto res_diag = solver.solve(diag_model);
+    KAVACH_ASSERT(res_diag.is_optimal());
+    KAVACH_ASSERT(res_diag.verification_report.fully_verified());
+    KAVACH_ASSERT_EQUAL(res_diag.telemetry.dense_equivalent_hessian_bytes, n * n * sizeof(double));
+    // Purely diagonal PSD check requires 0 auxiliary working bytes
+    KAVACH_ASSERT_EQUAL(res_diag.telemetry.sparse_psd_working_bytes, std::size_t(0));
+    // Total sparse working memory must be < 5% of a single n*n dense matrix
+    KAVACH_ASSERT(res_diag.telemetry.peak_working_memory_bytes * 20 <
+                  res_diag.telemetry.dense_equivalent_hessian_bytes);
+
+    // 2. Large connected tridiagonal Laplacian (s = 150 > 128) with rank n-1 (semidefinite, not
+    // strictly diagonally dominant at interior rows where Q_ii = 2, |Q_{i,i-1}|+|Q_{i,i+1}| = 2)
+    const std::size_t s = 150;
+    auto tridiag_model = make_simple_model("qp_tridiag_150");
+    std::vector<VarId> vars;
+    for (std::size_t j = 0; j < s; ++j) {
+        vars.push_back(tridiag_model.add_variable("y" + std::to_string(j), VariableType::CONTINUOUS,
+                                                  -5.0, 5.0));
+    }
+    // (y_0 - 2*y_1)^2 + Sum_{j=1..s-2} (y_j - y_{j+1})^2 is a sum of squares (strictly PSD),
+    // while row 0 has Q_00 = 2.0 and |Q_01| = 4.0 > Q_00 (not diagonally dominant),
+    // forcing the s=150 > 128 Sparse Row-Map Diagonal-Pivoted Cholesky path.
+    tridiag_model.add_objective_quadratic_term(vars[0], vars[0], 1.0);
+    tridiag_model.add_objective_quadratic_term(vars[1], vars[1], 4.0);
+    tridiag_model.add_objective_quadratic_term(vars[0], vars[1], -4.0);
+    for (std::size_t j = 1; j + 1 < s; ++j) {
+        tridiag_model.add_objective_quadratic_term(vars[j], vars[j], 1.0);
+        tridiag_model.add_objective_quadratic_term(vars[j + 1], vars[j + 1], 1.0);
+        tridiag_model.add_objective_quadratic_term(vars[j], vars[j + 1], -2.0);
+    }
+    tridiag_model.canonicalize();
+
+    numerics::CsrMatrix Q_tri = PrimalActiveSetQPSolver::build_hessian(tridiag_model);
+    std::string err;
+    std::size_t tri_psd_bytes = 0;
+    KAVACH_ASSERT(PrimalActiveSetQPSolver::check_psd(Q_tri, 1e-9, &err, &tri_psd_bytes));
+    // Sparse row-map Cholesky working bytes must be much smaller than 150*150*8 = 180,000 bytes
+    KAVACH_ASSERT(tri_psd_bytes < s * s * sizeof(double) / 3);
+
+    // 3. Indefinite large tridiagonal component (s = 150) must be rejected cleanly
+    tridiag_model.add_objective_quadratic_term(vars[10], vars[11], -6.0);
+    tridiag_model.canonicalize();
+    numerics::CsrMatrix Q_indef = PrimalActiveSetQPSolver::build_hessian(tridiag_model);
+    KAVACH_ASSERT(!PrimalActiveSetQPSolver::check_psd(Q_indef, 1e-9, &err, &tri_psd_bytes));
+}
+
+// ============================================================================
+// Test Z2: Independent Dense Test Oracle vs Sparse Production QP Solver
+// ============================================================================
+KAVACH_TEST(test_qp_dense_vs_sparse_numerical_oracle) {
+    // Solve min 1/2 x^T Q x + c^T x s.t. A x = b via explicit dense KKT Gaussian elimination
+    // in test-only oracle, and compare against PrimalActiveSetQPSolver.
+    auto model = make_simple_model("qp_dense_oracle");
+    VarId x0 = model.add_variable("x0", VariableType::CONTINUOUS, 0.0, 10.0);
+    VarId x1 = model.add_variable("x1", VariableType::CONTINUOUS, 0.0, 10.0);
+    VarId x2 = model.add_variable("x2", VariableType::CONTINUOUS, 0.0, 10.0);
+
+    // 1/2 x^T Q x with Q = [[4, 1, 0], [1, 2, 0.5], [0, 0.5, 3]]
+    model.add_objective_quadratic_term(x0, x0, 2.0);
+    model.add_objective_quadratic_term(x1, x1, 1.0);
+    model.add_objective_quadratic_term(x2, x2, 1.5);
+    model.add_objective_quadratic_term(x0, x1, 1.0);
+    model.add_objective_quadratic_term(x1, x2, 0.5);
+
+    model.set_objective_linear_coefficient(x0, -1.0);
+    model.set_objective_linear_coefficient(x1, -2.0);
+    model.set_objective_linear_coefficient(x2, -3.0);
+
+    // Equality constraint: x0 + x1 + x2 = 2.0
+    SparseLinearExpression eq;
+    eq.add_term(x0, 1.0);
+    eq.add_term(x1, 1.0);
+    eq.add_term(x2, 1.0);
+    model.add_constraint("sum_eq", std::move(eq), ConstraintSense::EQUAL, 2.0);
+    model.canonicalize();
+
+    // Dense 4x4 KKT Oracle:
+    // [ 4   1   0   1 ] [ x0 ]   [ 1 ]
+    // [ 1   2  0.5  1 ] [ x1 ] = [ 2 ]
+    // [ 0  0.5  3   1 ] [ x2 ]   [ 3 ]
+    // [ 1   1   1   0 ] [ y0 ]   [ 2 ]
+    std::vector<std::vector<double>> M = {
+        {4.0, 1.0, 0.0, 1.0, 1.0},
+        {1.0, 2.0, 0.5, 1.0, 2.0},
+        {0.0, 0.5, 3.0, 1.0, 3.0},
+        {1.0, 1.0, 1.0, 0.0, 2.0},
+    };
+    for (std::size_t col = 0; col < 4; ++col) {
+        std::size_t piv = col;
+        for (std::size_t r = col + 1; r < 4; ++r) {
+            if (std::abs(M[r][col]) > std::abs(M[piv][col])) {
+                piv = r;
+            }
+        }
+        std::swap(M[col], M[piv]);
+        for (std::size_t r = 0; r < 4; ++r) {
+            if (r == col) {
+                continue;
+            }
+            const double f = M[r][col] / M[col][col];
+            for (std::size_t c = col; c < 5; ++c) {
+                M[r][c] -= f * M[col][c];
+            }
+        }
+    }
+    const double oracle_x0 = M[0][4] / M[0][0];
+    const double oracle_x1 = M[1][4] / M[1][1];
+    const double oracle_x2 = M[2][4] / M[2][2];
+    const double oracle_y0 = M[3][4] / M[3][3];
+    const double oracle_obj = 2.0 * oracle_x0 * oracle_x0 + 1.0 * oracle_x1 * oracle_x1 +
+                              1.5 * oracle_x2 * oracle_x2 + 1.0 * oracle_x0 * oracle_x1 +
+                              0.5 * oracle_x1 * oracle_x2 - 1.0 * oracle_x0 - 2.0 * oracle_x1 -
+                              3.0 * oracle_x2;
+
+    PrimalActiveSetQPSolver solver;
+    auto res = solver.solve(model);
+
+    KAVACH_ASSERT(res.is_optimal());
+    KAVACH_ASSERT(res.verification_report.fully_verified());
+    KAVACH_ASSERT_NEAR(res.primal_solution[0], oracle_x0, 1e-8);
+    KAVACH_ASSERT_NEAR(res.primal_solution[1], oracle_x1, 1e-8);
+    KAVACH_ASSERT_NEAR(res.primal_solution[2], oracle_x2, 1e-8);
+    KAVACH_ASSERT_NEAR(res.dual_solution[0], oracle_y0, 1e-8);
+    KAVACH_ASSERT_NEAR(res.objective_value, oracle_obj, 1e-8);
+    KAVACH_ASSERT(res.kkt_residual < 1e-8);
+}

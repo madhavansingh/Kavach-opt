@@ -625,3 +625,42 @@ KAVACH_TEST(test_t_report_generation_all_sections) {
     KAVACH_ASSERT(report.find("## 9. GPU Acceleration & Telemetry Analysis") != std::string::npos);
     KAVACH_ASSERT(report.find("## 10. Reproducibility Instructions") != std::string::npos);
 }
+
+// ============================================================================
+// Test U: Live Out-of-Process HiGHS Reference Comparison
+// ============================================================================
+KAVACH_TEST(test_u_live_highs_out_of_process_comparison) {
+    ExternalReferenceAdapter adapter;
+    if (!adapter.is_available()) {
+        return;
+    }
+
+    std::string afiro_path = "benchmarks/netlib/afiro.mps";
+    if (!std::filesystem::exists(afiro_path)) {
+        afiro_path = "../benchmarks/netlib/afiro.mps";
+    }
+    if (!std::filesystem::exists(afiro_path)) {
+        return;
+    }
+
+    auto highs_res = adapter.run(afiro_path, 10.0);
+    KAVACH_ASSERT_EQUAL(highs_res.status, ReferenceSolverStatus::OPTIMAL);
+    KAVACH_ASSERT(highs_res.objective.has_value());
+    KAVACH_ASSERT_NEAR(*highs_res.objective, -464.75314286, 1e-4);
+
+    BenchmarkCase c;
+    c.case_id = "afiro_highs_cmp";
+    c.instance_name = "afiro";
+    c.instance_path = afiro_path;
+    c.problem_type = BenchmarkProblemType::LP;
+
+    BenchmarkRunnerOptions cfg;
+    cfg.compare_reference = true;
+    BenchmarkRunner runner(cfg);
+    auto cmp_res = runner.run_case(c);
+
+    KAVACH_ASSERT_EQUAL(cmp_res.status, BenchmarkStatus::OPTIMAL);
+    KAVACH_ASSERT(cmp_res.verification_passed);
+    KAVACH_ASSERT(cmp_res.reference_objective_val.has_value());
+    KAVACH_ASSERT_NEAR(*cmp_res.objective_value, *cmp_res.reference_objective_val, 1e-4);
+}

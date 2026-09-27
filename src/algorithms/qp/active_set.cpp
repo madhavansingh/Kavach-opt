@@ -75,94 +75,330 @@ numerics::CsrMatrix PrimalActiveSetQPSolver::build_hessian(const model::Canonica
 }
 
 bool PrimalActiveSetQPSolver::check_psd(const numerics::CsrMatrix& Q, double tol,
-                                        std::string* error_msg) {
+                                        std::string* error_msg, std::size_t* peak_working_bytes) {
+    if (peak_working_bytes) {
+        *peak_working_bytes = 0;
+    }
     const std::size_t n = Q.rows();
     if (n == 0) {
         return true;
     }
 
-    // 1. Initial diagonal check: any negative diagonal immediately proves non-PSD
-    for (std::size_t i = 0; i < n; ++i) {
-        const double d = Q.get(i, i);
-        if (d < -tol) {
+    const auto& q_cols = Q.col_idx();
+    const auto& q_vals = Q.values();
+
+    // 1. Sparse pass over CSR: check diagonals, null-diagonal off-diagonal coupling,
+    //    and Gershgorin diagonal dominance in O(nnz(Q)) time and O(1) auxiliary space.
+    bool is_purely_diagonal = true;
+    bool is_diagonally_dominant = true;
+
+    for (std::size_t r = 0; r < n; ++r) {
+        double diag_val = 0.0;
+        double off_diag_abs_sum = 0.0;
+        double max_off_diag_in_row = 0.0;
+
+        const std::size_t start = Q.row_start(r);
+        const std::size_t end = Q.row_end(r);
+        for (std::size_t k = start; k < end; ++k) {
+            const std::size_t c = q_cols[k];
+            const double val = q_vals[k];
+            if (c == r) {
+                diag_val += val;
+            } else {
+                const double abs_val = std::abs(val);
+                if (abs_val > 1e-15) {
+                    is_purely_diagonal = false;
+                    off_diag_abs_sum += abs_val;
+                    max_off_diag_in_row = std::max(max_off_diag_in_row, abs_val);
+                }
+            }
+        }
+
+        if (diag_val < -tol) {
             if (error_msg) {
-                *error_msg = "Negative diagonal entry Q[" + std::to_string(i) + "," +
-                             std::to_string(i) + "] = " + std::to_string(d) +
+                *error_msg = "Negative diagonal entry Q[" + std::to_string(r) + "," +
+                             std::to_string(r) + "] = " + std::to_string(diag_val) +
                              " detected: Hessian is indefinite (non-convex).";
             }
             return false;
         }
-    }
 
-    // 2. Dense working representation for complete diagonal-pivoted Cholesky factorization
-    std::vector<double> S(n * n, 0.0);
-    const auto& q_cols = Q.col_idx();
-    const auto& q_vals = Q.values();
-    for (std::size_t r = 0; r < n; ++r) {
-        const std::size_t start = Q.row_start(r);
-        const std::size_t end = Q.row_end(r);
-        for (std::size_t k = start; k < end; ++k) {
-            S[r * n + q_cols[k]] = q_vals[k];
-        }
-    }
-
-    std::vector<std::size_t> p(n);
-    for (std::size_t i = 0; i < n; ++i) {
-        p[i] = i;
-    }
-
-    for (std::size_t k = 0; k < n; ++k) {
-        double max_diag = -1.0;
-        std::size_t best_idx = k;
-        for (std::size_t i = k; i < n; ++i) {
-            const double diag = S[p[i] * n + p[i]];
-            if (diag > max_diag) {
-                max_diag = diag;
-                best_idx = i;
-            }
-        }
-
-        if (max_diag < -tol) {
+        if (diag_val <= tol && max_off_diag_in_row > tol * 100.0 + 1e-7) {
             if (error_msg) {
-                *error_msg =
-                    "Negative pivot in Cholesky factorization: " + std::to_string(max_diag) +
-                    " detected (Hessian is indefinite).";
+                *error_msg = "Non-zero off-diagonal entry in null Schur complement: " +
+                             std::to_string(max_off_diag_in_row) + " (Hessian is indefinite).";
             }
             return false;
         }
 
-        if (max_diag <= tol) {
-            // Remainder must be zero
-            for (std::size_t i = k; i < n; ++i) {
-                for (std::size_t j = k; j < n; ++j) {
-                    const double val = std::abs(S[p[i] * n + p[j]]);
-                    if (val > tol * 100.0 + 1e-7) {
-                        if (error_msg) {
-                            *error_msg = "Non-zero off-diagonal entry in null Schur complement: " +
-                                         std::to_string(val) + " (Hessian is indefinite).";
-                        }
-                        return false;
+        if (diag_val + tol < off_diag_abs_sum) {
+            is_diagonally_dominant = false;
+        }
+    }
+
+    // Fast-path A: Purely diagonal matrix with all Q_ii >= -tol is provably PSD (0 working bytes)
+    // Fast-path B: Symmetric diagonally dominant matrix with Q_ii >= sum_{j!=i} |Q_ij| - tol
+    //              has all eigenvalues >= -tol by Gershgorin's Circle Theorem (0 working bytes)
+    if (is_purely_diagonal || is_diagonally_dominant) {
+        return true;
+    }
+
+    // 2. Connected-Component Decomposition of the off-diagonal sparsity graph of Q.
+    //    Since Q is symmetric block-diagonal across connected components C_1, ..., C_r,
+    //    Q is PSD if and only if every principal submatrix Q[C_c, C_c] is PSD.
+    std::vector<std::uint8_t> visited(n, 0);
+    std::vector<std::size_t> global_to_local(n, 0);
+    std::vector<std::size_t> comp_nodes;
+    comp_nodes.reserve(std::min<std::size_t>(n, 64));
+
+    std::size_t max_comp_bytes = visited.capacity() * sizeof(std::uint8_t) +
+                                 global_to_local.capacity() * sizeof(std::size_t);
+
+    for (std::size_t root = 0; root < n; ++root) {
+        if (visited[root]) {
+            continue;
+        }
+
+        // Check if root has any non-zero off-diagonal entries
+        bool has_off_diag = false;
+        for (std::size_t k = Q.row_start(root); k < Q.row_end(root); ++k) {
+            if (q_cols[k] != root && std::abs(q_vals[k]) > 1e-15) {
+                has_off_diag = true;
+                break;
+            }
+        }
+        if (!has_off_diag) {
+            visited[root] = 1;
+            continue;  // Singleton component already certified in pass 1
+        }
+
+        // BFS to collect connected component
+        comp_nodes.clear();
+        comp_nodes.push_back(root);
+        visited[root] = 1;
+        for (std::size_t head = 0; head < comp_nodes.size(); ++head) {
+            const std::size_t u = comp_nodes[head];
+            for (std::size_t k = Q.row_start(u); k < Q.row_end(u); ++k) {
+                const std::size_t v = q_cols[k];
+                if (v != u && std::abs(q_vals[k]) > 1e-15 && !visited[v]) {
+                    visited[v] = 1;
+                    comp_nodes.push_back(v);
+                }
+            }
+        }
+
+        const std::size_t s = comp_nodes.size();
+        for (std::size_t local_idx = 0; local_idx < s; ++local_idx) {
+            global_to_local[comp_nodes[local_idx]] = local_idx;
+        }
+
+        if (s <= 128) {
+            // Small coupled component: exact diagonal-pivoted Cholesky on s x s submatrix
+            std::vector<double> S(s * s, 0.0);
+            std::vector<std::size_t> p(s);
+            for (std::size_t local_r = 0; local_r < s; ++local_r) {
+                p[local_r] = local_r;
+                const std::size_t r = comp_nodes[local_r];
+                for (std::size_t k = Q.row_start(r); k < Q.row_end(r); ++k) {
+                    const std::size_t c = q_cols[k];
+                    if (c == r || std::abs(q_vals[k]) > 1e-15) {
+                        S[local_r * s + global_to_local[c]] = q_vals[k];
                     }
                 }
             }
-            break;  // Remainder is null; Q is PSD with rank k
-        }
 
-        std::swap(p[k], p[best_idx]);
-        const std::size_t pk = p[k];
-        const double pivot = S[pk * n + pk];
+            const std::size_t comp_bytes =
+                S.capacity() * sizeof(double) + p.capacity() * sizeof(std::size_t);
+            max_comp_bytes = std::max(max_comp_bytes, comp_bytes);
 
-        for (std::size_t i = k + 1; i < n; ++i) {
-            const std::size_t pi = p[i];
-            const double factor = S[pi * n + pk] / pivot;
-            S[pi * n + pk] = factor;
-            for (std::size_t j = k + 1; j < n; ++j) {
-                const std::size_t pj = p[j];
-                S[pi * n + pj] -= factor * S[pk * n + pj];
+            for (std::size_t k = 0; k < s; ++k) {
+                double max_diag = -1.0;
+                std::size_t best_idx = k;
+                for (std::size_t i = k; i < s; ++i) {
+                    const double diag = S[p[i] * s + p[i]];
+                    if (diag > max_diag) {
+                        max_diag = diag;
+                        best_idx = i;
+                    }
+                }
+
+                if (max_diag < -tol) {
+                    if (error_msg) {
+                        *error_msg = "Negative pivot in Cholesky factorization: " +
+                                     std::to_string(max_diag) +
+                                     " detected (Hessian is indefinite).";
+                    }
+                    if (peak_working_bytes) {
+                        *peak_working_bytes = max_comp_bytes;
+                    }
+                    return false;
+                }
+
+                if (max_diag <= tol) {
+                    for (std::size_t i = k; i < s; ++i) {
+                        for (std::size_t j = k; j < s; ++j) {
+                            const double val = std::abs(S[p[i] * s + p[j]]);
+                            if (val > tol * 100.0 + 1e-7) {
+                                if (error_msg) {
+                                    *error_msg =
+                                        "Non-zero off-diagonal entry in null Schur complement: " +
+                                        std::to_string(val) + " (Hessian is indefinite).";
+                                }
+                                if (peak_working_bytes) {
+                                    *peak_working_bytes = max_comp_bytes;
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                std::swap(p[k], p[best_idx]);
+                const std::size_t pk = p[k];
+                const double pivot = S[pk * s + pk];
+
+                for (std::size_t i = k + 1; i < s; ++i) {
+                    const std::size_t pi = p[i];
+                    const double factor = S[pi * s + pk] / pivot;
+                    S[pi * s + pk] = factor;
+                    if (std::abs(factor) > 1e-16) {
+                        for (std::size_t j = k + 1; j < s; ++j) {
+                            const std::size_t pj = p[j];
+                            S[pi * s + pj] -= factor * S[pk * s + pj];
+                        }
+                    }
+                }
+            }
+        } else {
+            // Large coupled component (s > 128): Sparse Row-Map Diagonal-Pivoted Cholesky
+            std::vector<double> diag(s, 0.0);
+            std::vector<std::vector<std::pair<std::size_t, double>>> rows(s);
+            std::vector<std::uint8_t> eliminated(s, 0);
+
+            std::size_t sparse_rows_bytes =
+                diag.capacity() * sizeof(double) + eliminated.capacity() * sizeof(std::uint8_t);
+
+            for (std::size_t local_r = 0; local_r < s; ++local_r) {
+                const std::size_t r = comp_nodes[local_r];
+                for (std::size_t k = Q.row_start(r); k < Q.row_end(r); ++k) {
+                    const std::size_t c = q_cols[k];
+                    const double val = q_vals[k];
+                    if (c == r) {
+                        diag[local_r] = val;
+                    } else if (std::abs(val) > 1e-15) {
+                        rows[local_r].push_back({global_to_local[c], val});
+                    }
+                }
+                std::sort(rows[local_r].begin(), rows[local_r].end());
+                sparse_rows_bytes +=
+                    rows[local_r].capacity() * sizeof(std::pair<std::size_t, double>);
+            }
+            max_comp_bytes = std::max(max_comp_bytes, sparse_rows_bytes);
+
+            for (std::size_t step = 0; step < s; ++step) {
+                double max_diag = -1.0;
+                std::size_t pk = s;
+                for (std::size_t i = 0; i < s; ++i) {
+                    if (!eliminated[i] && diag[i] > max_diag) {
+                        max_diag = diag[i];
+                        pk = i;
+                    }
+                }
+
+                if (pk == s || max_diag < -tol) {
+                    if (error_msg) {
+                        *error_msg = "Negative pivot in Cholesky factorization: " +
+                                     std::to_string(max_diag) +
+                                     " detected (Hessian is indefinite).";
+                    }
+                    if (peak_working_bytes) {
+                        *peak_working_bytes = max_comp_bytes;
+                    }
+                    return false;
+                }
+
+                if (max_diag <= tol) {
+                    for (std::size_t i = 0; i < s; ++i) {
+                        if (eliminated[i]) {
+                            continue;
+                        }
+                        for (const auto& [col_j, val] : rows[i]) {
+                            if (!eliminated[col_j] && std::abs(val) > tol * 100.0 + 1e-7) {
+                                if (error_msg) {
+                                    *error_msg =
+                                        "Non-zero off-diagonal entry in null Schur complement: " +
+                                        std::to_string(std::abs(val)) + " (Hessian is indefinite).";
+                                }
+                                if (peak_working_bytes) {
+                                    *peak_working_bytes = max_comp_bytes;
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                eliminated[pk] = 1;
+                const double pivot = diag[pk];
+
+                // Extract active neighbors of pk in the remaining Schur complement
+                std::vector<std::pair<std::size_t, double>> pk_neighbors;
+                for (const auto& [col_j, val] : rows[pk]) {
+                    if (!eliminated[col_j] && std::abs(val) > 1e-15) {
+                        pk_neighbors.push_back({col_j, val});
+                    }
+                }
+
+                for (const auto& [pi, val_ip] : pk_neighbors) {
+                    const double factor = val_ip / pivot;
+                    diag[pi] -= factor * val_ip;
+
+                    // Sparse row merge: rows[pi] -= factor * pk_neighbors
+                    std::vector<std::pair<std::size_t, double>> merged;
+                    merged.reserve(rows[pi].size() + pk_neighbors.size());
+                    std::size_t idx_a = 0;
+                    std::size_t idx_b = 0;
+                    while (idx_a < rows[pi].size() || idx_b < pk_neighbors.size()) {
+                        if (idx_a < rows[pi].size() && eliminated[rows[pi][idx_a].first]) {
+                            ++idx_a;
+                            continue;
+                        }
+                        if (idx_b == pk_neighbors.size() ||
+                            (idx_a < rows[pi].size() &&
+                             rows[pi][idx_a].first < pk_neighbors[idx_b].first)) {
+                            merged.push_back(rows[pi][idx_a++]);
+                        } else if (idx_a == rows[pi].size() ||
+                                   pk_neighbors[idx_b].first < rows[pi][idx_a].first) {
+                            const std::size_t col_j = pk_neighbors[idx_b].first;
+                            const double upd = -factor * pk_neighbors[idx_b].second;
+                            if (col_j != pi && std::abs(upd) > 1e-15) {
+                                merged.push_back({col_j, upd});
+                            }
+                            ++idx_b;
+                        } else {
+                            const std::size_t col_j = rows[pi][idx_a].first;
+                            const double upd =
+                                rows[pi][idx_a].second - factor * pk_neighbors[idx_b].second;
+                            if (col_j != pi && std::abs(upd) > 1e-15) {
+                                merged.push_back({col_j, upd});
+                            }
+                            ++idx_a;
+                            ++idx_b;
+                        }
+                    }
+                    rows[pi] = std::move(merged);
+                }
+                rows[pk].clear();
+                rows[pk].shrink_to_fit();
             }
         }
     }
 
+    if (peak_working_bytes) {
+        *peak_working_bytes = max_comp_bytes;
+    }
     return true;
 }
 
@@ -309,8 +545,15 @@ QPSolution PrimalActiveSetQPSolver::solve(const model::CanonicalModel& model,
     // --- 2. Hessian Construction & PSD Check ---
     numerics::CsrMatrix Q = build_hessian(model);
     std::string psd_error;
-    if (!check_psd(Q, options.tolerances.pivot_tol, &psd_error)) {
+    std::size_t psd_working_bytes = 0;
+    if (!check_psd(Q, options.tolerances.pivot_tol, &psd_error, &psd_working_bytes)) {
         sol.status = core::SolverStatus::NUMERICAL_FAILURE;
+        sol.telemetry.dense_equivalent_hessian_bytes =
+            model.num_variables() * model.num_variables() * sizeof(double);
+        sol.telemetry.sparse_hessian_bytes = Q.values().capacity() * sizeof(double) +
+                                             Q.col_idx().capacity() * sizeof(std::size_t) +
+                                             (Q.rows() + 1) * sizeof(std::size_t);
+        sol.telemetry.sparse_psd_working_bytes = psd_working_bytes;
         sol.telemetry.error_message = psd_error;
         sol.verification_report.certified_status = core::SolverStatus::NUMERICAL_FAILURE;
         sol.verification_report.summary = psd_error;
@@ -392,7 +635,12 @@ QPSolution PrimalActiveSetQPSolver::solve(const model::CanonicalModel& model,
     }
 
     // Direct solve on current model
-    return solve_internal(model, options, start_time);
+    auto res = solve_internal(model, options, start_time);
+    res.telemetry.sparse_psd_working_bytes = psd_working_bytes;
+    res.telemetry.peak_working_memory_bytes =
+        std::max(res.telemetry.peak_working_memory_bytes,
+                 res.telemetry.sparse_hessian_bytes + psd_working_bytes);
+    return res;
 }
 
 QPSolution PrimalActiveSetQPSolver::solve_internal(
@@ -409,6 +657,10 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
     numerics::CsrMatrix Q = build_hessian(model);
     sol.telemetry.q_nonzeros = Q.nonzeros();
     sol.telemetry.a_nonzeros = model.num_nonzeros();
+    sol.telemetry.dense_equivalent_hessian_bytes = n * n * sizeof(double);
+    sol.telemetry.sparse_hessian_bytes = Q.values().capacity() * sizeof(double) +
+                                         Q.col_idx().capacity() * sizeof(std::size_t) +
+                                         (Q.rows() + 1) * sizeof(std::size_t);
 
     std::vector<double> c(n, 0.0);
     for (const auto& lt : model.objective().linear_terms.terms()) {
@@ -516,83 +768,148 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
         return val;
     };
 
-    // Helper: dense row extraction and Gram-Schmidt linear independence check
-    auto get_dense_a = [&](const NormalizedConstraint& constraint) {
-        std::vector<double> a(n, 0.0);
+    // Helper: Sparse Modified Gram-Schmidt LICQ check (zero O(n) / O(K*n) dense row vectors)
+    struct SparseBasisVec {
+        std::vector<std::pair<std::size_t, double>> terms;  // sorted by var_id
+        [[nodiscard]] std::size_t byte_footprint() const noexcept {
+            return terms.capacity() * sizeof(std::pair<std::size_t, double>);
+        }
+    };
+
+    auto make_sparse_vec = [&](const NormalizedConstraint& constraint) {
+        SparseBasisVec sv;
+        sv.terms.reserve(constraint.terms.size());
         for (const auto& [var_id, coeff] : constraint.terms) {
-            if (var_id < n)
-                a[var_id] += coeff;
+            if (var_id < n && std::abs(coeff) > 1e-15) {
+                sv.terms.push_back({var_id, coeff});
+            }
         }
-        return a;
+        std::sort(sv.terms.begin(), sv.terms.end(),
+                  [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+        // Combine duplicate variable indices if any
+        std::size_t out = 0;
+        for (std::size_t idx = 0; idx < sv.terms.size(); ++idx) {
+            if (out > 0 && sv.terms[out - 1].first == sv.terms[idx].first) {
+                sv.terms[out - 1].second += sv.terms[idx].second;
+            } else {
+                sv.terms[out++] = sv.terms[idx];
+            }
+        }
+        sv.terms.resize(out);
+        return sv;
     };
 
-    auto is_linearly_independent = [&](const std::vector<double>& a,
-                                       const std::vector<std::vector<double>>& b) {
+    auto sparse_dot = [](const SparseBasisVec& u, const SparseBasisVec& v) {
+        double sum = 0.0;
+        std::size_t i = 0;
+        std::size_t j = 0;
+        while (i < u.terms.size() && j < v.terms.size()) {
+            if (u.terms[i].first < v.terms[j].first) {
+                ++i;
+            } else if (v.terms[j].first < u.terms[i].first) {
+                ++j;
+            } else {
+                sum += u.terms[i].second * v.terms[j].second;
+                ++i;
+                ++j;
+            }
+        }
+        return sum;
+    };
+
+    auto sparse_axpy = [](SparseBasisVec& v, double alpha, const SparseBasisVec& q) {
+        std::vector<std::pair<std::size_t, double>> merged;
+        merged.reserve(v.terms.size() + q.terms.size());
+        std::size_t i = 0;
+        std::size_t j = 0;
+        while (i < v.terms.size() || j < q.terms.size()) {
+            if (j == q.terms.size() ||
+                (i < v.terms.size() && v.terms[i].first < q.terms[j].first)) {
+                merged.push_back(v.terms[i++]);
+            } else if (i == v.terms.size() || q.terms[j].first < v.terms[i].first) {
+                const double val = alpha * q.terms[j].second;
+                if (std::abs(val) > 1e-15) {
+                    merged.push_back({q.terms[j].first, val});
+                }
+                ++j;
+            } else {
+                const double val = v.terms[i].second + alpha * q.terms[j].second;
+                if (std::abs(val) > 1e-15) {
+                    merged.push_back({v.terms[i].first, val});
+                }
+                ++i;
+                ++j;
+            }
+        }
+        v.terms = std::move(merged);
+    };
+
+    auto project_sparse = [&](const SparseBasisVec& a, const std::vector<SparseBasisVec>& b,
+                              double& out_norm_a, double& out_norm_v) {
+        out_norm_a = std::sqrt(sparse_dot(a, a));
+        out_norm_v = 0.0;
+        SparseBasisVec v = a;
+        if (out_norm_a < 1e-12) {
+            return v;
+        }
+        for (const auto& q : b) {
+            const double dot = sparse_dot(q, v);
+            if (std::abs(dot) > 1e-16) {
+                sparse_axpy(v, -dot, q);
+            }
+        }
+        out_norm_v = std::sqrt(sparse_dot(v, v));
+        return v;
+    };
+
+    auto update_licq_bytes = [&](const std::vector<SparseBasisVec>& b) {
+        std::size_t total = b.capacity() * sizeof(SparseBasisVec);
+        for (const auto& q : b) {
+            total += q.byte_footprint();
+        }
+        sol.telemetry.sparse_licq_basis_bytes =
+            std::max(sol.telemetry.sparse_licq_basis_bytes, total);
+    };
+
+    auto try_add_to_basis = [&](const NormalizedConstraint& constr,
+                                std::vector<SparseBasisVec>& b) {
+        SparseBasisVec a = make_sparse_vec(constr);
         double norm_a = 0.0;
-        for (double val : a)
-            norm_a += val * val;
-        norm_a = std::sqrt(norm_a);
-        if (norm_a < 1e-12)
-            return false;
-
-        std::vector<double> v = a;
-        for (const auto& q : b) {
-            double dot = 0.0;
-            for (std::size_t j = 0; j < n; ++j)
-                dot += q[j] * v[j];
-            for (std::size_t j = 0; j < n; ++j)
-                v[j] -= dot * q[j];
-        }
         double norm_v = 0.0;
-        for (double val : v)
-            norm_v += val * val;
-        norm_v = std::sqrt(norm_v);
-        return norm_v > 1e-4 * norm_a;
-    };
-
-    auto add_to_basis = [&](const std::vector<double>& a, std::vector<std::vector<double>>& b) {
-        std::vector<double> v = a;
-        for (const auto& q : b) {
-            double dot = 0.0;
-            for (std::size_t j = 0; j < n; ++j)
-                dot += q[j] * v[j];
-            for (std::size_t j = 0; j < n; ++j)
-                v[j] -= dot * q[j];
-        }
-        double norm_v = 0.0;
-        for (double val : v)
-            norm_v += val * val;
-        norm_v = std::sqrt(norm_v);
-        if (norm_v > 1e-12) {
-            for (double& val : v)
-                val /= norm_v;
+        SparseBasisVec v = project_sparse(a, b, norm_a, norm_v);
+        if (norm_a >= 1e-12 && norm_v > 1e-4 * norm_a && norm_v > 1e-12) {
+            const double inv_norm = 1.0 / norm_v;
+            for (auto& [var_id, val] : v.terms) {
+                val *= inv_norm;
+            }
             b.push_back(std::move(v));
+            update_licq_bytes(b);
+            return true;
         }
+        return false;
     };
 
     auto rebuild_basis = [&](const std::vector<std::size_t>& current_W) {
-        std::vector<std::vector<double>> new_basis;
+        std::vector<SparseBasisVec> new_basis;
         new_basis.reserve(current_W.size());
         for (std::size_t idx : current_W) {
-            auto a = get_dense_a(all_constrs[idx]);
-            add_to_basis(a, new_basis);
+            (void)try_add_to_basis(all_constrs[idx], new_basis);
         }
+        update_licq_bytes(new_basis);
         return new_basis;
     };
 
     // --- 4. Initialize Working Set W with LICQ Filter ---
     std::vector<std::size_t> W;
     W.reserve(n);
-    std::vector<std::vector<double>> basis;
-    basis.reserve(n);
+    std::vector<SparseBasisVec> basis;
+    basis.reserve(std::min<std::size_t>(n, 64));
 
     // Always include all equality constraints (if linearly independent)
     for (std::size_t l = 0; l < num_total_constrs; ++l) {
         if (all_constrs[l].is_equality) {
-            auto a = get_dense_a(all_constrs[l]);
-            if (is_linearly_independent(a, basis)) {
+            if (try_add_to_basis(all_constrs[l], basis)) {
                 W.push_back(l);
-                add_to_basis(a, basis);
             }
         }
     }
@@ -603,10 +920,8 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
             const double ax = dot_constr(all_constrs[l], x);
             if (std::abs(ax - all_constrs[l].rhs) <= opts.tolerances.primal_feasibility_tol) {
                 if (W.size() < n) {
-                    auto a = get_dense_a(all_constrs[l]);
-                    if (is_linearly_independent(a, basis)) {
+                    if (try_add_to_basis(all_constrs[l], basis)) {
                         W.push_back(l);
-                        add_to_basis(a, basis);
                     }
                 }
             }
@@ -652,8 +967,13 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
         const std::size_t K = W.size();
         const std::size_t dim = n + K;
 
+        std::size_t active_terms_nnz = 0;
+        for (std::size_t k = 0; k < K; ++k) {
+            active_terms_nnz += all_constrs[W[k]].terms.size();
+        }
+
         std::vector<numerics::Triplet> kkt_triplets;
-        kkt_triplets.reserve(Q.nonzeros() + 2 * K * n + n);
+        kkt_triplets.reserve(Q.nonzeros() + 2 * active_terms_nnz + n);
 
         // Top-left: Q + small regularization on diagonal for numerical stability on semidefinite Q
         const auto& kkt_q_cols = Q.col_idx();
@@ -683,6 +1003,13 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
 
         numerics::CsrMatrix KKT_matrix =
             numerics::CsrMatrix::from_triplets(dim, dim, kkt_triplets, true);
+
+        const std::size_t kkt_bytes = kkt_triplets.capacity() * sizeof(numerics::Triplet) +
+                                      KKT_matrix.values().capacity() * sizeof(double) +
+                                      KKT_matrix.col_idx().capacity() * sizeof(std::size_t) +
+                                      (KKT_matrix.rows() + 1) * sizeof(std::size_t);
+        sol.telemetry.sparse_kkt_peak_bytes =
+            std::max(sol.telemetry.sparse_kkt_peak_bytes, kkt_bytes);
 
         // RHS: [ -g ; -(A_W x - b_W) ]
         std::vector<double> rhs(dim, 0.0);
@@ -807,10 +1134,8 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
             }
 
             if (alpha < 1.0 - opts.tolerances.pivot_tol && blocking_l >= 0) {
-                auto a = get_dense_a(all_constrs[static_cast<std::size_t>(blocking_l)]);
-                if (is_linearly_independent(a, basis)) {
+                if (try_add_to_basis(all_constrs[static_cast<std::size_t>(blocking_l)], basis)) {
                     W.push_back(static_cast<std::size_t>(blocking_l));
-                    add_to_basis(a, basis);
                     sol.telemetry.constraints_added++;
                 }
             }
@@ -845,6 +1170,9 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
     const auto end_time = std::chrono::steady_clock::now();
     sol.telemetry.solve_time_ms =
         std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    sol.telemetry.peak_working_memory_bytes = sol.telemetry.sparse_hessian_bytes +
+                                              sol.telemetry.sparse_licq_basis_bytes +
+                                              sol.telemetry.sparse_kkt_peak_bytes;
 
     // --- 6. Independent Verification ---
     verification::QPVerifier verifier(

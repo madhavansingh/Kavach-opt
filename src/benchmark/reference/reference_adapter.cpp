@@ -70,10 +70,19 @@ std::string ExternalReferenceAdapter::discover_binary() {
         }
     }
 
-    // 2. Check standard system locations
-    const std::vector<std::string> standard_paths = {
-        "/opt/homebrew/bin/highs", "/usr/local/bin/highs", "/usr/bin/highs", "/bin/highs",
-        "C:\\Program Files\\HiGHS\\bin\\highs.exe"};
+    // 2. Check standard system and user-level bin locations
+    std::vector<std::string> standard_paths = {"/opt/homebrew/bin/highs", "/usr/local/bin/highs",
+                                               "/usr/bin/highs", "/bin/highs",
+                                               "C:\\Program Files\\HiGHS\\bin\\highs.exe"};
+
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        const std::string h(home);
+        standard_paths.push_back(h + "/.local/bin/highs");
+        standard_paths.push_back(h + "/Library/Python/3.9/bin/highs");
+        standard_paths.push_back(h + "/Library/Python/3.10/bin/highs");
+        standard_paths.push_back(h + "/Library/Python/3.11/bin/highs");
+        standard_paths.push_back(h + "/Library/Python/3.12/bin/highs");
+    }
 
     for (const auto& p : standard_paths) {
         std::error_code ec;
@@ -180,6 +189,17 @@ ReferenceRunResult ExternalReferenceAdapter::parse_output(std::string_view stdou
             if (pos != std::string::npos && pos + 1 < line.size()) {
                 try {
                     res.iterations = std::stoull(line.substr(pos + 1));
+                } catch (...) {
+                }
+            }
+        }
+
+        // MIP nodes
+        if (line.find("MIP nodes           :") != std::string::npos) {
+            auto pos = line.find(':');
+            if (pos != std::string::npos && pos + 1 < line.size()) {
+                try {
+                    res.nodes = std::stoull(line.substr(pos + 1));
                 } catch (...) {
                 }
             }
