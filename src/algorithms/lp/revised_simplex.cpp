@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <limits>
 
 namespace kavach::algorithms::lp {
@@ -69,6 +68,15 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
         if (p1_status != core::SolverStatus::OPTIMAL) {
             basis.accumulate_telemetry(telemetry);
             return {p1_status, {}, {}, {}, 0.0, "Phase I terminated with non-optimal status"};
+        }
+        if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "PHASE1_TO_PHASE2_TRANSITION")) {
+            basis.accumulate_telemetry(telemetry);
+            return {core::SolverStatus::NUMERICAL_FAILURE,
+                    {},
+                    {},
+                    {},
+                    0.0,
+                    "Failed to factorize basis at Phase I/II transition"};
         }
     }
 
@@ -197,7 +205,7 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
             if (basis.update_chain_length() > 0) {
                 const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
                 const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
-                if (p_res > 1e-11 || d_res > 1e-11) {
+                if (p_res > options_.basis_drift_tol || d_res > options_.basis_drift_tol) {
                     if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
                                          "PHASE1_OPTIMALITY_VERIFICATION")) {
                         return core::SolverStatus::NUMERICAL_FAILURE;
@@ -294,10 +302,16 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
         // Direction vector: solve B * d = A[:, entering_var]
         auto d = basis.solve_direction(lp_.A_csc(), entering_var);
 
+        double d_inf = 0.0;
+        for (std::size_t i = 0; i < m; ++i) {
+            d_inf = std::max(d_inf, std::abs(d[i]));
+        }
+        const double pivot_thresh = std::max(tol_.pivot_tol, 1e-7 * d_inf);
+
         // Minimum ratio test
         double min_ratio = std::numeric_limits<double>::infinity();
         for (std::size_t i = 0; i < m; ++i) {
-            if (d[i] > tol_.pivot_tol) {
+            if (d[i] > pivot_thresh) {
                 double ratio = std::max(0.0, x_B[i]) / d[i];
                 if (ratio < min_ratio) {
                     min_ratio = ratio;
@@ -315,7 +329,7 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
         std::size_t min_leaving_var = std::numeric_limits<std::size_t>::max();
 
         for (std::size_t i = 0; i < m; ++i) {
-            if (d[i] > tol_.pivot_tol) {
+            if (d[i] > pivot_thresh) {
                 double ratio = std::max(0.0, x_B[i]) / d[i];
                 if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
                     std::size_t cand_var = basis.basis_vars()[i];
@@ -364,7 +378,7 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                 // and select the tied candidate row in the minimum-ratio band with largest d[i].
                 basis.update_pivot(leaving_row, prev_leaving_var);
                 std::size_t best_row = std::numeric_limits<std::size_t>::max();
-                double max_d = tol_.pivot_tol;
+                double max_d = pivot_thresh;
                 for (std::size_t i = 0; i < m; ++i) {
                     if (i != leaving_row && d[i] > max_d) {
                         double ratio = std::max(0.0, x_B[i]) / d[i];
@@ -374,12 +388,21 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                         }
                     }
                 }
-                if (best_row == std::numeric_limits<std::size_t>::max()) {
-                    return core::SolverStatus::NUMERICAL_FAILURE;
+                if (best_row != std::numeric_limits<std::size_t>::max()) {
+                    const std::size_t prev_best_var = basis.basis_vars()[best_row];
+                    basis.update_pivot(best_row, entering_var);
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
+                        basis.update_pivot(best_row, prev_best_var);
+                        best_row = std::numeric_limits<std::size_t>::max();
+                    }
                 }
-                basis.update_pivot(best_row, entering_var);
-                if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
-                    return core::SolverStatus::NUMERICAL_FAILURE;
+                if (best_row == std::numeric_limits<std::size_t>::max()) {
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "REVERT_SINGULAR_PIVOT")) {
+                        return core::SolverStatus::NUMERICAL_FAILURE;
+                    }
+                    consecutive_degenerate = options_.bland_watchdog_threshold;
+                    x_B = basis.solve_primal(lp_.b());
+                    continue;
                 }
             }
             x_B = basis.solve_primal(lp_.b());
@@ -457,9 +480,7 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
             if (basis.update_chain_length() > 0) {
                 const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
                 const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
-                std::cout << "[PHASE2 OPT CHECK] p_res=" << p_res << ", d_res=" << d_res
-                          << ", chain=" << basis.update_chain_length() << std::endl;
-                if (p_res > 1e-11 || d_res > 1e-11) {
+                if (p_res > options_.basis_drift_tol || d_res > options_.basis_drift_tol) {
                     if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
                                          "PHASE2_OPTIMALITY_VERIFICATION")) {
                         return core::SolverStatus::NUMERICAL_FAILURE;
@@ -474,10 +495,16 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
         // Direction vector: solve B * d = A[:, entering_var]
         auto d = basis.solve_direction(lp_.A_csc(), entering_var);
 
+        double d_inf = 0.0;
+        for (std::size_t i = 0; i < m; ++i) {
+            d_inf = std::max(d_inf, std::abs(d[i]));
+        }
+        const double pivot_thresh = std::max(tol_.pivot_tol, 1e-7 * d_inf);
+
         // Minimum ratio test
         double min_ratio = std::numeric_limits<double>::infinity();
         for (std::size_t i = 0; i < m; ++i) {
-            if (d[i] > tol_.pivot_tol) {
+            if (d[i] > pivot_thresh) {
                 double ratio = std::max(0.0, x_B[i]) / d[i];
                 if (ratio < min_ratio) {
                     min_ratio = ratio;
@@ -495,7 +522,7 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
         std::size_t min_leaving_var = std::numeric_limits<std::size_t>::max();
 
         for (std::size_t i = 0; i < m; ++i) {
-            if (d[i] > tol_.pivot_tol) {
+            if (d[i] > pivot_thresh) {
                 double ratio = std::max(0.0, x_B[i]) / d[i];
                 if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
                     std::size_t cand_var = basis.basis_vars()[i];
@@ -542,7 +569,7 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
             if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, refactor_reason)) {
                 basis.update_pivot(leaving_row, prev_leaving_var);
                 std::size_t best_row = std::numeric_limits<std::size_t>::max();
-                double max_d = tol_.pivot_tol;
+                double max_d = pivot_thresh;
                 for (std::size_t i = 0; i < m; ++i) {
                     if (i != leaving_row && d[i] > max_d) {
                         double ratio = std::max(0.0, x_B[i]) / d[i];
@@ -552,12 +579,21 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
                         }
                     }
                 }
-                if (best_row == std::numeric_limits<std::size_t>::max()) {
-                    return core::SolverStatus::NUMERICAL_FAILURE;
+                if (best_row != std::numeric_limits<std::size_t>::max()) {
+                    const std::size_t prev_best_var = basis.basis_vars()[best_row];
+                    basis.update_pivot(best_row, entering_var);
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
+                        basis.update_pivot(best_row, prev_best_var);
+                        best_row = std::numeric_limits<std::size_t>::max();
+                    }
                 }
-                basis.update_pivot(best_row, entering_var);
-                if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
-                    return core::SolverStatus::NUMERICAL_FAILURE;
+                if (best_row == std::numeric_limits<std::size_t>::max()) {
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "REVERT_SINGULAR_PIVOT")) {
+                        return core::SolverStatus::NUMERICAL_FAILURE;
+                    }
+                    consecutive_degenerate = options_.bland_watchdog_threshold;
+                    x_B = basis.solve_primal(lp_.b());
+                    continue;
                 }
             }
             x_B = basis.solve_primal(lp_.b());

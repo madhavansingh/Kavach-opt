@@ -123,8 +123,8 @@ Independent mathematical certification performed by `MILPVerifier`:
 |---|---|---|---|---|---|
 | `baseline` | 5445.909091 | N/A | N/A | 0.0013 s | UNAVAILABLE |
 | `scenario_a_reduced_crude` | 3750.000000 | N/A | N/A | 0.0014 s | UNAVAILABLE |
-| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0012 s | UNAVAILABLE |
-| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0012 s | UNAVAILABLE |
+| `scenario_b_tight_quality` | 4975.000000 | N/A | N/A | 0.0011 s | UNAVAILABLE |
+| `scenario_c_reduced_capacity` | 5445.909091 | N/A | N/A | 0.0013 s | UNAVAILABLE |
 | `scenario_d_infeasible` | N/A | N/A | N/A | 0.0000 s | UNAVAILABLE |
 
 ## 14. Limitations

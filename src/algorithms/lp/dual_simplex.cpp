@@ -154,7 +154,7 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
             if (basis.update_chain_length() > 0) {
                 const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
                 const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
-                if (p_res > 1e-11 || d_res > 1e-11) {
+                if (p_res > options_.basis_drift_tol || d_res > options_.basis_drift_tol) {
                     if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
                                          "DUAL_OPTIMALITY_VERIFICATION")) {
                         basis.accumulate_telemetry(telemetry);

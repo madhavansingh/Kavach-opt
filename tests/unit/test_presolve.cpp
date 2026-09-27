@@ -908,12 +908,6 @@ KAVACH_TEST(test_presolve_cert_netlib_on_vs_off_equivalence) {
         opts_off.enable_presolve = false;
         auto sol_off = solver.solve(*model, opts_off);
 
-        std::cout << "[EQUIV TEST] " << file_name << " sol_on=" << core::to_string(sol_on.status)
-                  << " (iters=" << sol_on.iterations << ")"
-                  << " sol_off=" << core::to_string(sol_off.status)
-                  << " (iters=" << sol_off.iterations << ", msg=" << sol_off.message << ")"
-                  << std::endl;
-
         KAVACH_ASSERT(sol_on.status == core::SolverStatus::OPTIMAL);
         KAVACH_ASSERT(sol_off.status == core::SolverStatus::OPTIMAL);
 
