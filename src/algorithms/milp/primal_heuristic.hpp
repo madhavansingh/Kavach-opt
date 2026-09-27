@@ -38,9 +38,9 @@ public:
      * @param backend Optional execution backend for batched candidate activity evaluation.
      * @return PrimalHeuristicResult containing candidate solution if certified feasible.
      */
-    [[nodiscard]] PrimalHeuristicResult search(
-        const model::CanonicalModel& model, const std::vector<double>& x_lp,
-        backend::ExecutionBackend* backend = nullptr) const;
+    [[nodiscard]] PrimalHeuristicResult search(const model::CanonicalModel& model,
+                                               const std::vector<double>& x_lp,
+                                               backend::ExecutionBackend* backend = nullptr) const;
 
 private:
     core::SolverTolerances tols_;

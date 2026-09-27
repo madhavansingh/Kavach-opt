@@ -59,7 +59,8 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
     SimplexBasis basis;
     basis.load_state(initial_basis);
 
-    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
+    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "DUAL_WARM_START_INITIAL")) {
+        basis.accumulate_telemetry(telemetry);
         return {core::SolverStatus::NUMERICAL_FAILURE,
                 {},
                 {},
@@ -67,13 +68,13 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
                 0.0,
                 "Inherited basis factorization failed: " + basis.error_message()};
     }
-    ++telemetry.refactorization_count;
 
     // 3. Compute initial simplex multipliers y = B^{-T} c_B
     std::vector<double> c_B(m, 0.0);
     for (std::size_t i = 0; i < m; ++i) {
         std::size_t v = basis.basis_vars()[i];
         if (v >= n) {
+            basis.accumulate_telemetry(telemetry);
             return {core::SolverStatus::NUMERICAL_FAILURE,
                     {},
                     {},
@@ -97,6 +98,7 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
             double yTa = at_y[j];
             double rc = lp_.c()[j] - yTa;
             if (rc < -tol_.dual_feasibility_tol) {
+                basis.accumulate_telemetry(telemetry);
                 return {core::SolverStatus::NUMERICAL_FAILURE,
                         {},
                         {},
@@ -119,10 +121,12 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
     while (true) {
         if (telemetry.total_iterations >= options_.max_iterations ||
             telemetry.dual_simplex_iterations >= max_dual_iters) {
+            basis.accumulate_telemetry(telemetry);
             return {core::SolverStatus::LIMIT_REACHED,     {}, {}, {}, 0.0,
                     "Dual simplex iteration limit reached"};
         }
         if (check_time_limit(start_time)) {
+            basis.accumulate_telemetry(telemetry);
             return {core::SolverStatus::LIMIT_REACHED, {}, {}, {}, 0.0,
                     "Dual simplex time limit reached"};
         }
@@ -147,6 +151,29 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
 
         // --- Step 2: Check primal feasibility termination ---
         if (leaving_row == std::numeric_limits<std::size_t>::max()) {
+            if (basis.update_chain_length() > 0) {
+                const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+                const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+                if (p_res > 1e-11 || d_res > 1e-11) {
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
+                                         "DUAL_OPTIMALITY_VERIFICATION")) {
+                        basis.accumulate_telemetry(telemetry);
+                        return {core::SolverStatus::NUMERICAL_FAILURE,
+                                {},
+                                {},
+                                {},
+                                0.0,
+                                "Basis factorization failed at dual optimality verification"};
+                    }
+                    x_B = basis.solve_primal(lp_.b());
+                    for (std::size_t i = 0; i < m; ++i) {
+                        c_B[i] = lp_.c()[basis.basis_vars()[i]];
+                    }
+                    y = basis.solve_dual(c_B);
+                    continue;
+                }
+            }
+
             // All basic variables are non-negative within primal feasibility tolerance!
             // Primal feasibility restored + dual feasibility maintained => OPTIMAL
             std::vector<double> z(n, 0.0);
@@ -160,8 +187,8 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
             std::vector<double> reduced_costs(n, 0.0);
             std::vector<double> at_y_opt(n, 0.0);
             if (options_.execution_backend != nullptr) {
-                options_.execution_backend->batched_spmv_transpose(
-                    lp_.A_csr(), y.data(), at_y_opt.data(), 1);
+                options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), y.data(),
+                                                                   at_y_opt.data(), 1);
             } else {
                 lp_.A_csr().spmv_transpose(y.data(), at_y_opt.data());
             }
@@ -176,6 +203,9 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
                 obj += lp_.c()[j] * z[j];
             }
 
+            (void)basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+            (void)basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+            basis.accumulate_telemetry(telemetry);
             resulting_basis = basis.export_state();
             telemetry.condition_estimate = basis.condition_estimate();
 
@@ -197,8 +227,8 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
         }
         std::vector<double> batch_out(2 * n, 0.0);
         if (options_.execution_backend != nullptr) {
-            options_.execution_backend->batched_spmv_transpose(
-                lp_.A_csr(), batch_vy.data(), batch_out.data(), 2);
+            options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), batch_vy.data(),
+                                                               batch_out.data(), 2);
         } else {
             lp_.A_csr().spmv_transpose(v.data(), batch_out.data());
             lp_.A_csr().spmv_transpose(y.data(), batch_out.data() + n);
@@ -232,6 +262,7 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
         // --- Step 5: Check primal infeasibility (dual unboundedness) ---
         if (entering_col == std::numeric_limits<std::size_t>::max()) {
             // Row has no negative entries: dual ray proven, problem is primal infeasible!
+            basis.accumulate_telemetry(telemetry);
             return {core::SolverStatus::INFEASIBLE,
                     {},
                     {},
@@ -253,29 +284,51 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
             ++telemetry.bland_fallback_iterations;
         }
 
-        // --- Step 6: Pivot ---
-        basis.update_pivot(leaving_row, entering_col);
+        // --- Step 6: Pivot with Incremental Eta Basis Update ---
+        auto d = basis.solve_direction(lp_.A_csc(), entering_col);
+        const bool eta_ok = basis.apply_eta_update(leaving_row, entering_col, d, tol_.pivot_tol);
         ++telemetry.pivot_count;
         ++telemetry.dual_simplex_iterations;
         ++telemetry.total_iterations;
 
-        // Periodic or required refactorization
-        if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-            return {core::SolverStatus::NUMERICAL_FAILURE,
-                    {},
-                    {},
-                    {},
-                    0.0,
-                    "Basis factorization failed during dual pivot: " + basis.error_message()};
-        }
-        ++telemetry.refactorization_count;
+        bool need_refactor =
+            !eta_ok || basis.needs_refactorization(options_.refactorization_interval);
+        std::string refactor_reason =
+            need_refactor ? basis.pending_refactorization_reason(options_.refactorization_interval)
+                          : "";
 
-        // Recompute primal and dual quantities
-        x_B = basis.solve_primal(lp_.b());
-        for (std::size_t i = 0; i < m; ++i) {
-            c_B[i] = lp_.c()[basis.basis_vars()[i]];
+        if (!need_refactor) {
+            x_B = basis.solve_primal(lp_.b());
+            for (std::size_t i = 0; i < m; ++i) {
+                c_B[i] = lp_.c()[basis.basis_vars()[i]];
+            }
+            y = basis.solve_dual(c_B);
+            const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+            const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+            if (p_res > options_.basis_drift_tol || d_res > options_.basis_drift_tol) {
+                need_refactor = true;
+                refactor_reason = "DUAL_SIMPLEX_RESIDUAL_DRIFT";
+            }
         }
-        y = basis.solve_dual(c_B);
+
+        if (need_refactor) {
+            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, refactor_reason)) {
+                basis.accumulate_telemetry(telemetry);
+                return {core::SolverStatus::NUMERICAL_FAILURE,
+                        {},
+                        {},
+                        {},
+                        0.0,
+                        "Basis factorization failed during dual pivot: " + basis.error_message()};
+            }
+            x_B = basis.solve_primal(lp_.b());
+            for (std::size_t i = 0; i < m; ++i) {
+                c_B[i] = lp_.c()[basis.basis_vars()[i]];
+            }
+            y = basis.solve_dual(c_B);
+            (void)basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+            (void)basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+        }
     }
 }
 

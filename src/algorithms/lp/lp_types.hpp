@@ -44,6 +44,7 @@ struct LPSolverOptions {
     bool enable_warm_start{false};
     bool preserve_bounds_structure{false};  ///< Keep BOXED representation even if ub == lb
     std::size_t refactorization_interval{50};
+    double basis_drift_tol{1e-9};  ///< Max acceptable ||B x_B - b||_inf before refactorization
     std::size_t bland_watchdog_threshold{30};  ///< Degenerate iterations before Bland fallback
     bool force_bland_rule{false};  ///< Unconditionally use Bland's rule from iteration 1
     bool verbose{false};
@@ -76,6 +77,21 @@ struct LPSolverTelemetry {
     double solve_time_seconds{0.0};
     double condition_estimate{1.0};
     std::vector<std::string> numerical_warnings;
+
+    // Basis-Update Factorization Telemetry
+    std::size_t basis_updates{0};
+    std::size_t full_refactorizations{0};
+    std::size_t update_failures{0};
+    std::string refactorization_reason{"INITIAL_FACTORIZATION"};
+    std::size_t maximum_update_chain{0};
+    double average_update_chain{0.0};
+    double basis_residual_max{0.0};
+    double update_application_time_seconds{0.0};
+    double full_refactorization_time_seconds{0.0};
+    std::size_t base_factorization_bytes{0};
+    std::size_t update_chain_bytes{0};
+    std::size_t peak_memory_bytes{0};
+    std::size_t memory_after_refactor_bytes{0};
 
     // Dual Simplex / Warm-Start Telemetry
     std::size_t warm_start_attempts{0};

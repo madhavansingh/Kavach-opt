@@ -50,7 +50,8 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
     SimplexBasis basis;
     basis.initialize(lp_.initial_basis(), n);
 
-    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
+    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "INITIAL_FACTORIZATION")) {
+        basis.accumulate_telemetry(telemetry);
         telemetry.numerical_warnings.push_back("Initial basis factorization failed: " +
                                                basis.error_message());
         return {core::SolverStatus::NUMERICAL_FAILURE,
@@ -60,12 +61,12 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
                 0.0,
                 "Numerical failure in initial basis factorization"};
     }
-    ++telemetry.refactorization_count;
 
     // Phase I: Artificial variable feasibility problem
     if (lp_.has_artificials()) {
         auto p1_status = run_phase1(basis, telemetry, start_time);
         if (p1_status != core::SolverStatus::OPTIMAL) {
+            basis.accumulate_telemetry(telemetry);
             return {p1_status, {}, {}, {}, 0.0, "Phase I terminated with non-optimal status"};
         }
     }
@@ -73,6 +74,7 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
     // Phase II: Optimization of true objective
     auto p2_status = run_phase2(basis, telemetry, start_time);
     if (p2_status != core::SolverStatus::OPTIMAL) {
+        basis.accumulate_telemetry(telemetry);
         return {p2_status, {}, {}, {}, 0.0, "Phase II terminated with non-optimal status"};
     }
 
@@ -111,6 +113,9 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
         obj += lp_.c()[j] * z[j];
     }
 
+    (void)basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+    (void)basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+    basis.accumulate_telemetry(telemetry);
     telemetry.condition_estimate = basis.condition_estimate();
     return {core::SolverStatus::OPTIMAL, std::move(z), std::move(y),
             std::move(reduced_costs),    obj,          "Optimal",
@@ -188,6 +193,19 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
 
         // Phase I optimality reached?
         if (entering_var == std::numeric_limits<std::size_t>::max()) {
+            if (basis.update_chain_length() > 0) {
+                const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+                const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+                if (p_res > 1e-11 || d_res > 1e-11) {
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
+                                         "PHASE1_OPTIMALITY_VERIFICATION")) {
+                        return core::SolverStatus::NUMERICAL_FAILURE;
+                    }
+                    x_B = basis.solve_primal(lp_.b());
+                    continue;
+                }
+            }
+
             double phase1_obj = 0.0;
             for (std::size_t i = 0; i < m; ++i) {
                 phase1_obj += c_B[i] * x_B[i];
@@ -213,7 +231,8 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                     std::vector<double> e_r(m, 0.0);
                     e_r[art_rows[k]] = 1.0;
                     auto vk = basis.solve_dual(e_r);
-                    std::copy(vk.begin(), vk.end(), batch_v.begin() + static_cast<std::ptrdiff_t>(k * m));
+                    std::copy(vk.begin(), vk.end(),
+                              batch_v.begin() + static_cast<std::ptrdiff_t>(k * m));
                 }
                 std::vector<double> batch_w(K * n, 0.0);
                 options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), batch_v.data(),
@@ -247,14 +266,17 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                         }
                     }
                     if (best_j != std::numeric_limits<std::size_t>::max()) {
-                        basis.update_pivot(r, best_j);
-                        if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-                            basis.update_pivot(r, b_var);
-                            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-                                return core::SolverStatus::NUMERICAL_FAILURE;
+                        auto d_art = basis.solve_direction(lp_.A_csc(), best_j);
+                        if (!basis.apply_eta_update(r, best_j, d_art, tol_.pivot_tol) ||
+                            basis.needs_refactorization(options_.refactorization_interval)) {
+                            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
+                                                 "ARTIFICIAL_BASIS_PURGE")) {
+                                basis.update_pivot(r, b_var);
+                                if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
+                                                     "ARTIFICIAL_PURGE_REVERT")) {
+                                    return core::SolverStatus::NUMERICAL_FAILURE;
+                                }
                             }
-                        } else {
-                            ++telemetry.refactorization_count;
                         }
                     }
                 }
@@ -315,36 +337,53 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
         }
 
         const std::size_t prev_leaving_var = basis.basis_vars()[leaving_row];
-        basis.update_pivot(leaving_row, entering_var);
+        const bool eta_ok = basis.apply_eta_update(leaving_row, entering_var, d, tol_.pivot_tol);
         ++telemetry.pivot_count;
         ++telemetry.phase1_iterations;
         ++telemetry.total_iterations;
 
-        if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-            // Revert singular pivot caused by near-zero LU roundoff in d[leaving_row]
-            // and select the tied candidate row in the minimum-ratio band with largest d[i].
-            basis.update_pivot(leaving_row, prev_leaving_var);
-            std::size_t best_row = std::numeric_limits<std::size_t>::max();
-            double max_d = tol_.pivot_tol;
-            for (std::size_t i = 0; i < m; ++i) {
-                if (i != leaving_row && d[i] > max_d) {
-                    double ratio = std::max(0.0, x_B[i]) / d[i];
-                    if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
-                        max_d = d[i];
-                        best_row = i;
-                    }
-                }
-            }
-            if (best_row == std::numeric_limits<std::size_t>::max()) {
-                return core::SolverStatus::NUMERICAL_FAILURE;
-            }
-            basis.update_pivot(best_row, entering_var);
-            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-                return core::SolverStatus::NUMERICAL_FAILURE;
+        bool need_refactor =
+            !eta_ok || basis.needs_refactorization(options_.refactorization_interval);
+        std::string refactor_reason =
+            need_refactor ? basis.pending_refactorization_reason(options_.refactorization_interval)
+                          : "";
+
+        if (!need_refactor) {
+            x_B = basis.solve_primal(lp_.b());
+            const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+            if (p_res > options_.basis_drift_tol) {
+                need_refactor = true;
+                refactor_reason = "PRIMAL_RESIDUAL_DRIFT";
             }
         }
-        ++telemetry.refactorization_count;
-        x_B = basis.solve_primal(lp_.b());
+
+        if (need_refactor) {
+            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, refactor_reason)) {
+                // Revert singular pivot caused by near-zero LU roundoff in d[leaving_row]
+                // and select the tied candidate row in the minimum-ratio band with largest d[i].
+                basis.update_pivot(leaving_row, prev_leaving_var);
+                std::size_t best_row = std::numeric_limits<std::size_t>::max();
+                double max_d = tol_.pivot_tol;
+                for (std::size_t i = 0; i < m; ++i) {
+                    if (i != leaving_row && d[i] > max_d) {
+                        double ratio = std::max(0.0, x_B[i]) / d[i];
+                        if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
+                            max_d = d[i];
+                            best_row = i;
+                        }
+                    }
+                }
+                if (best_row == std::numeric_limits<std::size_t>::max()) {
+                    return core::SolverStatus::NUMERICAL_FAILURE;
+                }
+                basis.update_pivot(best_row, entering_var);
+                if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
+                    return core::SolverStatus::NUMERICAL_FAILURE;
+                }
+            }
+            x_B = basis.solve_primal(lp_.b());
+            (void)basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+        }
     }
 
     return core::SolverStatus::UNKNOWN;
@@ -414,6 +453,18 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
 
         // Optimality criterion satisfied: all reduced costs >= -optimality_tol
         if (entering_var == std::numeric_limits<std::size_t>::max()) {
+            if (basis.update_chain_length() > 0) {
+                const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+                const double d_res = basis.compute_dual_residual(lp_.A_csc(), y, c_B);
+                if (p_res > 1e-11 || d_res > 1e-11) {
+                    if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol,
+                                         "PHASE2_OPTIMALITY_VERIFICATION")) {
+                        return core::SolverStatus::NUMERICAL_FAILURE;
+                    }
+                    x_B = basis.solve_primal(lp_.b());
+                    continue;
+                }
+            }
             return core::SolverStatus::OPTIMAL;
         }
 
@@ -464,34 +515,51 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
         }
 
         const std::size_t prev_leaving_var = basis.basis_vars()[leaving_row];
-        basis.update_pivot(leaving_row, entering_var);
+        const bool eta_ok = basis.apply_eta_update(leaving_row, entering_var, d, tol_.pivot_tol);
         ++telemetry.pivot_count;
         ++telemetry.phase2_iterations;
         ++telemetry.total_iterations;
 
-        if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-            basis.update_pivot(leaving_row, prev_leaving_var);
-            std::size_t best_row = std::numeric_limits<std::size_t>::max();
-            double max_d = tol_.pivot_tol;
-            for (std::size_t i = 0; i < m; ++i) {
-                if (i != leaving_row && d[i] > max_d) {
-                    double ratio = std::max(0.0, x_B[i]) / d[i];
-                    if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
-                        max_d = d[i];
-                        best_row = i;
-                    }
-                }
-            }
-            if (best_row == std::numeric_limits<std::size_t>::max()) {
-                return core::SolverStatus::NUMERICAL_FAILURE;
-            }
-            basis.update_pivot(best_row, entering_var);
-            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol)) {
-                return core::SolverStatus::NUMERICAL_FAILURE;
+        bool need_refactor =
+            !eta_ok || basis.needs_refactorization(options_.refactorization_interval);
+        std::string refactor_reason =
+            need_refactor ? basis.pending_refactorization_reason(options_.refactorization_interval)
+                          : "";
+
+        if (!need_refactor) {
+            x_B = basis.solve_primal(lp_.b());
+            const double p_res = basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+            if (p_res > options_.basis_drift_tol) {
+                need_refactor = true;
+                refactor_reason = "PRIMAL_RESIDUAL_DRIFT";
             }
         }
-        ++telemetry.refactorization_count;
-        x_B = basis.solve_primal(lp_.b());
+
+        if (need_refactor) {
+            if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, refactor_reason)) {
+                basis.update_pivot(leaving_row, prev_leaving_var);
+                std::size_t best_row = std::numeric_limits<std::size_t>::max();
+                double max_d = tol_.pivot_tol;
+                for (std::size_t i = 0; i < m; ++i) {
+                    if (i != leaving_row && d[i] > max_d) {
+                        double ratio = std::max(0.0, x_B[i]) / d[i];
+                        if (std::abs(ratio - min_ratio) <= tol_.primal_feasibility_tol) {
+                            max_d = d[i];
+                            best_row = i;
+                        }
+                    }
+                }
+                if (best_row == std::numeric_limits<std::size_t>::max()) {
+                    return core::SolverStatus::NUMERICAL_FAILURE;
+                }
+                basis.update_pivot(best_row, entering_var);
+                if (!basis.factorize(lp_.A_csc(), tol_.pivot_tol, "SINGULAR_PIVOT_RECOVERY")) {
+                    return core::SolverStatus::NUMERICAL_FAILURE;
+                }
+            }
+            x_B = basis.solve_primal(lp_.b());
+            (void)basis.compute_primal_residual(lp_.A_csc(), x_B, lp_.b());
+        }
     }
 }
 

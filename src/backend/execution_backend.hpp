@@ -94,13 +94,13 @@ struct BackendExecutionTelemetry {
     bool fallback_occurred{false};
     std::string fallback_reason;
     std::string kernel_name;
-    std::size_t batch_size{0};           ///< Maximum batch size executed across invocations
-    std::size_t total_vectors{0};        ///< Total vectors processed across all invocations
-    std::size_t invocations{0};          ///< Number of actual backend kernel/routine calls
-    std::size_t worker_count{1};         ///< Active CPU worker threads or GPU execution streams
-    double h2d_time_seconds{0.0};        ///< Host-to-device transfer time (0 for CPU backends)
-    double kernel_time_seconds{0.0};     ///< Pure kernel or CPU execution time
-    double d2h_time_seconds{0.0};        ///< Device-to-host transfer time (0 for CPU backends)
+    std::size_t batch_size{0};               ///< Maximum batch size executed across invocations
+    std::size_t total_vectors{0};            ///< Total vectors processed across all invocations
+    std::size_t invocations{0};              ///< Number of actual backend kernel/routine calls
+    std::size_t worker_count{1};             ///< Active CPU worker threads or GPU execution streams
+    double h2d_time_seconds{0.0};            ///< Host-to-device transfer time (0 for CPU backends)
+    double kernel_time_seconds{0.0};         ///< Pure kernel or CPU execution time
+    double d2h_time_seconds{0.0};            ///< Device-to-host transfer time (0 for CPU backends)
     double total_backend_time_seconds{0.0};  ///< Total backend execution time
 };
 
@@ -256,4 +256,3 @@ protected:
     bool force_cuda_fallback = false, std::string initial_fallback_reason = "");
 
 }  // namespace kavach::backend
-

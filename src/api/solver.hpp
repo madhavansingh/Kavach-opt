@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "algorithms/lp/lp_types.hpp"
 #include "algorithms/milp/cut_types.hpp"
 #include "algorithms/milp/search_types.hpp"
 #include "algorithms/miqp/miqp_types.hpp"
@@ -57,6 +58,7 @@ struct SolverResult {
     std::optional<algorithms::milp::CutTelemetry> cut_telemetry{std::nullopt};
     std::optional<algorithms::milp::SearchTelemetry> search_telemetry{std::nullopt};
     std::optional<algorithms::miqp::MIQPTelemetry> miqp_telemetry{std::nullopt};
+    std::optional<algorithms::lp::LPSolverTelemetry> lp_telemetry{std::nullopt};
 };
 
 /**

@@ -24,9 +24,8 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model) {
 strategy::StrategyDecision KavachSolver::plan(const model::CanonicalModel& model,
                                               const SolverOptions& options) {
     auto config = options.strategy_config;
-    const bool explicit_cuda_override =
-        config.override_backend.has_value() &&
-        *config.override_backend == backend::BackendType::CUDA_GPU;
+    const bool explicit_cuda_override = config.override_backend.has_value() &&
+                                        *config.override_backend == backend::BackendType::CUDA_GPU;
     if (!options.use_gpu && !explicit_cuda_override) {
         config.force_no_gpu = true;
     }
@@ -76,16 +75,15 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         initial_fallback_reason = "GPU execution disabled via force_no_gpu / --no-gpu";
     }
 
-    const std::size_t num_workers =
-        (selected_backend == backend::BackendType::CPU_MULTICORE ||
-         requested_backend == backend::BackendType::CPU_MULTICORE ||
-         requested_backend == backend::BackendType::CUDA_GPU)
-            ? std::max<std::size_t>(2, decision.recommended_cpu_threads)
-            : 1;
+    const std::size_t num_workers = (selected_backend == backend::BackendType::CPU_MULTICORE ||
+                                     requested_backend == backend::BackendType::CPU_MULTICORE ||
+                                     requested_backend == backend::BackendType::CUDA_GPU)
+                                        ? std::max<std::size_t>(2, decision.recommended_cpu_threads)
+                                        : 1;
 
-    auto exec_backend = backend::create_execution_backend(
-        requested_backend, selected_backend, num_workers, options.force_cuda_fallback,
-        initial_fallback_reason);
+    auto exec_backend =
+        backend::create_execution_backend(requested_backend, selected_backend, num_workers,
+                                          options.force_cuda_fallback, initial_fallback_reason);
 
     double time_limit_sec = 0.0;
     if (options.time_limit.has_value()) {
@@ -106,8 +104,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
             sol.primal_solution.size() == model.num_variables()) {
             const auto orig_csr = numerics::canonical_model_to_csr(model);
             std::vector<double> activities(model.num_constraints(), 0.0);
-            exec_backend->batched_spmv(orig_csr, sol.primal_solution.data(),
-                                       activities.data(), 1);
+            exec_backend->batched_spmv(orig_csr, sol.primal_solution.data(), activities.data(), 1);
         }
 
         auto end_time = std::chrono::steady_clock::now();
@@ -161,6 +158,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
             sol.telemetry.dual_simplex_iterations + sol.telemetry.cold_start_iterations;
         result.cut_telemetry = sol.telemetry.cut_telemetry;
         result.search_telemetry = sol.telemetry.search_telemetry;
+        result.lp_telemetry = sol.telemetry.lp_basis_telemetry;
 
         if (sol.is_optimal() && sol.has_incumbent()) {
             verification::MILPVerifier verifier;
@@ -192,8 +190,8 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
             sol.incumbent_solution.size() == model.num_variables()) {
             const auto orig_csr = numerics::canonical_model_to_csr(model);
             std::vector<double> activities(model.num_constraints(), 0.0);
-            exec_backend->batched_spmv(orig_csr, sol.incumbent_solution.data(),
-                                       activities.data(), 1);
+            exec_backend->batched_spmv(orig_csr, sol.incumbent_solution.data(), activities.data(),
+                                       1);
         }
 
         auto end_time = std::chrono::steady_clock::now();
@@ -244,6 +242,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         result.dual_solution = sol.dual_multipliers;
         result.reduced_costs = sol.reduced_costs;
         result.iterations = sol.iterations;
+        result.lp_telemetry = sol.telemetry;
 
         if (sol.is_optimal()) {
             verification::LPVerifier verifier;

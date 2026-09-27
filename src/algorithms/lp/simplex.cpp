@@ -174,8 +174,8 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
 
     // 9. Reconstruct original model solution and optimality certificate
     if (reconstruction_map.has_value()) {
-        auto cert = reconstruction_map->restore_certificate(
-            x_reduced, dual_reduced, rc_reduced, effective_options.tolerances);
+        auto cert = reconstruction_map->restore_certificate(x_reduced, dual_reduced, rc_reduced,
+                                                            effective_options.tolerances);
         if (!cert.valid) {
             solution.status = core::SolverStatus::NUMERICAL_FAILURE;
             solution.message = "Presolve certificate reconstruction failed: " + cert.diagnostic;

@@ -55,8 +55,7 @@ PrimalHeuristicResult PrimalHeuristic::search(const model::CanonicalModel& model
             std::size_t flip_j = fractional_indices[b - 1];
             const auto& var = model.variable(static_cast<model::VarId>(flip_j));
             double lp_val = x_lp[flip_j];
-            double alt_val =
-                (x[flip_j] >= lp_val) ? std::floor(lp_val) : std::ceil(lp_val);
+            double alt_val = (x[flip_j] >= lp_val) ? std::floor(lp_val) : std::ceil(lp_val);
             alt_val = std::max(var.lower_bound, std::min(var.upper_bound, alt_val));
             batch_x[b * n + flip_j] = alt_val;
         }

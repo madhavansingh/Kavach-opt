@@ -606,6 +606,33 @@ int handle_solve(const std::vector<std::string_view>& args) {
                     static_cast<double>(result.miqp_telemetry->nodes_pruned_infeasible);
                 res["miqp"] = std::move(miqp);
             }
+            if (result.lp_telemetry.has_value()) {
+                kavach::benchmark::JsonValue::Object basis_tel;
+                basis_tel["basis_updates"] =
+                    static_cast<double>(result.lp_telemetry->basis_updates);
+                basis_tel["full_refactorizations"] =
+                    static_cast<double>(result.lp_telemetry->full_refactorizations);
+                basis_tel["update_failures"] =
+                    static_cast<double>(result.lp_telemetry->update_failures);
+                basis_tel["refactorization_reason"] = result.lp_telemetry->refactorization_reason;
+                basis_tel["maximum_update_chain"] =
+                    static_cast<double>(result.lp_telemetry->maximum_update_chain);
+                basis_tel["average_update_chain"] = result.lp_telemetry->average_update_chain;
+                basis_tel["basis_residual_max"] = result.lp_telemetry->basis_residual_max;
+                basis_tel["update_application_time_seconds"] =
+                    result.lp_telemetry->update_application_time_seconds;
+                basis_tel["full_refactorization_time_seconds"] =
+                    result.lp_telemetry->full_refactorization_time_seconds;
+                basis_tel["base_factorization_bytes"] =
+                    static_cast<double>(result.lp_telemetry->base_factorization_bytes);
+                basis_tel["update_chain_bytes"] =
+                    static_cast<double>(result.lp_telemetry->update_chain_bytes);
+                basis_tel["peak_memory_bytes"] =
+                    static_cast<double>(result.lp_telemetry->peak_memory_bytes);
+                basis_tel["memory_after_refactor_bytes"] =
+                    static_cast<double>(result.lp_telemetry->memory_after_refactor_bytes);
+                res["basis_telemetry"] = std::move(basis_tel);
+            }
             root["result"] = std::move(res);
 
             kavach::benchmark::JsonValue::Object ver;
@@ -749,6 +776,13 @@ int handle_solve(const std::vector<std::string_view>& args) {
                               ? "VERIFIED_OPTIMAL (Certified by LPVerifier)"
                               : "UNVERIFIED")
                       << "\n";
+        }
+        if (result.lp_telemetry.has_value()) {
+            std::cout << "Basis Factorization: Updates=" << result.lp_telemetry->basis_updates
+                      << ", FullRefactors=" << result.lp_telemetry->full_refactorizations
+                      << ", MaxChain=" << result.lp_telemetry->maximum_update_chain
+                      << ", MaxResidual=" << result.lp_telemetry->basis_residual_max
+                      << ", Reason=" << result.lp_telemetry->refactorization_reason << "\n";
         }
         std::cout << "Execution Backend: "
                   << kavach::backend::to_string(result.backend_telemetry.executed_backend)

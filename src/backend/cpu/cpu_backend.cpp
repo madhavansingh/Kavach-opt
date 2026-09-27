@@ -137,46 +137,44 @@ void parallel_batched_spmv(const numerics::CsrMatrix& A, const double* batch_x, 
             const auto& row_ptr = A.row_ptr();
             const auto& col_idx = A.col_idx();
             const auto& values = A.values();
-            pool->parallel_for_chunks(
-                out_dim, pool->worker_count(),
-                [&row_ptr, &col_idx, &values, batch_x, batch_y](std::size_t r_start,
-                                                                std::size_t r_end) {
-                    for (std::size_t r = r_start; r < r_end; ++r) {
-                        double sum = 0.0;
-                        const std::size_t p_start = row_ptr[r];
-                        const std::size_t p_end = row_ptr[r + 1];
-                        for (std::size_t p = p_start; p < p_end; ++p) {
-                            sum += values[p] * batch_x[col_idx[p]];
-                        }
-                        batch_y[r] = sum;
-                    }
-                });
+            pool->parallel_for_chunks(out_dim, pool->worker_count(),
+                                      [&row_ptr, &col_idx, &values, batch_x, batch_y](
+                                          std::size_t r_start, std::size_t r_end) {
+                                          for (std::size_t r = r_start; r < r_end; ++r) {
+                                              double sum = 0.0;
+                                              const std::size_t p_start = row_ptr[r];
+                                              const std::size_t p_end = row_ptr[r + 1];
+                                              for (std::size_t p = p_start; p < p_end; ++p) {
+                                                  sum += values[p] * batch_x[col_idx[p]];
+                                              }
+                                              batch_y[r] = sum;
+                                          }
+                                      });
         } else {
             // batch_size == 1, transpose: partition output columns [0, A.cols()) deterministically
             const auto& row_ptr = A.row_ptr();
             const auto& col_idx = A.col_idx();
             const auto& values = A.values();
             const std::size_t rows = A.rows();
-            pool->parallel_for_chunks(
-                out_dim, pool->worker_count(),
-                [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](std::size_t c_start,
-                                                                      std::size_t c_end) {
-                    std::fill(batch_y + c_start, batch_y + c_end, 0.0);
-                    for (std::size_t r = 0; r < rows; ++r) {
-                        const double xr = batch_x[r];
-                        if (xr == 0.0) {
-                            continue;
-                        }
-                        const std::size_t p_start = row_ptr[r];
-                        const std::size_t p_end = row_ptr[r + 1];
-                        for (std::size_t p = p_start; p < p_end; ++p) {
-                            const std::size_t c = col_idx[p];
-                            if (c >= c_start && c < c_end) {
-                                batch_y[c] += values[p] * xr;
-                            }
-                        }
-                    }
-                });
+            pool->parallel_for_chunks(out_dim, pool->worker_count(),
+                                      [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](
+                                          std::size_t c_start, std::size_t c_end) {
+                                          std::fill(batch_y + c_start, batch_y + c_end, 0.0);
+                                          for (std::size_t r = 0; r < rows; ++r) {
+                                              const double xr = batch_x[r];
+                                              if (xr == 0.0) {
+                                                  continue;
+                                              }
+                                              const std::size_t p_start = row_ptr[r];
+                                              const std::size_t p_end = row_ptr[r + 1];
+                                              for (std::size_t p = p_start; p < p_end; ++p) {
+                                                  const std::size_t c = col_idx[p];
+                                                  if (c >= c_start && c < c_end) {
+                                                      batch_y[c] += values[p] * xr;
+                                                  }
+                                              }
+                                          }
+                                      });
         }
     }
 
@@ -593,26 +591,25 @@ void parallel_batched_spmv_transpose(const numerics::CsrMatrix& A, const double*
             const auto& col_idx = A.col_idx();
             const auto& values = A.values();
             const std::size_t rows = A.rows();
-            pool->parallel_for_chunks(
-                out_dim, pool->worker_count(),
-                [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](std::size_t c_start,
-                                                                      std::size_t c_end) {
-                    std::fill(batch_y + c_start, batch_y + c_end, 0.0);
-                    for (std::size_t r = 0; r < rows; ++r) {
-                        const double xr = batch_x[r];
-                        if (xr == 0.0) {
-                            continue;
-                        }
-                        const std::size_t p_start = row_ptr[r];
-                        const std::size_t p_end = row_ptr[r + 1];
-                        for (std::size_t p = p_start; p < p_end; ++p) {
-                            const std::size_t c = col_idx[p];
-                            if (c >= c_start && c < c_end) {
-                                batch_y[c] += values[p] * xr;
-                            }
-                        }
-                    }
-                });
+            pool->parallel_for_chunks(out_dim, pool->worker_count(),
+                                      [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](
+                                          std::size_t c_start, std::size_t c_end) {
+                                          std::fill(batch_y + c_start, batch_y + c_end, 0.0);
+                                          for (std::size_t r = 0; r < rows; ++r) {
+                                              const double xr = batch_x[r];
+                                              if (xr == 0.0) {
+                                                  continue;
+                                              }
+                                              const std::size_t p_start = row_ptr[r];
+                                              const std::size_t p_end = row_ptr[r + 1];
+                                              for (std::size_t p = p_start; p < p_end; ++p) {
+                                                  const std::size_t c = col_idx[p];
+                                                  if (c >= c_start && c < c_end) {
+                                                      batch_y[c] += values[p] * xr;
+                                                  }
+                                              }
+                                          }
+                                      });
         }
     }
 
@@ -884,11 +881,10 @@ void CpuSequentialBackend::batched_spmv(const numerics::CsrMatrix& A, const doub
     opts.run_parallel = false;
     BatchedSpmvTelemetry tel;
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &tel);
-    record_invocation(BackendType::CPU_SEQUENTIAL,
-                      opts.transpose ? "serial_batched_csr_transpose_spmv"
-                                     : "serial_batched_csr_spmv",
-                      batch_size, 1, 0.0, tel.parallel_time_seconds, 0.0,
-                      tel.parallel_time_seconds);
+    record_invocation(
+        BackendType::CPU_SEQUENTIAL,
+        opts.transpose ? "serial_batched_csr_transpose_spmv" : "serial_batched_csr_spmv",
+        batch_size, 1, 0.0, tel.parallel_time_seconds, 0.0, tel.parallel_time_seconds);
 }
 
 void CpuSequentialBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
@@ -1005,11 +1001,11 @@ void CpuMulticoreBackend::batched_spmv(const numerics::CsrMatrix& A, const doubl
     }
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
                           thread_pool_.get());
-    record_invocation(BackendType::CPU_MULTICORE,
-                      opts.transpose ? "parallel_batched_csr_transpose_spmv"
-                                     : "parallel_batched_csr_spmv",
-                      batch_size, worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
-                      last_telemetry_.parallel_time_seconds);
+    record_invocation(
+        BackendType::CPU_MULTICORE,
+        opts.transpose ? "parallel_batched_csr_transpose_spmv" : "parallel_batched_csr_spmv",
+        batch_size, worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+        last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,

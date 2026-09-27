@@ -28,8 +28,8 @@
 #include "core/error.hpp"
 #include "core/logger.hpp"
 #include "core/status.hpp"
-#include "numerics/model_converter.hpp"
 #include "model/model.hpp"
+#include "numerics/model_converter.hpp"
 #include "verification/milp_verifier.hpp"
 
 namespace kavach::algorithms::milp {
@@ -522,6 +522,40 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
 
     lp::RevisedSimplex lp_solver(lp_opts);
 
+    auto merge_lp_basis_telemetry = [&](const lp::LPSolverTelemetry& src) {
+        const std::size_t prev_updates = tel.lp_basis_telemetry.basis_updates;
+        const double prev_chain_sum =
+            tel.lp_basis_telemetry.average_update_chain * static_cast<double>(prev_updates);
+        tel.lp_basis_telemetry.basis_updates += src.basis_updates;
+        tel.lp_basis_telemetry.full_refactorizations += src.full_refactorizations;
+        tel.lp_basis_telemetry.refactorization_count = tel.lp_basis_telemetry.full_refactorizations;
+        tel.lp_basis_telemetry.update_failures += src.update_failures;
+        if (!src.refactorization_reason.empty()) {
+            tel.lp_basis_telemetry.refactorization_reason = src.refactorization_reason;
+        }
+        tel.lp_basis_telemetry.maximum_update_chain =
+            std::max(tel.lp_basis_telemetry.maximum_update_chain, src.maximum_update_chain);
+        if (tel.lp_basis_telemetry.basis_updates > 0) {
+            tel.lp_basis_telemetry.average_update_chain =
+                (prev_chain_sum +
+                 src.average_update_chain * static_cast<double>(src.basis_updates)) /
+                static_cast<double>(tel.lp_basis_telemetry.basis_updates);
+        }
+        tel.lp_basis_telemetry.basis_residual_max =
+            std::max(tel.lp_basis_telemetry.basis_residual_max, src.basis_residual_max);
+        tel.lp_basis_telemetry.update_application_time_seconds +=
+            src.update_application_time_seconds;
+        tel.lp_basis_telemetry.full_refactorization_time_seconds +=
+            src.full_refactorization_time_seconds;
+        tel.lp_basis_telemetry.base_factorization_bytes =
+            std::max(tel.lp_basis_telemetry.base_factorization_bytes, src.base_factorization_bytes);
+        tel.lp_basis_telemetry.update_chain_bytes = src.update_chain_bytes;
+        tel.lp_basis_telemetry.peak_memory_bytes =
+            std::max(tel.lp_basis_telemetry.peak_memory_bytes, src.peak_memory_bytes);
+        tel.lp_basis_telemetry.memory_after_refactor_bytes = std::max(
+            tel.lp_basis_telemetry.memory_after_refactor_bytes, src.memory_after_refactor_bytes);
+    };
+
     auto solve_node_lp =
         [&](model::CanonicalModel& wm,
             const std::optional<lp::BasisState>& inherited_basis) -> lp::LPSolution {
@@ -537,6 +571,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             double ws_sec = std::chrono::duration<double>(Clock::now() - ws_start).count();
             tel.warm_start_time_seconds += ws_sec;
             tel.dual_simplex_iterations += ws_sol.telemetry.dual_simplex_iterations;
+            merge_lp_basis_telemetry(ws_sol.telemetry);
 
             if (ws_sol.is_optimal() || ws_sol.is_infeasible()) {
                 ++tel.warm_start_successes;
@@ -556,6 +591,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
         double cs_sec = std::chrono::duration<double>(Clock::now() - cs_start).count();
         tel.cold_start_time_seconds += cs_sec;
         tel.cold_start_iterations += cs_sol.iterations;
+        merge_lp_basis_telemetry(cs_sol.telemetry);
         return cs_sol;
     };
 
@@ -589,8 +625,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
             rounded.size() == orig_model.num_variables()) {
             const auto orig_csr = numerics::canonical_model_to_csr(orig_model);
             std::vector<double> activities(orig_model.num_constraints(), 0.0);
-            opts.execution_backend->batched_spmv(orig_csr, rounded.data(),
-                                                 activities.data(), 1);
+            opts.execution_backend->batched_spmv(orig_csr, rounded.data(), activities.data(), 1);
         }
         // Verify integrality of rounded solution
         if (!is_integer_feasible(orig_model, rounded, tols.integrality_tol)) {
@@ -856,7 +891,8 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                 if (opts.enable_primal_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
                     ++tel.search_telemetry.heuristic_calls;
-                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution, opts.execution_backend);
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution,
+                                                            opts.execution_backend);
                     if (heur_res.found_feasible) {
                         ++tel.search_telemetry.heuristic_feasible_candidates;
                         if (incumbent.empty() ||
@@ -1076,7 +1112,8 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                 if (opts.enable_primal_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
                     ++tel.search_telemetry.heuristic_calls;
-                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution, opts.execution_backend);
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution,
+                                                            opts.execution_backend);
                     if (heur_res.found_feasible) {
                         ++tel.search_telemetry.heuristic_feasible_candidates;
                         if (incumbent.empty() ||

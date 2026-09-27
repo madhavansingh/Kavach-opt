@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include "algorithms/lp/lp_types.hpp"
 #include "algorithms/milp/cut_types.hpp"
 #include "algorithms/milp/search_types.hpp"
 #include "backend/execution_backend.hpp"
@@ -103,6 +104,9 @@ struct MILPSolverTelemetry {
 
     // Execution Backend Telemetry
     backend::BackendExecutionTelemetry backend_telemetry;
+
+    // Aggregated LP Basis-Update Factorization Telemetry across B&B nodes
+    lp::LPSolverTelemetry lp_basis_telemetry;
 };
 
 // ============================================================================

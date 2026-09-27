@@ -28,10 +28,10 @@ void CudaBackend::sync_execution_telemetry(std::size_t batch_size) const noexcep
     if (fell_back && !options_.injected_fallback_reason.empty()) {
         reason = options_.injected_fallback_reason;
     }
-    const std::string_view kname = (last_telemetry_.kernel_name == "None" ||
-                                    last_telemetry_.kernel_name.empty())
-                                       ? "cuda_batched_csr_spmv"
-                                       : std::string_view(last_telemetry_.kernel_name);
+    const std::string_view kname =
+        (last_telemetry_.kernel_name == "None" || last_telemetry_.kernel_name.empty())
+            ? "cuda_batched_csr_spmv"
+            : std::string_view(last_telemetry_.kernel_name);
     record_invocation(actual, kname, batch_size, workers, h2d_sec, kernel_sec, d2h_sec, total_sec,
                       fell_back, reason);
 }
@@ -147,9 +147,8 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
                     last_telemetry_.total_gpu_time_seconds;
             }
             if (last_telemetry_.kernel_time_seconds > 0.0) {
-                last_telemetry_.kernel_only_speedup =
-                    last_telemetry_.cpu_reference_time_seconds /
-                    last_telemetry_.kernel_time_seconds;
+                last_telemetry_.kernel_only_speedup = last_telemetry_.cpu_reference_time_seconds /
+                                                      last_telemetry_.kernel_time_seconds;
             }
         }
     } catch (const std::exception& e) {
@@ -267,9 +266,8 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
                     last_telemetry_.total_gpu_time_seconds;
             }
             if (last_telemetry_.kernel_time_seconds > 0.0) {
-                last_telemetry_.kernel_only_speedup =
-                    last_telemetry_.cpu_reference_time_seconds /
-                    last_telemetry_.kernel_time_seconds;
+                last_telemetry_.kernel_only_speedup = last_telemetry_.cpu_reference_time_seconds /
+                                                      last_telemetry_.kernel_time_seconds;
             }
         }
     } catch (const std::exception& e) {

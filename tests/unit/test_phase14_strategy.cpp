@@ -710,15 +710,14 @@ KAVACH_TEST(test_backend_orchestration_cuda_request_and_fallback_truth) {
         KAVACH_ASSERT(res.verification_report.passed);
         KAVACH_ASSERT_EQUAL(res.backend_telemetry.requested_backend,
                             backend::BackendType::CUDA_GPU);
-        KAVACH_ASSERT_EQUAL(res.backend_telemetry.selected_backend,
-                            backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT_EQUAL(res.backend_telemetry.selected_backend, backend::BackendType::CUDA_GPU);
         KAVACH_ASSERT(res.backend_telemetry.invocations > 0);
         KAVACH_ASSERT_EQUAL(res.backend_used, res.backend_telemetry.executed_backend);
 
         if (res.backend_telemetry.fallback_occurred) {
-            // No label-only lie: when fallback occurs, executed_backend and backend_used MUST NOT be CUDA_GPU
-            KAVACH_ASSERT(res.backend_telemetry.executed_backend !=
-                          backend::BackendType::CUDA_GPU);
+            // No label-only lie: when fallback occurs, executed_backend and backend_used MUST NOT
+            // be CUDA_GPU
+            KAVACH_ASSERT(res.backend_telemetry.executed_backend != backend::BackendType::CUDA_GPU);
             KAVACH_ASSERT(res.backend_used != backend::BackendType::CUDA_GPU);
             KAVACH_ASSERT(!res.backend_telemetry.fallback_reason.empty());
         } else {
@@ -765,8 +764,7 @@ KAVACH_TEST(test_backend_orchestration_forced_cuda_fault_injection) {
     auto lp_res = solver.solve(lp_model, opts);
     KAVACH_ASSERT_EQUAL(lp_res.status, core::SolverStatus::OPTIMAL);
     KAVACH_ASSERT(lp_res.verification_report.passed);
-    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.requested_backend,
-                        backend::BackendType::CUDA_GPU);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.requested_backend, backend::BackendType::CUDA_GPU);
     KAVACH_ASSERT(lp_res.backend_telemetry.fallback_occurred);
     KAVACH_ASSERT(lp_res.backend_telemetry.executed_backend != backend::BackendType::CUDA_GPU);
     KAVACH_ASSERT_EQUAL(lp_res.backend_used, lp_res.backend_telemetry.executed_backend);
@@ -849,9 +847,9 @@ KAVACH_TEST(test_backend_orchestration_lp_dual_simplex_and_milp_batched_spmv) {
     KAVACH_ASSERT_EQUAL(sol.telemetry.backend_telemetry.executed_backend,
                         backend::BackendType::CPU_MULTICORE);
     KAVACH_ASSERT(sol.telemetry.backend_telemetry.invocations > 0);
-    // Warm-start dual simplex (batch_size=2) and PrimalHeuristic (batch_size>=2) process multiple vectors
+    // Warm-start dual simplex (batch_size=2) and PrimalHeuristic (batch_size>=2) process multiple
+    // vectors
     KAVACH_ASSERT(sol.telemetry.backend_telemetry.total_vectors >
                   sol.telemetry.backend_telemetry.invocations);
     KAVACH_ASSERT_EQUAL(sol.telemetry.backend_telemetry.worker_count, 4);
 }
-
