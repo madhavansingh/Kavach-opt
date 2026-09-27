@@ -151,6 +151,14 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     if (reconstruction_map.has_value()) {
         auto cert = reconstruction_map->restore_certificate(x_reduced, dual_reduced, rc_reduced,
                                                             options.tolerances);
+        if (!cert.valid) {
+            solution.status = core::SolverStatus::NUMERICAL_FAILURE;
+            solution.message = "Presolve certificate reconstruction failed: " + cert.diagnostic;
+            auto end_time = std::chrono::steady_clock::now();
+            solution.telemetry.solve_time_seconds =
+                std::chrono::duration<double>(end_time - start_time).count();
+            return solution;
+        }
         solution.primal_solution = std::move(cert.primal_solution);
         solution.dual_multipliers = std::move(cert.dual_multipliers);
         solution.reduced_costs = std::move(cert.reduced_costs);

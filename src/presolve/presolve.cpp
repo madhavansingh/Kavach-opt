@@ -317,6 +317,7 @@ ReconstructedCertificate ReconstructionMap::restore_certificate(
 
     // 1. Validate variable mappings and initialize primal vector x
     std::vector<double> x(n, 0.0);
+    std::vector<bool> seen_reduced_var(reduced_primal.size(), false);
     for (std::size_t j = 0; j < n; ++j) {
         const auto& vm = variable_mappings_[j];
         if (vm.original_var_id != static_cast<model::VarId>(j)) {
@@ -332,6 +333,14 @@ ReconstructedCertificate ReconstructionMap::restore_certificate(
                                   std::to_string(j);
                 return cert;
             }
+            if (seen_reduced_var[vm.reduced_var_id]) {
+                cert.valid = false;
+                cert.diagnostic = "ReconstructionMap: duplicate reduced VarId " +
+                                  std::to_string(vm.reduced_var_id) + " at variable " +
+                                  std::to_string(j);
+                return cert;
+            }
+            seen_reduced_var[vm.reduced_var_id] = true;
             x[j] = reduced_primal[vm.reduced_var_id];
         } else {
             if (!std::isfinite(vm.fixed_value)) {
@@ -346,6 +355,7 @@ ReconstructedCertificate ReconstructionMap::restore_certificate(
 
     // 2. Validate constraint mappings and initialize dual vector y at terminal state S_T
     std::vector<double> y(m, 0.0);
+    std::vector<bool> seen_reduced_constr(reduced_dual.size(), false);
     for (std::size_t i = 0; i < m; ++i) {
         const auto& cm = constraint_mappings_[i];
         if (cm.original_constr_id != static_cast<model::ConstrId>(i)) {
@@ -361,6 +371,14 @@ ReconstructedCertificate ReconstructionMap::restore_certificate(
                     "ReconstructionMap: reduced ConstrId out of range at row " + std::to_string(i);
                 return cert;
             }
+            if (seen_reduced_constr[cm.reduced_constr_id]) {
+                cert.valid = false;
+                cert.diagnostic = "ReconstructionMap: duplicate reduced ConstrId " +
+                                  std::to_string(cm.reduced_constr_id) + " at row " +
+                                  std::to_string(i);
+                return cert;
+            }
+            seen_reduced_constr[cm.reduced_constr_id] = true;
             y[i] = reduced_dual[cm.reduced_constr_id];
         } else {
             y[i] = 0.0;
