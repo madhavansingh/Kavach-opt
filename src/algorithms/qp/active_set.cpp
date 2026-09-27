@@ -168,20 +168,20 @@ bool PrimalActiveSetQPSolver::check_psd(const numerics::CsrMatrix& Q, double tol
             }
         }
         if (!has_off_diag) {
-            visited[root] = 1;
+            visited[root] = std::uint8_t{1};
             continue;  // Singleton component already certified in pass 1
         }
 
         // BFS to collect connected component
         comp_nodes.clear();
         comp_nodes.push_back(root);
-        visited[root] = 1;
+        visited[root] = std::uint8_t{1};
         for (std::size_t head = 0; head < comp_nodes.size(); ++head) {
             const std::size_t u = comp_nodes[head];
             for (std::size_t k = Q.row_start(u); k < Q.row_end(u); ++k) {
                 const std::size_t v = q_cols[k];
                 if (v != u && std::abs(q_vals[k]) > 1e-15 && !visited[v]) {
-                    visited[v] = 1;
+                    visited[v] = std::uint8_t{1};
                     comp_nodes.push_back(v);
                 }
             }
@@ -323,12 +323,13 @@ bool PrimalActiveSetQPSolver::check_psd(const numerics::CsrMatrix& Q, double tol
                         if (eliminated[i]) {
                             continue;
                         }
-                        for (const auto& [col_j, val] : rows[i]) {
-                            if (!eliminated[col_j] && std::abs(val) > tol * 100.0 + 1e-7) {
+                        for (const auto& [sc_col, sc_val] : rows[i]) {
+                            if (!eliminated[sc_col] && std::abs(sc_val) > tol * 100.0 + 1e-7) {
                                 if (error_msg) {
                                     *error_msg =
                                         "Non-zero off-diagonal entry in null Schur complement: " +
-                                        std::to_string(std::abs(val)) + " (Hessian is indefinite).";
+                                        std::to_string(std::abs(sc_val)) +
+                                        " (Hessian is indefinite).";
                                 }
                                 if (peak_working_bytes) {
                                     *peak_working_bytes = max_comp_bytes;
@@ -340,55 +341,55 @@ bool PrimalActiveSetQPSolver::check_psd(const numerics::CsrMatrix& Q, double tol
                     break;
                 }
 
-                eliminated[pk] = 1;
+                eliminated[pk] = std::uint8_t{1};
                 const double pivot = diag[pk];
 
                 // Extract active neighbors of pk in the remaining Schur complement
                 std::vector<std::pair<std::size_t, double>> pk_neighbors;
-                for (const auto& [col_j, val] : rows[pk]) {
-                    if (!eliminated[col_j] && std::abs(val) > 1e-15) {
-                        pk_neighbors.push_back({col_j, val});
+                for (const auto& [pkn_col, pkn_val] : rows[pk]) {
+                    if (!eliminated[pkn_col] && std::abs(pkn_val) > 1e-15) {
+                        pk_neighbors.push_back({pkn_col, pkn_val});
                     }
                 }
 
-                for (const auto& [pi, val_ip] : pk_neighbors) {
-                    const double factor = val_ip / pivot;
-                    diag[pi] -= factor * val_ip;
+                for (const auto& [nbr_pi, nbr_val_ip] : pk_neighbors) {
+                    const double factor = nbr_val_ip / pivot;
+                    diag[nbr_pi] -= factor * nbr_val_ip;
 
-                    // Sparse row merge: rows[pi] -= factor * pk_neighbors
+                    // Sparse row merge: rows[nbr_pi] -= factor * pk_neighbors
                     std::vector<std::pair<std::size_t, double>> merged;
-                    merged.reserve(rows[pi].size() + pk_neighbors.size());
+                    merged.reserve(rows[nbr_pi].size() + pk_neighbors.size());
                     std::size_t idx_a = 0;
                     std::size_t idx_b = 0;
-                    while (idx_a < rows[pi].size() || idx_b < pk_neighbors.size()) {
-                        if (idx_a < rows[pi].size() && eliminated[rows[pi][idx_a].first]) {
+                    while (idx_a < rows[nbr_pi].size() || idx_b < pk_neighbors.size()) {
+                        if (idx_a < rows[nbr_pi].size() && eliminated[rows[nbr_pi][idx_a].first]) {
                             ++idx_a;
                             continue;
                         }
                         if (idx_b == pk_neighbors.size() ||
-                            (idx_a < rows[pi].size() &&
-                             rows[pi][idx_a].first < pk_neighbors[idx_b].first)) {
-                            merged.push_back(rows[pi][idx_a++]);
-                        } else if (idx_a == rows[pi].size() ||
-                                   pk_neighbors[idx_b].first < rows[pi][idx_a].first) {
-                            const std::size_t col_j = pk_neighbors[idx_b].first;
+                            (idx_a < rows[nbr_pi].size() &&
+                             rows[nbr_pi][idx_a].first < pk_neighbors[idx_b].first)) {
+                            merged.push_back(rows[nbr_pi][idx_a++]);
+                        } else if (idx_a == rows[nbr_pi].size() ||
+                                   pk_neighbors[idx_b].first < rows[nbr_pi][idx_a].first) {
+                            const std::size_t merge_col = pk_neighbors[idx_b].first;
                             const double upd = -factor * pk_neighbors[idx_b].second;
-                            if (col_j != pi && std::abs(upd) > 1e-15) {
-                                merged.push_back({col_j, upd});
+                            if (merge_col != nbr_pi && std::abs(upd) > 1e-15) {
+                                merged.push_back({merge_col, upd});
                             }
                             ++idx_b;
                         } else {
-                            const std::size_t col_j = rows[pi][idx_a].first;
+                            const std::size_t merge_col = rows[nbr_pi][idx_a].first;
                             const double upd =
-                                rows[pi][idx_a].second - factor * pk_neighbors[idx_b].second;
-                            if (col_j != pi && std::abs(upd) > 1e-15) {
-                                merged.push_back({col_j, upd});
+                                rows[nbr_pi][idx_a].second - factor * pk_neighbors[idx_b].second;
+                            if (merge_col != nbr_pi && std::abs(upd) > 1e-15) {
+                                merged.push_back({merge_col, upd});
                             }
                             ++idx_a;
                             ++idx_b;
                         }
                     }
-                    rows[pi] = std::move(merged);
+                    rows[nbr_pi] = std::move(merged);
                 }
                 rows[pk].clear();
                 rows[pk].shrink_to_fit();
@@ -761,11 +762,11 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
 
     // Helper: compute a_l^T v
     auto dot_constr = [&](const NormalizedConstraint& constraint, const std::vector<double>& v) {
-        double val = 0.0;
-        for (const auto& [var_id, coeff] : constraint.terms) {
-            val += coeff * v[var_id];
+        double dot_val = 0.0;
+        for (const auto& [dc_vid, dc_coeff] : constraint.terms) {
+            dot_val += dc_coeff * v[dc_vid];
         }
-        return val;
+        return dot_val;
     };
 
     // Helper: Sparse Modified Gram-Schmidt LICQ check (zero O(n) / O(K*n) dense row vectors)
@@ -779,9 +780,9 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
     auto make_sparse_vec = [&](const NormalizedConstraint& constraint) {
         SparseBasisVec sv;
         sv.terms.reserve(constraint.terms.size());
-        for (const auto& [var_id, coeff] : constraint.terms) {
-            if (var_id < n && std::abs(coeff) > 1e-15) {
-                sv.terms.push_back({var_id, coeff});
+        for (const auto& [sv_vid, sv_coeff] : constraint.terms) {
+            if (sv_vid < n && std::abs(sv_coeff) > 1e-15) {
+                sv.terms.push_back({sv_vid, sv_coeff});
             }
         }
         std::sort(sv.terms.begin(), sv.terms.end(),
@@ -879,8 +880,8 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
         SparseBasisVec v = project_sparse(a, b, norm_a, norm_v);
         if (norm_a >= 1e-12 && norm_v > 1e-4 * norm_a && norm_v > 1e-12) {
             const double inv_norm = 1.0 / norm_v;
-            for (auto& [var_id, val] : v.terms) {
-                val *= inv_norm;
+            for (auto& [tab_vid, tab_val] : v.terms) {
+                tab_val *= inv_norm;
             }
             b.push_back(std::move(v));
             update_licq_bytes(b);
@@ -993,11 +994,11 @@ QPSolution PrimalActiveSetQPSolver::solve_internal(
         // Top-right and Bottom-left: A_W^T and A_W
         for (std::size_t k = 0; k < K; ++k) {
             const auto& constr = all_constrs[W[k]];
-            for (const auto& [var_id, coeff] : constr.terms) {
-                // A_W row k: row (n + k), col var_id
-                kkt_triplets.push_back({.row = n + k, .col = var_id, .value = coeff});
-                // A_W^T col k: row var_id, col (n + k)
-                kkt_triplets.push_back({.row = var_id, .col = n + k, .value = coeff});
+            for (const auto& [kkt_vid, kkt_coeff] : constr.terms) {
+                // A_W row k: row (n + k), col kkt_vid
+                kkt_triplets.push_back({.row = n + k, .col = kkt_vid, .value = kkt_coeff});
+                // A_W^T col k: row kkt_vid, col (n + k)
+                kkt_triplets.push_back({.row = kkt_vid, .col = n + k, .value = kkt_coeff});
             }
         }
 
