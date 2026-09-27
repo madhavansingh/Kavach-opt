@@ -1,4 +1,4 @@
-# Kavach-Opt — Sovereign Mathematical Optimization Engine
+# Kavach-Opt - Sovereign Mathematical Optimization Engine
 
 [![Build Standard](https://img.shields.io/badge/C%2B%2B-20-blue.svg?style=flat-square&logo=c%2B%2B)](https://isocpp.org/)
 [![Test Suite](https://img.shields.io/badge/Unit%20Tests-412%2F412%20Passed-success.svg?style=flat-square)](tests/)
@@ -39,7 +39,7 @@
 26. [Comparative Analysis Against Reference Solvers (HiGHS Out-of-Process)](#26-comparative-analysis-against-reference-solvers-highs-out-of-process)
 27. [Comprehensive Command-Line Interface (`kavach-opt`) Reference](#27-comprehensive-command-line-interface-kavach-opt-reference)
 28. [Public C++ API Reference (`include/kavach/solver.hpp`)](#28-public-c-api-reference-includekavachsolverhpp)
-29: [Build Configuration, Prerequisites & Toolchains](#29-build-configuration-prerequisites--toolchains)
+29. [Build Configuration, Prerequisites & Toolchains](#29-build-configuration-prerequisites--toolchains)
 30. [Complete 19-Suite Test Framework & Sanitizer Verification (412 Tests)](#30-complete-19-suite-test-framework--sanitizer-verification-412-tests)
 31. [Known Scope, Boundaries & Engineering Limitations](#31-known-scope-boundaries--engineering-limitations)
 32. [Comprehensive Mathematical Notation Guide](#32-comprehensive-mathematical-notation-guide)
