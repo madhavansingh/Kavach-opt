@@ -6,26 +6,6 @@
 
 namespace kavach::algorithms::lp {
 
-namespace {
-
-double dot_sparse_col(const std::vector<double>& y, const numerics::CscMatrix& A_csc,
-                      std::size_t col_idx) {
-    const std::size_t nnz = A_csc.col_nnz(col_idx);
-    const std::size_t* r_idx = A_csc.col_indices(col_idx);
-    const double* vals = A_csc.col_values(col_idx);
-
-    double sum = 0.0;
-    for (std::size_t p = 0; p < nnz; ++p) {
-        std::size_t r = r_idx[p];
-        if (r < y.size()) {
-            sum += y[r] * vals[p];
-        }
-    }
-    return sum;
-}
-
-}  // namespace
-
 RevisedSimplexCore::RevisedSimplexCore(const StandardFormLP& lp, const LPSolverOptions& options)
     : lp_(lp), options_(options), tol_(options.tolerances) {}
 
@@ -112,11 +92,17 @@ SimplexExecutionResult RevisedSimplexCore::run(LPSolverTelemetry& telemetry) {
     }
     auto y = basis.solve_dual(c_B);
 
+    std::vector<double> at_y(n, 0.0);
+    if (options_.execution_backend != nullptr) {
+        options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), y.data(), at_y.data(), 1);
+    } else {
+        lp_.A_csr().spmv_transpose(y.data(), at_y.data());
+    }
+
     std::vector<double> reduced_costs(n, 0.0);
     for (std::size_t j = 0; j < n; ++j) {
         if (!basis.is_basic(j)) {
-            double yTa = dot_sparse_col(y, lp_.A_csc(), j);
-            reduced_costs[j] = lp_.c()[j] - yTa;
+            reduced_costs[j] = lp_.c()[j] - at_y[j];
         }
     }
 
@@ -146,6 +132,7 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
 
     auto x_B = basis.solve_primal(lp_.b());
     std::size_t consecutive_degenerate = 0;
+    std::vector<double> at_y(n, 0.0);
 
     while (true) {
         if (telemetry.total_iterations >= options_.max_iterations) {
@@ -161,6 +148,13 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
         }
         auto y = basis.solve_dual(c_B);
 
+        if (options_.execution_backend != nullptr) {
+            options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), y.data(), at_y.data(),
+                                                               1);
+        } else {
+            lp_.A_csr().spmv_transpose(y.data(), at_y.data());
+        }
+
         // Find improving entering variable
         std::size_t entering_var = std::numeric_limits<std::size_t>::max();
         double best_rc = 0.0;
@@ -173,7 +167,7 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
         }
 
         for (std::size_t j : basis.nonbasic_vars()) {
-            double yTa = dot_sparse_col(y, lp_.A_csc(), j);
+            double yTa = at_y[j];
             double rc = c_phase1[j] - yTa;
 
             if (rc < -tol_.optimality_tol) {
@@ -203,7 +197,30 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                 return core::SolverStatus::INFEASIBLE;
             }
 
-            // Phase I is feasible. Pivot out any basic artificial variables
+            // Phase I is feasible. If multiple artificial variables remain in the basis,
+            // pre-evaluate their dual row vectors V = [v_0, ..., v_{K-1}] in a single batched
+            // transpose SpMV call before sequential pivot updates.
+            std::vector<std::size_t> art_rows;
+            for (std::size_t r = 0; r < m; ++r) {
+                if (lp_.is_artificial(basis.basis_vars()[r])) {
+                    art_rows.push_back(r);
+                }
+            }
+            if (!art_rows.empty() && options_.execution_backend != nullptr) {
+                const std::size_t K = art_rows.size();
+                std::vector<double> batch_v(K * m, 0.0);
+                for (std::size_t k = 0; k < K; ++k) {
+                    std::vector<double> e_r(m, 0.0);
+                    e_r[art_rows[k]] = 1.0;
+                    auto vk = basis.solve_dual(e_r);
+                    std::copy(vk.begin(), vk.end(), batch_v.begin() + static_cast<std::ptrdiff_t>(k * m));
+                }
+                std::vector<double> batch_w(K * n, 0.0);
+                options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), batch_v.data(),
+                                                                   batch_w.data(), K);
+            }
+
+            // Pivot out any basic artificial variables
             for (std::size_t r = 0; r < m; ++r) {
                 std::size_t b_var = basis.basis_vars()[r];
                 if (lp_.is_artificial(b_var)) {
@@ -211,11 +228,18 @@ core::SolverStatus RevisedSimplexCore::run_phase1(
                     e_r[r] = 1.0;
                     auto v = basis.solve_dual(e_r);
 
+                    if (options_.execution_backend != nullptr) {
+                        options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), v.data(),
+                                                                           at_y.data(), 1);
+                    } else {
+                        lp_.A_csr().spmv_transpose(v.data(), at_y.data());
+                    }
+
                     std::size_t best_j = std::numeric_limits<std::size_t>::max();
                     double max_alpha = tol_.pivot_tol;
                     for (std::size_t j : basis.nonbasic_vars()) {
                         if (!lp_.is_artificial(j)) {
-                            double alpha = std::abs(dot_sparse_col(v, lp_.A_csc(), j));
+                            double alpha = std::abs(at_y[j]);
                             if (alpha > max_alpha) {
                                 max_alpha = alpha;
                                 best_j = j;
@@ -330,9 +354,11 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
     SimplexBasis& basis, LPSolverTelemetry& telemetry,
     const std::chrono::steady_clock::time_point& start_time) {
     const std::size_t m = lp_.num_rows();
+    const std::size_t n = lp_.num_cols();
 
     auto x_B = basis.solve_primal(lp_.b());
     std::size_t consecutive_degenerate = 0;
+    std::vector<double> at_y(n, 0.0);
 
     while (true) {
         if (telemetry.total_iterations >= options_.max_iterations) {
@@ -348,6 +374,13 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
         }
         auto y = basis.solve_dual(c_B);
 
+        if (options_.execution_backend != nullptr) {
+            options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), y.data(), at_y.data(),
+                                                               1);
+        } else {
+            lp_.A_csr().spmv_transpose(y.data(), at_y.data());
+        }
+
         // Find improving entering variable
         std::size_t entering_var = std::numeric_limits<std::size_t>::max();
         double best_rc = 0.0;
@@ -360,7 +393,7 @@ core::SolverStatus RevisedSimplexCore::run_phase2(
         }
 
         for (std::size_t j : basis.nonbasic_vars()) {
-            double yTa = dot_sparse_col(y, lp_.A_csc(), j);
+            double yTa = at_y[j];
             double rc = lp_.c()[j] - yTa;
 
             if (rc < -tol_.optimality_tol) {

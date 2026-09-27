@@ -25,6 +25,7 @@
 
 #include "algorithms/milp/cut_types.hpp"
 #include "algorithms/milp/search_types.hpp"
+#include "backend/execution_backend.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
@@ -57,6 +58,12 @@ struct MILPSolverOptions {
     std::size_t heuristic_max_repair_rounds{5};  ///< Maximum constraint deficit repair passes
 
     bool verbose{false};
+    backend::ExecutionBackend* execution_backend{nullptr};
+    backend::BackendType requested_backend{backend::BackendType::CPU_SEQUENTIAL};
+    backend::BackendType selected_backend{backend::BackendType::CPU_SEQUENTIAL};
+    std::size_t num_workers{0};
+    bool force_cuda_fallback{false};
+    std::string initial_fallback_reason{};
 };
 
 // ============================================================================
@@ -93,6 +100,9 @@ struct MILPSolverTelemetry {
 
     // Advanced Search Telemetry
     SearchTelemetry search_telemetry;
+
+    // Execution Backend Telemetry
+    backend::BackendExecutionTelemetry backend_telemetry;
 };
 
 // ============================================================================

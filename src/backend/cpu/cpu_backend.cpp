@@ -103,7 +103,8 @@ void parallel_batched_spmv(const numerics::CsrMatrix& A, const double* batch_x, 
         workers = static_cast<std::size_t>(std::max(1u, std::thread::hardware_concurrency()));
     }
 
-    const bool execute_parallel = options.run_parallel && workers > 1 && batch_size > 1;
+    const bool execute_parallel =
+        options.run_parallel && workers > 1 && (batch_size > 1 || out_dim > 1);
     const auto t_start = std::chrono::steady_clock::now();
 
     if (!execute_parallel) {
@@ -116,20 +117,67 @@ void parallel_batched_spmv(const numerics::CsrMatrix& A, const double* batch_x, 
             pool = local_pool.get();
         }
 
-        pool->parallel_for_chunks(
-            batch_size, pool->worker_count(),
-            [&A, batch_x, batch_y, in_dim, out_dim, transpose = options.transpose](
-                std::size_t start, std::size_t end) {
-                for (std::size_t k = start; k < end; ++k) {
-                    const double* x_k = batch_x + (k * in_dim);
-                    double* y_k = batch_y + (k * out_dim);
-                    if (transpose) {
-                        A.spmv_transpose(x_k, y_k);
-                    } else {
-                        A.spmv(x_k, y_k);
+        if (batch_size > 1) {
+            pool->parallel_for_chunks(
+                batch_size, pool->worker_count(),
+                [&A, batch_x, batch_y, in_dim, out_dim, transpose = options.transpose](
+                    std::size_t start, std::size_t end) {
+                    for (std::size_t k = start; k < end; ++k) {
+                        const double* x_k = batch_x + (k * in_dim);
+                        double* y_k = batch_y + (k * out_dim);
+                        if (transpose) {
+                            A.spmv_transpose(x_k, y_k);
+                        } else {
+                            A.spmv(x_k, y_k);
+                        }
                     }
-                }
-            });
+                });
+        } else if (!options.transpose) {
+            // batch_size == 1, non-transpose: partition rows [0, A.rows()) deterministically
+            const auto& row_ptr = A.row_ptr();
+            const auto& col_idx = A.col_idx();
+            const auto& values = A.values();
+            pool->parallel_for_chunks(
+                out_dim, pool->worker_count(),
+                [&row_ptr, &col_idx, &values, batch_x, batch_y](std::size_t r_start,
+                                                                std::size_t r_end) {
+                    for (std::size_t r = r_start; r < r_end; ++r) {
+                        double sum = 0.0;
+                        const std::size_t p_start = row_ptr[r];
+                        const std::size_t p_end = row_ptr[r + 1];
+                        for (std::size_t p = p_start; p < p_end; ++p) {
+                            sum += values[p] * batch_x[col_idx[p]];
+                        }
+                        batch_y[r] = sum;
+                    }
+                });
+        } else {
+            // batch_size == 1, transpose: partition output columns [0, A.cols()) deterministically
+            const auto& row_ptr = A.row_ptr();
+            const auto& col_idx = A.col_idx();
+            const auto& values = A.values();
+            const std::size_t rows = A.rows();
+            pool->parallel_for_chunks(
+                out_dim, pool->worker_count(),
+                [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](std::size_t c_start,
+                                                                      std::size_t c_end) {
+                    std::fill(batch_y + c_start, batch_y + c_end, 0.0);
+                    for (std::size_t r = 0; r < rows; ++r) {
+                        const double xr = batch_x[r];
+                        if (xr == 0.0) {
+                            continue;
+                        }
+                        const std::size_t p_start = row_ptr[r];
+                        const std::size_t p_end = row_ptr[r + 1];
+                        for (std::size_t p = p_start; p < p_end; ++p) {
+                            const std::size_t c = col_idx[p];
+                            if (c >= c_start && c < c_end) {
+                                batch_y[c] += values[p] * xr;
+                            }
+                        }
+                    }
+                });
+        }
     }
 
     const auto t_end = std::chrono::steady_clock::now();
@@ -518,7 +566,8 @@ void parallel_batched_spmv_transpose(const numerics::CsrMatrix& A, const double*
     if (workers == 0) {
         workers = static_cast<std::size_t>(std::max(1u, std::thread::hardware_concurrency()));
     }
-    const bool execute_parallel = options.run_parallel && workers > 1 && batch_size > 1;
+    const bool execute_parallel =
+        options.run_parallel && workers > 1 && (batch_size > 1 || out_dim > 1);
     const auto t_start = std::chrono::steady_clock::now();
 
     if (!execute_parallel) {
@@ -530,13 +579,41 @@ void parallel_batched_spmv_transpose(const numerics::CsrMatrix& A, const double*
             local_pool = std::make_unique<ThreadPool>(workers);
             pool = local_pool.get();
         }
-        pool->parallel_for_chunks(
-            batch_size, pool->worker_count(),
-            [&A, batch_x, batch_y, in_dim, out_dim](std::size_t start, std::size_t end) {
-                for (std::size_t k = start; k < end; ++k) {
-                    A.spmv_transpose(batch_x + (k * in_dim), batch_y + (k * out_dim));
-                }
-            });
+        if (batch_size > 1) {
+            pool->parallel_for_chunks(
+                batch_size, pool->worker_count(),
+                [&A, batch_x, batch_y, in_dim, out_dim](std::size_t start, std::size_t end) {
+                    for (std::size_t k = start; k < end; ++k) {
+                        A.spmv_transpose(batch_x + (k * in_dim), batch_y + (k * out_dim));
+                    }
+                });
+        } else {
+            // batch_size == 1: partition output columns [0, A.cols()) deterministically
+            const auto& row_ptr = A.row_ptr();
+            const auto& col_idx = A.col_idx();
+            const auto& values = A.values();
+            const std::size_t rows = A.rows();
+            pool->parallel_for_chunks(
+                out_dim, pool->worker_count(),
+                [&row_ptr, &col_idx, &values, rows, batch_x, batch_y](std::size_t c_start,
+                                                                      std::size_t c_end) {
+                    std::fill(batch_y + c_start, batch_y + c_end, 0.0);
+                    for (std::size_t r = 0; r < rows; ++r) {
+                        const double xr = batch_x[r];
+                        if (xr == 0.0) {
+                            continue;
+                        }
+                        const std::size_t p_start = row_ptr[r];
+                        const std::size_t p_end = row_ptr[r + 1];
+                        for (std::size_t p = p_start; p < p_end; ++p) {
+                            const std::size_t c = col_idx[p];
+                            if (c >= c_start && c < c_end) {
+                                batch_y[c] += values[p] * xr;
+                            }
+                        }
+                    }
+                });
+        }
     }
 
     const auto t_end = std::chrono::steady_clock::now();
@@ -780,8 +857,11 @@ void CpuSequentialBackend::batched_spmv(std::size_t batch_size, std::size_t rows
                                         double* batch_y) {
     BatchedSpmvOptions options;
     options.run_parallel = false;
+    BatchedSpmvTelemetry tel;
     parallel_batched_spmv_raw(batch_size, rows, cols, values, row_ptr, col_indices, batch_x,
-                              batch_y, options);
+                              batch_y, options, &tel);
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_csr_spmv", batch_size, 1, 0.0,
+                      tel.parallel_time_seconds, 0.0, tel.parallel_time_seconds);
 }
 
 void CpuSequentialBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::size_t cols,
@@ -790,8 +870,11 @@ void CpuSequentialBackend::batched_spmv(std::size_t batch_size, std::size_t rows
                                         double* batch_y) {
     BatchedSpmvOptions options;
     options.run_parallel = false;
+    BatchedSpmvTelemetry tel;
     parallel_batched_spmv_raw(batch_size, rows, cols, values, row_ptr, col_indices, batch_x,
-                              batch_y, options);
+                              batch_y, options, &tel);
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_csr_spmv", batch_size, 1, 0.0,
+                      tel.parallel_time_seconds, 0.0, tel.parallel_time_seconds);
 }
 
 void CpuSequentialBackend::batched_spmv(const numerics::CsrMatrix& A, const double* batch_x,
@@ -799,40 +882,76 @@ void CpuSequentialBackend::batched_spmv(const numerics::CsrMatrix& A, const doub
                                         const BatchedSpmvOptions& options) {
     BatchedSpmvOptions opts = options;
     opts.run_parallel = false;
-    parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts);
+    BatchedSpmvTelemetry tel;
+    parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &tel);
+    record_invocation(BackendType::CPU_SEQUENTIAL,
+                      opts.transpose ? "serial_batched_csr_transpose_spmv"
+                                     : "serial_batched_csr_spmv",
+                      batch_size, 1, 0.0, tel.parallel_time_seconds, 0.0,
+                      tel.parallel_time_seconds);
 }
 
 void CpuSequentialBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
                                                   const double* batch_x, double* batch_y,
                                                   std::size_t batch_size,
                                                   const BatchedSpmvOptions&) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_spmv_transpose(A, batch_x, batch_y, batch_size);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_csr_transpose_spmv", batch_size,
+                      1, 0.0, sec, 0.0, sec);
 }
 
 void CpuSequentialBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* batch_x,
                                             double* batch_y, std::size_t batch_size,
                                             const BatchedSpmvOptions&) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_csc_spmv(A, batch_x, batch_y, batch_size);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_csc_spmv", batch_size, 1, 0.0,
+                      sec, 0.0, sec);
 }
 
 void CpuSequentialBackend::batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
                                          const double* batch_x, double beta, double* batch_y) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_axpby", batch_size, 1, 0.0, sec,
+                      0.0, sec);
 }
 
 void CpuSequentialBackend::batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
                                        const double* batch_y, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_dot(batch_size, n, batch_x, batch_y, results);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_dot", batch_size, 1, 0.0, sec,
+                      0.0, sec);
 }
 
 void CpuSequentialBackend::batched_l2_norm(std::size_t batch_size, std::size_t n,
                                            const double* batch_x, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_l2_norm(batch_size, n, batch_x, results);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_l2_norm", batch_size, 1, 0.0,
+                      sec, 0.0, sec);
 }
 
 void CpuSequentialBackend::batched_linf_norm(std::size_t batch_size, std::size_t n,
                                              const double* batch_x, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     serial_batched_linf_norm(batch_size, n, batch_x, results);
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_SEQUENTIAL, "serial_batched_linf_norm", batch_size, 1, 0.0,
+                      sec, 0.0, sec);
 }
 
 // ============================================================================
@@ -858,6 +977,9 @@ void CpuMulticoreBackend::batched_spmv(std::size_t batch_size, std::size_t rows,
     options.num_workers = worker_count();
     parallel_batched_spmv_raw(batch_size, rows, cols, values, row_ptr, col_indices, batch_x,
                               batch_y, options, &last_telemetry_, thread_pool_.get());
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_csr_spmv", batch_size,
+                      worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+                      last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::size_t cols,
@@ -869,6 +991,9 @@ void CpuMulticoreBackend::batched_spmv(std::size_t batch_size, std::size_t rows,
     options.num_workers = worker_count();
     parallel_batched_spmv_raw(batch_size, rows, cols, values, row_ptr, col_indices, batch_x,
                               batch_y, options, &last_telemetry_, thread_pool_.get());
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_csr_spmv", batch_size,
+                      worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+                      last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_spmv(const numerics::CsrMatrix& A, const double* batch_x,
@@ -880,6 +1005,11 @@ void CpuMulticoreBackend::batched_spmv(const numerics::CsrMatrix& A, const doubl
     }
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
                           thread_pool_.get());
+    record_invocation(BackendType::CPU_MULTICORE,
+                      opts.transpose ? "parallel_batched_csr_transpose_spmv"
+                                     : "parallel_batched_csr_spmv",
+                      batch_size, worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+                      last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
@@ -892,6 +1022,9 @@ void CpuMulticoreBackend::batched_spmv_transpose(const numerics::CsrMatrix& A,
     }
     parallel_batched_spmv_transpose(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
                                     thread_pool_.get());
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_csr_transpose_spmv", batch_size,
+                      worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+                      last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* batch_x,
@@ -903,26 +1036,49 @@ void CpuMulticoreBackend::batched_csc_spmv(const numerics::CscMatrix& A, const d
     }
     parallel_batched_spmv(A, batch_x, batch_y, batch_size, opts, &last_telemetry_,
                           thread_pool_.get());
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_csc_spmv", batch_size,
+                      worker_count(), 0.0, last_telemetry_.parallel_time_seconds, 0.0,
+                      last_telemetry_.parallel_time_seconds);
 }
 
 void CpuMulticoreBackend::batched_axpby(std::size_t batch_size, std::size_t n, double alpha,
                                         const double* batch_x, double beta, double* batch_y) {
+    const auto t0 = std::chrono::steady_clock::now();
     parallel_batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y, thread_pool_.get());
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_axpby", batch_size,
+                      worker_count(), 0.0, sec, 0.0, sec);
 }
 
 void CpuMulticoreBackend::batched_dot(std::size_t batch_size, std::size_t n, const double* batch_x,
                                       const double* batch_y, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     parallel_batched_dot(batch_size, n, batch_x, batch_y, results, thread_pool_.get());
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_dot", batch_size,
+                      worker_count(), 0.0, sec, 0.0, sec);
 }
 
 void CpuMulticoreBackend::batched_l2_norm(std::size_t batch_size, std::size_t n,
                                           const double* batch_x, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     parallel_batched_l2_norm(batch_size, n, batch_x, results, thread_pool_.get());
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_l2_norm", batch_size,
+                      worker_count(), 0.0, sec, 0.0, sec);
 }
 
 void CpuMulticoreBackend::batched_linf_norm(std::size_t batch_size, std::size_t n,
                                             const double* batch_x, double* results) {
+    const auto t0 = std::chrono::steady_clock::now();
     parallel_batched_linf_norm(batch_size, n, batch_x, results, thread_pool_.get());
+    const auto t1 = std::chrono::steady_clock::now();
+    const double sec = std::chrono::duration<double>(t1 - t0).count();
+    record_invocation(BackendType::CPU_MULTICORE, "parallel_batched_linf_norm", batch_size,
+                      worker_count(), 0.0, sec, 0.0, sec);
 }
 
 }  // namespace kavach::backend::cpu

@@ -11,26 +11,6 @@
 
 namespace kavach::algorithms::lp {
 
-namespace {
-
-double dot_sparse_col(const std::vector<double>& y, const numerics::CscMatrix& A_csc,
-                      std::size_t col_idx) {
-    const std::size_t nnz = A_csc.col_nnz(col_idx);
-    const std::size_t* r_idx = A_csc.col_indices(col_idx);
-    const double* vals = A_csc.col_values(col_idx);
-
-    double sum = 0.0;
-    for (std::size_t p = 0; p < nnz; ++p) {
-        std::size_t r = r_idx[p];
-        if (r < y.size()) {
-            sum += y[r] * vals[p];
-        }
-    }
-    return sum;
-}
-
-}  // namespace
-
 DualSimplexCore::DualSimplexCore(const StandardFormLP& lp, const LPSolverOptions& options)
     : lp_(lp), options_(options), tol_(options.tolerances) {}
 
@@ -105,10 +85,16 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
     }
     auto y = basis.solve_dual(c_B);
 
-    // 4. Verify dual feasibility of inherited basis
+    // 4. Verify dual feasibility of inherited basis via ExecutionBackend::batched_spmv_transpose
+    std::vector<double> at_y(n, 0.0);
+    if (options_.execution_backend != nullptr) {
+        options_.execution_backend->batched_spmv_transpose(lp_.A_csr(), y.data(), at_y.data(), 1);
+    } else {
+        lp_.A_csr().spmv_transpose(y.data(), at_y.data());
+    }
     for (std::size_t j : basis.nonbasic_vars()) {
         if (j < n) {
-            double yTa = dot_sparse_col(y, lp_.A_csc(), j);
+            double yTa = at_y[j];
             double rc = lp_.c()[j] - yTa;
             if (rc < -tol_.dual_feasibility_tol) {
                 return {core::SolverStatus::NUMERICAL_FAILURE,
@@ -172,10 +158,16 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
             }
 
             std::vector<double> reduced_costs(n, 0.0);
+            std::vector<double> at_y_opt(n, 0.0);
+            if (options_.execution_backend != nullptr) {
+                options_.execution_backend->batched_spmv_transpose(
+                    lp_.A_csr(), y.data(), at_y_opt.data(), 1);
+            } else {
+                lp_.A_csr().spmv_transpose(y.data(), at_y_opt.data());
+            }
             for (std::size_t j = 0; j < n; ++j) {
                 if (!basis.is_basic(j)) {
-                    double yTa = dot_sparse_col(y, lp_.A_csc(), j);
-                    reduced_costs[j] = lp_.c()[j] - yTa;
+                    reduced_costs[j] = lp_.c()[j] - at_y_opt[j];
                 }
             }
 
@@ -197,15 +189,30 @@ SimplexExecutionResult DualSimplexCore::run_warm_start(const BasisState& initial
         auto v = basis.solve_dual(e_l);
 
         // --- Step 4: Dual Ratio Test to find entering variable ---
+        // Evaluate [A^T v, A^T y] in a 2-vector batch via ExecutionBackend::batched_spmv_transpose
+        std::vector<double> batch_vy(2 * m, 0.0);
+        for (std::size_t i = 0; i < m; ++i) {
+            batch_vy[i] = v[i];
+            batch_vy[m + i] = y[i];
+        }
+        std::vector<double> batch_out(2 * n, 0.0);
+        if (options_.execution_backend != nullptr) {
+            options_.execution_backend->batched_spmv_transpose(
+                lp_.A_csr(), batch_vy.data(), batch_out.data(), 2);
+        } else {
+            lp_.A_csr().spmv_transpose(v.data(), batch_out.data());
+            lp_.A_csr().spmv_transpose(y.data(), batch_out.data() + n);
+        }
+
         std::size_t entering_col = std::numeric_limits<std::size_t>::max();
         double min_ratio = std::numeric_limits<double>::infinity();
 
         for (std::size_t j : basis.nonbasic_vars()) {
-            double alpha = dot_sparse_col(v, lp_.A_csc(), j);
+            double alpha = batch_out[j];
 
             // In dual simplex, for x_B[leaving_row] < 0, entering column must have alpha < 0
             if (alpha < -tol_.pivot_tol) {
-                double yTa = dot_sparse_col(y, lp_.A_csc(), j);
+                double yTa = batch_out[n + j];
                 double rc = lp_.c()[j] - yTa;
                 double ratio = std::max(0.0, rc) / (-alpha);
 

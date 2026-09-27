@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace kavach::numerics {
@@ -80,6 +82,29 @@ struct SpmvComparisonResult {
 };
 
 /**
+ * @brief Truthful execution telemetry captured during real solver backend execution.
+ *
+ * Records requested_backend, selected_backend, executed_backend, fallback_reason,
+ * kernel_name, batch_size, invocations, and transfer/kernel timings.
+ */
+struct BackendExecutionTelemetry {
+    BackendType requested_backend{BackendType::CPU_SEQUENTIAL};
+    BackendType selected_backend{BackendType::CPU_SEQUENTIAL};
+    BackendType executed_backend{BackendType::CPU_SEQUENTIAL};
+    bool fallback_occurred{false};
+    std::string fallback_reason;
+    std::string kernel_name;
+    std::size_t batch_size{0};           ///< Maximum batch size executed across invocations
+    std::size_t total_vectors{0};        ///< Total vectors processed across all invocations
+    std::size_t invocations{0};          ///< Number of actual backend kernel/routine calls
+    std::size_t worker_count{1};         ///< Active CPU worker threads or GPU execution streams
+    double h2d_time_seconds{0.0};        ///< Host-to-device transfer time (0 for CPU backends)
+    double kernel_time_seconds{0.0};     ///< Pure kernel or CPU execution time
+    double d2h_time_seconds{0.0};        ///< Device-to-host transfer time (0 for CPU backends)
+    double total_backend_time_seconds{0.0};  ///< Total backend execution time
+};
+
+/**
  * @brief Architecture interface for Execution Backends (CPU Sequential, CPU Multicore, CUDA GPU).
  * Fulfills Blueprint Section 4, 14, 15, and Section 32 (Phases 10 & 11).
  * Supports batched SpMV, sparse transpose SpMV, CSC SpMV, vector operations, and reductions.
@@ -90,6 +115,41 @@ public:
 
     [[nodiscard]] virtual BackendType type() const noexcept = 0;
     [[nodiscard]] virtual bool is_available() const noexcept = 0;
+
+    /**
+     * @brief Configure requested and selected backend context prior to solver execution.
+     */
+    void configure_dispatch_context(BackendType requested, BackendType selected,
+                                    std::string initial_fallback_reason = "") noexcept {
+        execution_telemetry_ = {};
+        execution_telemetry_.requested_backend = requested;
+        execution_telemetry_.selected_backend = selected;
+        execution_telemetry_.executed_backend = selected;
+        if (!initial_fallback_reason.empty() && requested != selected) {
+            execution_telemetry_.fallback_occurred = true;
+            execution_telemetry_.fallback_reason = std::move(initial_fallback_reason);
+        }
+        context_configured_ = true;
+    }
+
+    void reset_execution_telemetry() noexcept {
+        const BackendType req =
+            context_configured_ ? execution_telemetry_.requested_backend : type();
+        const BackendType sel =
+            context_configured_ ? execution_telemetry_.selected_backend : type();
+        const bool fb = execution_telemetry_.fallback_occurred;
+        const std::string fb_reason = execution_telemetry_.fallback_reason;
+        execution_telemetry_ = {};
+        execution_telemetry_.requested_backend = req;
+        execution_telemetry_.selected_backend = sel;
+        execution_telemetry_.executed_backend = sel;
+        execution_telemetry_.fallback_occurred = fb;
+        execution_telemetry_.fallback_reason = fb_reason;
+    }
+
+    [[nodiscard]] const BackendExecutionTelemetry& execution_telemetry() const noexcept {
+        return execution_telemetry_;
+    }
 
     /**
      * @brief Batched SpMV execution with raw int row_ptr/col_indices.
@@ -150,6 +210,50 @@ public:
      */
     virtual void batched_linf_norm(std::size_t batch_size, std::size_t n, const double* batch_x,
                                    double* results) = 0;
+
+protected:
+    void record_invocation(BackendType actual_executed, std::string_view kernel,
+                           std::size_t batch_sz, std::size_t workers, double h2d_sec,
+                           double kernel_sec, double d2h_sec, double total_sec,
+                           bool fell_back = false, std::string_view reason = "") const noexcept {
+        if (!context_configured_ && execution_telemetry_.invocations == 0) {
+            execution_telemetry_.requested_backend = type();
+            execution_telemetry_.selected_backend = type();
+        }
+        execution_telemetry_.executed_backend = actual_executed;
+        if (fell_back || actual_executed != execution_telemetry_.requested_backend) {
+            execution_telemetry_.fallback_occurred = true;
+            if (!reason.empty() && execution_telemetry_.fallback_reason.empty()) {
+                execution_telemetry_.fallback_reason = std::string(reason);
+            }
+        }
+        if (!kernel.empty()) {
+            execution_telemetry_.kernel_name = std::string(kernel);
+        }
+        if (batch_sz > execution_telemetry_.batch_size) {
+            execution_telemetry_.batch_size = batch_sz;
+        }
+        execution_telemetry_.total_vectors += batch_sz;
+        execution_telemetry_.invocations += 1;
+        if (workers > 0) {
+            execution_telemetry_.worker_count = workers;
+        }
+        execution_telemetry_.h2d_time_seconds += h2d_sec;
+        execution_telemetry_.kernel_time_seconds += kernel_sec;
+        execution_telemetry_.d2h_time_seconds += d2h_sec;
+        execution_telemetry_.total_backend_time_seconds += total_sec;
+    }
+
+    mutable BackendExecutionTelemetry execution_telemetry_;
+    mutable bool context_configured_{false};
 };
 
+/**
+ * @brief Factory creating a concrete ExecutionBackend for the requested/selected backend dispatch.
+ */
+[[nodiscard]] std::unique_ptr<ExecutionBackend> create_execution_backend(
+    BackendType requested_backend, BackendType selected_backend, std::size_t num_workers = 0,
+    bool force_cuda_fallback = false, std::string initial_fallback_reason = "");
+
 }  // namespace kavach::backend
+

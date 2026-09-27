@@ -37,6 +37,7 @@ struct SolverOptions {
     std::size_t strong_branching_candidates{5};
     std::size_t pseudocost_reliability_threshold{4};
     bool enable_primal_heuristic{true};
+    bool force_cuda_fallback{false};
 };
 
 struct SolverResult {
@@ -51,6 +52,7 @@ struct SolverResult {
     double solve_time_seconds{0.0};
     verification::VerificationReport verification_report;
     backend::BackendType backend_used{backend::BackendType::CPU_SEQUENTIAL};
+    backend::BackendExecutionTelemetry backend_telemetry;
     strategy::StrategyDecision strategy_decision;
     std::optional<algorithms::milp::CutTelemetry> cut_telemetry{std::nullopt};
     std::optional<algorithms::milp::SearchTelemetry> search_telemetry{std::nullopt};

@@ -492,6 +492,11 @@ int handle_solve(const std::vector<std::string_view>& args) {
         kavach::api::KavachSolver solver(config);
         kavach::api::SolverOptions opts;
         opts.strategy_config = config;
+        if (config.override_backend.has_value() &&
+            *config.override_backend == kavach::backend::BackendType::CUDA_GPU &&
+            !config.force_no_gpu) {
+            opts.use_gpu = true;
+        }
         if (time_limit_sec > 0.0) {
             opts.time_limit =
                 std::chrono::milliseconds(static_cast<int64_t>(time_limit_sec * 1000.0));
@@ -529,6 +534,27 @@ int handle_solve(const std::vector<std::string_view>& args) {
             res["backend_used"] = kavach::backend::to_string(result.backend_used);
             res["verified"] = result.verification_report.passed;
             res["optimality_gap"] = result.optimality_gap;
+
+            kavach::benchmark::JsonValue::Object btel;
+            btel["requested_backend"] =
+                kavach::backend::to_string(result.backend_telemetry.requested_backend);
+            btel["selected_backend"] =
+                kavach::backend::to_string(result.backend_telemetry.selected_backend);
+            btel["executed_backend"] =
+                kavach::backend::to_string(result.backend_telemetry.executed_backend);
+            btel["fallback_occurred"] = result.backend_telemetry.fallback_occurred;
+            btel["fallback_reason"] = result.backend_telemetry.fallback_reason;
+            btel["kernel_name"] = result.backend_telemetry.kernel_name;
+            btel["batch_size"] = static_cast<double>(result.backend_telemetry.batch_size);
+            btel["total_vectors"] = static_cast<double>(result.backend_telemetry.total_vectors);
+            btel["invocations"] = static_cast<double>(result.backend_telemetry.invocations);
+            btel["worker_count"] = static_cast<double>(result.backend_telemetry.worker_count);
+            btel["h2d_time_seconds"] = result.backend_telemetry.h2d_time_seconds;
+            btel["kernel_time_seconds"] = result.backend_telemetry.kernel_time_seconds;
+            btel["d2h_time_seconds"] = result.backend_telemetry.d2h_time_seconds;
+            btel["total_backend_time_seconds"] =
+                result.backend_telemetry.total_backend_time_seconds;
+            res["backend_telemetry"] = std::move(btel);
             if (result.cut_telemetry.has_value()) {
                 kavach::benchmark::JsonValue::Object cuts;
                 cuts["cuts_generated"] = static_cast<double>(result.cut_telemetry->cuts_generated);
@@ -723,6 +749,18 @@ int handle_solve(const std::vector<std::string_view>& args) {
                               ? "VERIFIED_OPTIMAL (Certified by LPVerifier)"
                               : "UNVERIFIED")
                       << "\n";
+        }
+        std::cout << "Execution Backend: "
+                  << kavach::backend::to_string(result.backend_telemetry.executed_backend)
+                  << " (Requested: "
+                  << kavach::backend::to_string(result.backend_telemetry.requested_backend)
+                  << ", Selected: "
+                  << kavach::backend::to_string(result.backend_telemetry.selected_backend)
+                  << ", Invocations: " << result.backend_telemetry.invocations
+                  << ", Vectors: " << result.backend_telemetry.total_vectors
+                  << ", Workers: " << result.backend_telemetry.worker_count << ")\n";
+        if (result.backend_telemetry.fallback_occurred) {
+            std::cout << "Backend Fallback: " << result.backend_telemetry.fallback_reason << "\n";
         }
         return 0;
     } catch (const std::exception& e) {

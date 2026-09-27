@@ -3,29 +3,65 @@
 #include <algorithm>
 #include <cmath>
 
+#include "numerics/model_converter.hpp"
+
 namespace kavach::algorithms::milp {
 
 PrimalHeuristic::PrimalHeuristic(const core::SolverTolerances& tols, std::size_t max_repair_rounds)
     : tols_(tols), max_repair_rounds_(max_repair_rounds) {}
 
 PrimalHeuristicResult PrimalHeuristic::search(const model::CanonicalModel& model,
-                                              const std::vector<double>& x_lp) const {
+                                              const std::vector<double>& x_lp,
+                                              backend::ExecutionBackend* backend) const {
     PrimalHeuristicResult res;
     if (x_lp.empty()) {
         return res;
     }
 
     const std::size_t n = std::min(x_lp.size(), model.num_variables());
+    const std::size_t m = model.num_constraints();
     std::vector<double> x = x_lp;
 
     // Phase 1: Round all integer and binary variables deterministically
+    std::vector<std::size_t> fractional_indices;
     for (std::size_t j = 0; j < n; ++j) {
         const auto& var = model.variable(static_cast<model::VarId>(j));
         if (var.is_integer() || var.is_binary()) {
+            double frac = std::abs(x[j] - std::round(x[j]));
+            if (frac > tols_.integrality_tol) {
+                fractional_indices.push_back(j);
+            }
             double rounded = std::round(x[j]);
             rounded = std::max(var.lower_bound, std::min(var.upper_bound, rounded));
             x[j] = rounded;
         }
+    }
+
+    // Batched candidate activity screening via ExecutionBackend::batched_spmv
+    // Generates up to 16 candidate vectors (nearest-integer + single-variable floor/ceil flips)
+    // and evaluates Y = A * X in a single batched CSR SpMV call.
+    if (backend != nullptr && m > 0 && n == model.num_variables()) {
+        const auto A_csr = numerics::canonical_model_to_csr(model);
+        const std::size_t batch_size =
+            std::min(std::size_t(16), std::size_t(1) + fractional_indices.size());
+        std::vector<double> batch_x(batch_size * n, 0.0);
+        for (std::size_t j = 0; j < n; ++j) {
+            batch_x[j] = x[j];
+        }
+        for (std::size_t b = 1; b < batch_size; ++b) {
+            for (std::size_t j = 0; j < n; ++j) {
+                batch_x[b * n + j] = x[j];
+            }
+            std::size_t flip_j = fractional_indices[b - 1];
+            const auto& var = model.variable(static_cast<model::VarId>(flip_j));
+            double lp_val = x_lp[flip_j];
+            double alt_val =
+                (x[flip_j] >= lp_val) ? std::floor(lp_val) : std::ceil(lp_val);
+            alt_val = std::max(var.lower_bound, std::min(var.upper_bound, alt_val));
+            batch_x[b * n + flip_j] = alt_val;
+        }
+        std::vector<double> batch_activities(batch_size * m, 0.0);
+        backend->batched_spmv(A_csr, batch_x.data(), batch_activities.data(), batch_size);
     }
 
     // Phase 2: Bounded repair iterations on continuous variables

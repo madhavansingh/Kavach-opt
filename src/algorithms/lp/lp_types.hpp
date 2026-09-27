@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "backend/execution_backend.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
 #include "numerics/scaling.hpp"
@@ -46,6 +47,12 @@ struct LPSolverOptions {
     std::size_t bland_watchdog_threshold{30};  ///< Degenerate iterations before Bland fallback
     bool force_bland_rule{false};  ///< Unconditionally use Bland's rule from iteration 1
     bool verbose{false};
+    backend::ExecutionBackend* execution_backend{nullptr};  ///< Optional active execution backend
+    backend::BackendType requested_backend{backend::BackendType::CPU_SEQUENTIAL};
+    backend::BackendType selected_backend{backend::BackendType::CPU_SEQUENTIAL};
+    std::size_t num_workers{0};
+    bool force_cuda_fallback{false};
+    std::string initial_fallback_reason;
 };
 
 /**
@@ -80,6 +87,9 @@ struct LPSolverTelemetry {
     double warm_start_time_seconds{0.0};
     double cold_start_time_seconds{0.0};
     std::size_t basis_transfer_count{0};
+
+    // Execution Backend Telemetry
+    backend::BackendExecutionTelemetry backend_telemetry;
 };
 
 /**

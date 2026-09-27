@@ -28,6 +28,7 @@
 #include "core/error.hpp"
 #include "core/logger.hpp"
 #include "core/status.hpp"
+#include "numerics/model_converter.hpp"
 #include "model/model.hpp"
 #include "verification/milp_verifier.hpp"
 
@@ -512,6 +513,12 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
     lp_opts.enable_scaling = opts.enable_scaling;
     lp_opts.preserve_bounds_structure = true;
     lp_opts.verbose = false;
+    lp_opts.execution_backend = opts.execution_backend;
+    lp_opts.requested_backend = opts.requested_backend;
+    lp_opts.selected_backend = opts.selected_backend;
+    lp_opts.num_workers = opts.num_workers;
+    lp_opts.force_cuda_fallback = opts.force_cuda_fallback;
+    lp_opts.initial_fallback_reason = opts.initial_fallback_reason;
 
     lp::RevisedSimplex lp_solver(lp_opts);
 
@@ -577,6 +584,13 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
         if (rounded.empty()) {
             ++tel.rounding_failures;
             return false;
+        }
+        if (opts.execution_backend != nullptr && orig_model.num_constraints() > 0 &&
+            rounded.size() == orig_model.num_variables()) {
+            const auto orig_csr = numerics::canonical_model_to_csr(orig_model);
+            std::vector<double> activities(orig_model.num_constraints(), 0.0);
+            opts.execution_backend->batched_spmv(orig_csr, rounded.data(),
+                                                 activities.data(), 1);
         }
         // Verify integrality of rounded solution
         if (!is_integer_feasible(orig_model, rounded, tols.integrality_tol)) {
@@ -668,7 +682,8 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
         // Try primal heuristic on root
         if (opts.enable_primal_heuristic) {
             ++tel.search_telemetry.heuristic_calls;
-            auto heur_res = primal_heuristic.search(orig_model, root_sol.primal_solution);
+            auto heur_res = primal_heuristic.search(orig_model, root_sol.primal_solution,
+                                                    opts.execution_backend);
             if (heur_res.found_feasible) {
                 ++tel.search_telemetry.heuristic_feasible_candidates;
                 if (incumbent.empty() || is_better(heur_res.objective, incumbent_obj, sense)) {
@@ -841,7 +856,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                 if (opts.enable_primal_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
                     ++tel.search_telemetry.heuristic_calls;
-                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution);
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution, opts.execution_backend);
                     if (heur_res.found_feasible) {
                         ++tel.search_telemetry.heuristic_feasible_candidates;
                         if (incumbent.empty() ||
@@ -1061,7 +1076,7 @@ MILPSolution run_bb(const model::CanonicalModel& orig_model, const MILPSolverOpt
                 if (opts.enable_primal_heuristic &&
                     (tel.nodes_explored % opts.rounding_interval == 0)) {
                     ++tel.search_telemetry.heuristic_calls;
-                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution);
+                    auto heur_res = primal_heuristic.search(orig_model, node_sol.primal_solution, opts.execution_backend);
                     if (heur_res.found_feasible) {
                         ++tel.search_telemetry.heuristic_feasible_candidates;
                         if (incumbent.empty() ||
@@ -1287,11 +1302,25 @@ MILPSolution BranchAndBound::solve(const model::CanonicalModel& model,
 
 MILPSolution BranchAndBound::solve(const model::CanonicalModel& model,
                                    const MILPSolverOptions& options) {
+    std::unique_ptr<backend::ExecutionBackend> local_backend;
+    MILPSolverOptions effective_options = options;
+    if (effective_options.execution_backend == nullptr) {
+        local_backend = backend::create_execution_backend(
+            effective_options.requested_backend, effective_options.selected_backend,
+            effective_options.num_workers, effective_options.force_cuda_fallback,
+            effective_options.initial_fallback_reason);
+        effective_options.execution_backend = local_backend.get();
+    }
+    backend::ExecutionBackend* active_backend = effective_options.execution_backend;
+
     // Reject QP models
     if (model.is_qp()) {
         MILPSolution sol;
         sol.status = core::SolverStatus::NUMERICAL_FAILURE;
         sol.message = "MILP solver received a model with quadratic objective terms. Rejected.";
+        if (active_backend != nullptr) {
+            sol.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return sol;
     }
 
@@ -1305,15 +1334,25 @@ MILPSolution BranchAndBound::solve(const model::CanonicalModel& model,
             msg += " [" + e.component + ": " + e.message + "]";
         }
         sol.message = msg;
+        if (active_backend != nullptr) {
+            sol.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return sol;
     }
 
     // Pure LP: no integer/binary variables — route directly to LP solver
     if (model.is_lp()) {
         lp::LPSolverOptions lp_opts;
-        lp_opts.tolerances = options.tolerances;
-        lp_opts.enable_presolve = options.enable_presolve;
-        lp_opts.enable_scaling = options.enable_scaling;
+        lp_opts.tolerances = effective_options.tolerances;
+        lp_opts.enable_presolve = effective_options.enable_presolve;
+        lp_opts.enable_scaling = effective_options.enable_scaling;
+        lp_opts.execution_backend = active_backend;
+        lp_opts.requested_backend = effective_options.requested_backend;
+        lp_opts.selected_backend = effective_options.selected_backend;
+        lp_opts.num_workers = effective_options.num_workers;
+        lp_opts.force_cuda_fallback = effective_options.force_cuda_fallback;
+        lp_opts.initial_fallback_reason = effective_options.initial_fallback_reason;
+
         lp::RevisedSimplex lp_solver(lp_opts);
         auto lp_sol = lp_solver.solve(model, lp_opts);
 
@@ -1325,10 +1364,15 @@ MILPSolution BranchAndBound::solve(const model::CanonicalModel& model,
         sol.incumbent_solution = lp_sol.primal_solution;
         sol.message = "Pure LP (no integer variables) — routed to LP solver. " + lp_sol.message;
         sol.telemetry.solve_time_seconds = lp_sol.telemetry.solve_time_seconds;
+        sol.telemetry.backend_telemetry = lp_sol.telemetry.backend_telemetry;
         return sol;
     }
 
-    return run_bb(model, options);
+    auto sol = run_bb(model, effective_options);
+    if (active_backend != nullptr) {
+        sol.telemetry.backend_telemetry = active_backend->execution_telemetry();
+    }
+    return sol;
 }
 
 }  // namespace kavach::algorithms::milp

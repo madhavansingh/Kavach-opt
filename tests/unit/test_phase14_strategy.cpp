@@ -592,3 +592,266 @@ KAVACH_TEST(test_programmatic_kavach_solver_api) {
     KAVACH_ASSERT_EQUAL(res2.status, core::SolverStatus::OPTIMAL);
     KAVACH_ASSERT_NEAR(res2.objective_value, 6.0, 1e-6);
 }
+
+// ============================================================================
+// Section 9: Real Execution Backend Orchestration & Telemetry Truth
+// ============================================================================
+
+namespace {
+
+model::CanonicalModel create_nontrivial_milp() {
+    model::CanonicalModel m("nontrivial_milp");
+    auto x0 = m.add_variable("x0", model::VariableType::INTEGER, 0.0, 10.0);
+    auto x1 = m.add_variable("x1", model::VariableType::INTEGER, 0.0, 10.0);
+    auto x2 = m.add_variable("x2", model::VariableType::INTEGER, 0.0, 10.0);
+    auto s0 = m.add_variable("s0", model::VariableType::CONTINUOUS, 0.0, 5.0);
+
+    m.add_constraint("c0", make_expr({{x0, 2.0}, {x1, 3.0}, {x2, 1.5}, {s0, -0.5}}),
+                     model::ConstraintSense::GREATER_EQUAL, 8.7);
+    m.add_constraint("c1", make_expr({{x0, 1.5}, {x1, 1.0}, {x2, 2.5}, {s0, 1.0}}),
+                     model::ConstraintSense::GREATER_EQUAL, 7.3);
+    m.add_constraint("c2", make_expr({{x0, 1.0}, {x1, 2.0}, {x2, 1.0}}),
+                     model::ConstraintSense::LESS_EQUAL, 15.0);
+
+    m.set_objective_sense(model::ObjectiveSense::MINIMIZE);
+    m.set_objective_linear_coefficient(x0, 4.0);
+    m.set_objective_linear_coefficient(x1, 5.0);
+    m.set_objective_linear_coefficient(x2, 3.0);
+    m.set_objective_linear_coefficient(s0, 2.0);
+    return m;
+}
+
+}  // namespace
+
+KAVACH_TEST(test_backend_orchestration_cpu_sequential_real_solve) {
+    auto lp_model = create_toy_lp();
+    auto milp_model = create_nontrivial_milp();
+
+    api::KavachSolver solver;
+    api::SolverOptions opts;
+    opts.run_presolve = false;
+    opts.strategy_config.override_backend = backend::BackendType::CPU_SEQUENTIAL;
+
+    auto lp_res = solver.solve(lp_model, opts);
+    KAVACH_ASSERT_EQUAL(lp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(lp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_used, backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.requested_backend,
+                        backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.selected_backend,
+                        backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.executed_backend,
+                        backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT(lp_res.backend_telemetry.invocations > 0);
+    KAVACH_ASSERT(lp_res.backend_telemetry.total_vectors > 0);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.worker_count, 1);
+    KAVACH_ASSERT(!lp_res.backend_telemetry.fallback_occurred);
+
+    auto milp_res = solver.solve(milp_model, opts);
+    KAVACH_ASSERT_EQUAL(milp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(milp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_used, backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_telemetry.executed_backend,
+                        backend::BackendType::CPU_SEQUENTIAL);
+    KAVACH_ASSERT(milp_res.backend_telemetry.invocations > 0);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_telemetry.worker_count, 1);
+    KAVACH_ASSERT(!milp_res.backend_telemetry.fallback_occurred);
+}
+
+KAVACH_TEST(test_backend_orchestration_cpu_multicore_real_solve) {
+    auto lp_model = create_toy_lp();
+    auto milp_model = create_nontrivial_milp();
+
+    api::KavachSolver solver;
+    api::SolverOptions opts;
+    opts.run_presolve = false;
+    opts.strategy_config.override_backend = backend::BackendType::CPU_MULTICORE;
+
+    auto lp_res = solver.solve(lp_model, opts);
+    KAVACH_ASSERT_EQUAL(lp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(lp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_used, backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.requested_backend,
+                        backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.selected_backend,
+                        backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.executed_backend,
+                        backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT(lp_res.backend_telemetry.invocations > 0);
+    KAVACH_ASSERT(lp_res.backend_telemetry.total_vectors >= 2);
+    KAVACH_ASSERT(lp_res.backend_telemetry.worker_count >= 2);
+    KAVACH_ASSERT(!lp_res.backend_telemetry.fallback_occurred);
+
+    auto milp_res = solver.solve(milp_model, opts);
+    KAVACH_ASSERT_EQUAL(milp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(milp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_used, backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_telemetry.executed_backend,
+                        backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT(milp_res.backend_telemetry.invocations > 0);
+    KAVACH_ASSERT(milp_res.backend_telemetry.worker_count >= 2);
+    KAVACH_ASSERT(!milp_res.backend_telemetry.fallback_occurred);
+}
+
+KAVACH_TEST(test_backend_orchestration_cuda_request_and_fallback_truth) {
+    auto milp_model = create_nontrivial_milp();
+
+    api::KavachSolver solver;
+
+    // Case A: Request CUDA_GPU with use_gpu = true
+    {
+        api::SolverOptions opts;
+        opts.use_gpu = true;
+        opts.run_presolve = false;
+        opts.strategy_config.override_backend = backend::BackendType::CUDA_GPU;
+
+        auto res = solver.solve(milp_model, opts);
+        KAVACH_ASSERT_EQUAL(res.status, core::SolverStatus::OPTIMAL);
+        KAVACH_ASSERT(res.verification_report.passed);
+        KAVACH_ASSERT_EQUAL(res.backend_telemetry.requested_backend,
+                            backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT_EQUAL(res.backend_telemetry.selected_backend,
+                            backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT(res.backend_telemetry.invocations > 0);
+        KAVACH_ASSERT_EQUAL(res.backend_used, res.backend_telemetry.executed_backend);
+
+        if (res.backend_telemetry.fallback_occurred) {
+            // No label-only lie: when fallback occurs, executed_backend and backend_used MUST NOT be CUDA_GPU
+            KAVACH_ASSERT(res.backend_telemetry.executed_backend !=
+                          backend::BackendType::CUDA_GPU);
+            KAVACH_ASSERT(res.backend_used != backend::BackendType::CUDA_GPU);
+            KAVACH_ASSERT(!res.backend_telemetry.fallback_reason.empty());
+        } else {
+            KAVACH_ASSERT_EQUAL(res.backend_telemetry.executed_backend,
+                                backend::BackendType::CUDA_GPU);
+            KAVACH_ASSERT_EQUAL(res.backend_used, backend::BackendType::CUDA_GPU);
+        }
+    }
+
+    // Case B: Request CUDA_GPU with force_no_gpu = true (--backend cuda --no-gpu)
+    {
+        api::SolverOptions opts;
+        opts.use_gpu = false;
+        opts.run_presolve = false;
+        opts.strategy_config.override_backend = backend::BackendType::CUDA_GPU;
+        opts.strategy_config.force_no_gpu = true;
+
+        auto res = solver.solve(milp_model, opts);
+        KAVACH_ASSERT_EQUAL(res.status, core::SolverStatus::OPTIMAL);
+        KAVACH_ASSERT(res.verification_report.passed);
+        KAVACH_ASSERT_EQUAL(res.backend_telemetry.requested_backend,
+                            backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT(res.backend_telemetry.selected_backend != backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT(res.backend_telemetry.executed_backend != backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT(res.backend_used != backend::BackendType::CUDA_GPU);
+        KAVACH_ASSERT(res.backend_telemetry.fallback_occurred);
+        KAVACH_ASSERT(res.backend_telemetry.fallback_reason.find("force_no_gpu") !=
+                      std::string::npos);
+        KAVACH_ASSERT(res.backend_telemetry.invocations > 0);
+    }
+}
+
+KAVACH_TEST(test_backend_orchestration_forced_cuda_fault_injection) {
+    auto lp_model = create_toy_lp();
+    auto milp_model = create_nontrivial_milp();
+
+    api::KavachSolver solver;
+    api::SolverOptions opts;
+    opts.use_gpu = true;
+    opts.force_cuda_fallback = true;
+    opts.run_presolve = false;
+    opts.strategy_config.override_backend = backend::BackendType::CUDA_GPU;
+
+    auto lp_res = solver.solve(lp_model, opts);
+    KAVACH_ASSERT_EQUAL(lp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(lp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_telemetry.requested_backend,
+                        backend::BackendType::CUDA_GPU);
+    KAVACH_ASSERT(lp_res.backend_telemetry.fallback_occurred);
+    KAVACH_ASSERT(lp_res.backend_telemetry.executed_backend != backend::BackendType::CUDA_GPU);
+    KAVACH_ASSERT_EQUAL(lp_res.backend_used, lp_res.backend_telemetry.executed_backend);
+    KAVACH_ASSERT(!lp_res.backend_telemetry.fallback_reason.empty());
+    KAVACH_ASSERT(lp_res.backend_telemetry.invocations > 0);
+
+    auto milp_res = solver.solve(milp_model, opts);
+    KAVACH_ASSERT_EQUAL(milp_res.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT(milp_res.verification_report.passed);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_telemetry.requested_backend,
+                        backend::BackendType::CUDA_GPU);
+    KAVACH_ASSERT(milp_res.backend_telemetry.fallback_occurred);
+    KAVACH_ASSERT(milp_res.backend_telemetry.executed_backend != backend::BackendType::CUDA_GPU);
+    KAVACH_ASSERT_EQUAL(milp_res.backend_used, milp_res.backend_telemetry.executed_backend);
+    KAVACH_ASSERT(!milp_res.backend_telemetry.fallback_reason.empty());
+    KAVACH_ASSERT(milp_res.backend_telemetry.invocations > 0);
+}
+
+KAVACH_TEST(test_backend_orchestration_cross_backend_equivalence_and_determinism) {
+    auto milp_model = create_nontrivial_milp();
+    api::KavachSolver solver;
+
+    const std::vector<backend::BackendType> backends = {
+        backend::BackendType::CPU_SEQUENTIAL,
+        backend::BackendType::CPU_MULTICORE,
+        backend::BackendType::CUDA_GPU,
+    };
+
+    double ref_obj = 0.0;
+    std::size_t ref_nodes = 0;
+    std::size_t ref_iters = 0;
+    bool ref_set = false;
+
+    for (auto btype : backends) {
+        api::SolverOptions opts;
+        opts.use_gpu = (btype == backend::BackendType::CUDA_GPU);
+        opts.run_presolve = true;
+        opts.strategy_config.override_backend = btype;
+
+        auto r1 = solver.solve(milp_model, opts);
+        auto r2 = solver.solve(milp_model, opts);
+
+        KAVACH_ASSERT_EQUAL(r1.status, core::SolverStatus::OPTIMAL);
+        KAVACH_ASSERT_EQUAL(r2.status, core::SolverStatus::OPTIMAL);
+        KAVACH_ASSERT(r1.verification_report.passed);
+        KAVACH_ASSERT(r2.verification_report.passed);
+        KAVACH_ASSERT(r1.backend_telemetry.invocations > 0);
+        KAVACH_ASSERT_EQUAL(r1.backend_telemetry.invocations, r2.backend_telemetry.invocations);
+        KAVACH_ASSERT_EQUAL(r1.nodes, r2.nodes);
+        KAVACH_ASSERT_EQUAL(r1.iterations, r2.iterations);
+        KAVACH_ASSERT_NEAR(r1.objective_value, r2.objective_value, 1e-12);
+
+        if (!ref_set) {
+            ref_obj = r1.objective_value;
+            ref_nodes = r1.nodes;
+            ref_iters = r1.iterations;
+            ref_set = true;
+        } else {
+            KAVACH_ASSERT_NEAR(r1.objective_value, ref_obj, 1e-9);
+            KAVACH_ASSERT_EQUAL(r1.nodes, ref_nodes);
+            KAVACH_ASSERT_EQUAL(r1.iterations, ref_iters);
+        }
+    }
+}
+
+KAVACH_TEST(test_backend_orchestration_lp_dual_simplex_and_milp_batched_spmv) {
+    auto milp_model = create_nontrivial_milp();
+
+    algorithms::milp::MILPSolverOptions milp_opts;
+    milp_opts.requested_backend = backend::BackendType::CPU_MULTICORE;
+    milp_opts.selected_backend = backend::BackendType::CPU_MULTICORE;
+    milp_opts.num_workers = 4;
+    milp_opts.enable_warm_starts = true;
+    milp_opts.enable_primal_heuristic = true;
+
+    algorithms::milp::BranchAndBound bb(milp_opts);
+    auto sol = bb.solve(milp_model, milp_opts);
+
+    KAVACH_ASSERT_EQUAL(sol.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT_EQUAL(sol.telemetry.backend_telemetry.executed_backend,
+                        backend::BackendType::CPU_MULTICORE);
+    KAVACH_ASSERT(sol.telemetry.backend_telemetry.invocations > 0);
+    // Warm-start dual simplex (batch_size=2) and PrimalHeuristic (batch_size>=2) process multiple vectors
+    KAVACH_ASSERT(sol.telemetry.backend_telemetry.total_vectors >
+                  sol.telemetry.backend_telemetry.invocations);
+    KAVACH_ASSERT_EQUAL(sol.telemetry.backend_telemetry.worker_count, 4);
+}
+

@@ -9,6 +9,7 @@
 #include "algorithms/lp/standard_form.hpp"
 #include "core/error.hpp"
 #include "core/logger.hpp"
+#include "numerics/model_converter.hpp"
 #include "numerics/scaling.hpp"
 #include "presolve/presolve.hpp"
 #include "verification/lp_verifier.hpp"
@@ -32,6 +33,17 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     LPSolution solution;
     solution.telemetry.original_rows = model.num_constraints();
     solution.telemetry.original_cols = model.num_variables();
+
+    std::unique_ptr<backend::ExecutionBackend> local_backend;
+    LPSolverOptions effective_options = options;
+    if (effective_options.execution_backend == nullptr) {
+        local_backend = backend::create_execution_backend(
+            effective_options.requested_backend, effective_options.selected_backend,
+            effective_options.num_workers, effective_options.force_cuda_fallback,
+            effective_options.initial_fallback_reason);
+        effective_options.execution_backend = local_backend.get();
+    }
+    backend::ExecutionBackend* active_backend = effective_options.execution_backend;
 
     // 1. Problem class validation: Reject non-continuous (integer/binary) models
     for (std::size_t j = 0; j < model.num_variables(); ++j) {
@@ -58,6 +70,9 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
             msg += " [" + err.component + ": " + err.message + "]";
         }
         solution.message = msg;
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return solution;
     }
 
@@ -66,10 +81,10 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     std::optional<presolve::ReconstructionMap> reconstruction_map;
     const model::CanonicalModel* working_model = &model;
 
-    if (options.enable_presolve) {
+    if (effective_options.enable_presolve) {
         presolve::Presolver presolver;
         presolve::PresolveOptions popts;
-        popts.tolerances = options.tolerances;
+        popts.tolerances = effective_options.tolerances;
         auto presolve_res = presolver.apply(model, popts);
 
         solution.telemetry.presolved_rows = presolve_res.stats.reduced_constraints;
@@ -78,12 +93,18 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
         if (presolve_res.is_infeasible()) {
             solution.status = core::SolverStatus::INFEASIBLE;
             solution.message = "Presolve detected infeasibility: " + presolve_res.message;
+            if (active_backend != nullptr) {
+                solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+            }
             return solution;
         }
 
         if (presolve_res.is_unbounded()) {
             solution.status = core::SolverStatus::UNBOUNDED;
             solution.message = "Presolve detected unboundedness: " + presolve_res.message;
+            if (active_backend != nullptr) {
+                solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+            }
             return solution;
         }
 
@@ -98,12 +119,13 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     }
 
     // 4. Standard Form Transformation
-    StandardFormLP standard_lp(*working_model, options.tolerances,
-                               options.preserve_bounds_structure);
+    StandardFormLP standard_lp(*working_model, effective_options.tolerances,
+                               effective_options.preserve_bounds_structure);
 
     // 5. Scaling (if enabled)
     std::optional<numerics::ScalingFactors> scaling_factors;
-    if (options.enable_scaling && standard_lp.num_rows() > 0 && standard_lp.num_cols() > 0) {
+    if (effective_options.enable_scaling && standard_lp.num_rows() > 0 &&
+        standard_lp.num_cols() > 0) {
         auto diag = numerics::analyze_conditioning(standard_lp.A_csr());
         if (diag.recommend_scaling) {
             scaling_factors = numerics::compute_geometric_mean_scaling(standard_lp.A_csr(), 4);
@@ -112,7 +134,7 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     }
 
     // 6. Execute Revised Simplex Core
-    RevisedSimplexCore core(standard_lp, options);
+    RevisedSimplexCore core(standard_lp, effective_options);
     auto exec_res = core.run(solution.telemetry);
 
     solution.status = exec_res.status;
@@ -120,6 +142,9 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     solution.iterations = solution.telemetry.total_iterations;
 
     if (exec_res.status != core::SolverStatus::OPTIMAL) {
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         auto end_time = std::chrono::steady_clock::now();
         solution.telemetry.solve_time_seconds =
             std::chrono::duration<double>(end_time - start_time).count();
@@ -149,11 +174,14 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
 
     // 9. Reconstruct original model solution and optimality certificate
     if (reconstruction_map.has_value()) {
-        auto cert = reconstruction_map->restore_certificate(x_reduced, dual_reduced, rc_reduced,
-                                                            options.tolerances);
+        auto cert = reconstruction_map->restore_certificate(
+            x_reduced, dual_reduced, rc_reduced, effective_options.tolerances);
         if (!cert.valid) {
             solution.status = core::SolverStatus::NUMERICAL_FAILURE;
             solution.message = "Presolve certificate reconstruction failed: " + cert.diagnostic;
+            if (active_backend != nullptr) {
+                solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+            }
             auto end_time = std::chrono::steady_clock::now();
             solution.telemetry.solve_time_seconds =
                 std::chrono::duration<double>(end_time - start_time).count();
@@ -176,12 +204,22 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
         solution.objective_value = obj;
     }
 
+    // 10. Original-model constraint activity evaluation via ExecutionBackend
+    // (Also ensures backend execution occurs even if presolve reduced all rows)
+    if (active_backend != nullptr && model.num_constraints() > 0 &&
+        solution.primal_solution.size() == model.num_variables()) {
+        const auto orig_csr = numerics::canonical_model_to_csr(model);
+        std::vector<double> orig_activities(model.num_constraints(), 0.0);
+        active_backend->batched_spmv(orig_csr, solution.primal_solution.data(),
+                                     orig_activities.data(), 1);
+    }
+
     // 11. Independent Verification [Y] — mandatory for OPTIMAL claim
     // The verifier operates on the original (pre-presolve) model and the
     // fully-reconstructed primal/dual/reduced-cost certificate.
     {
         verification::LPVerifier verifier(
-            verification::VerifierTolerances::from_solver_tolerances(options.tolerances));
+            verification::VerifierTolerances::from_solver_tolerances(effective_options.tolerances));
 
         auto vr =
             verifier.verify(model, solution.primal_solution, solution.dual_multipliers,
@@ -199,6 +237,10 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
         }
     }
 
+    if (active_backend != nullptr) {
+        solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+    }
+
     auto end_time = std::chrono::steady_clock::now();
     solution.telemetry.solve_time_seconds =
         std::chrono::duration<double>(end_time - start_time).count();
@@ -213,9 +255,23 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
     LPSolution solution;
     solution.telemetry.warm_start_attempts = 1;
 
+    std::unique_ptr<backend::ExecutionBackend> local_backend;
+    LPSolverOptions effective_options = options;
+    if (effective_options.execution_backend == nullptr) {
+        local_backend = backend::create_execution_backend(
+            effective_options.requested_backend, effective_options.selected_backend,
+            effective_options.num_workers, effective_options.force_cuda_fallback,
+            effective_options.initial_fallback_reason);
+        effective_options.execution_backend = local_backend.get();
+    }
+    backend::ExecutionBackend* active_backend = effective_options.execution_backend;
+
     if (!warm_basis.is_valid) {
         solution.status = core::SolverStatus::NUMERICAL_FAILURE;
         solution.message = "Warm start rejected: invalid basis state provided";
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return solution;
     }
 
@@ -223,6 +279,9 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
     if (model.is_qp()) {
         solution.status = core::SolverStatus::NUMERICAL_FAILURE;
         solution.message = "QP models rejected: use active-set QP solver";
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return solution;
     }
 
@@ -231,11 +290,15 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
     if (!val.valid) {
         solution.status = core::SolverStatus::UNKNOWN;
         solution.message = "Model validation failed";
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return solution;
     }
 
     // 3. Transform to standard form preserving bounds structure
-    StandardFormLP standard_lp(model, options.tolerances, options.preserve_bounds_structure);
+    StandardFormLP standard_lp(model, effective_options.tolerances,
+                               effective_options.preserve_bounds_structure);
 
     // 4. Verify structural compatibility with warm_basis
     if (standard_lp.num_rows() != warm_basis.num_rows ||
@@ -245,6 +308,9 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
             "Structural dimension mismatch: LP has (" + std::to_string(standard_lp.num_rows()) +
             "x" + std::to_string(standard_lp.num_cols()) + ") but basis has (" +
             std::to_string(warm_basis.num_rows) + "x" + std::to_string(warm_basis.num_cols) + ")";
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         return solution;
     }
 
@@ -253,13 +319,16 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
         if (!warm_basis.scaling_factors.has_value()) {
             solution.status = core::SolverStatus::NUMERICAL_FAILURE;
             solution.message = "Scaling mismatch: warm basis missing scaling factors";
+            if (active_backend != nullptr) {
+                solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+            }
             return solution;
         }
         standard_lp.apply_scaling(*warm_basis.scaling_factors);
     }
 
     // 6. Execute Dual Simplex
-    DualSimplexCore dual_core(standard_lp, options);
+    DualSimplexCore dual_core(standard_lp, effective_options);
     std::optional<BasisState> resulting_basis;
     auto exec_res = dual_core.run_warm_start(warm_basis, solution.telemetry, resulting_basis);
 
@@ -268,6 +337,9 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
     solution.iterations = solution.telemetry.total_iterations;
 
     if (exec_res.status != core::SolverStatus::OPTIMAL) {
+        if (active_backend != nullptr) {
+            solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+        }
         auto end_time = std::chrono::steady_clock::now();
         solution.telemetry.solve_time_seconds =
             std::chrono::duration<double>(end_time - start_time).count();
@@ -299,7 +371,7 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
     // 10. Independent Verification [Y]
     {
         verification::LPVerifier verifier(
-            verification::VerifierTolerances::from_solver_tolerances(options.tolerances));
+            verification::VerifierTolerances::from_solver_tolerances(effective_options.tolerances));
         auto vr =
             verifier.verify(model, solution.primal_solution, solution.dual_multipliers,
                             solution.reduced_costs, solution.objective_value, solution.status);
@@ -316,6 +388,10 @@ LPSolution RevisedSimplex::solve_warm_start(const model::CanonicalModel& model,
                 }
             }
         }
+    }
+
+    if (active_backend != nullptr) {
+        solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
     }
 
     auto end_time = std::chrono::steady_clock::now();

@@ -18,8 +18,10 @@ struct CudaBackendOptions {
     int device_id{0};        ///< CUDA GPU device index
     bool strict_gpu{false};  ///< If true and GPU is unavailable, throw instead of falling back
     bool force_cpu_fallback{false};  ///< Force CPU fallback (implements --no-gpu)
+    bool measure_cpu_reference{false};  ///< If true, also run CPU reference for speedup telemetry
     std::size_t cpu_fallback_workers{
         0};  ///< Worker threads to use if CPU fallback occurs (0 = auto)
+    std::string injected_fallback_reason;  ///< Optional diagnostic override for forced fallback
 };
 
 /**
@@ -106,6 +108,8 @@ public:
                            double* results) override;
 
 private:
+    void sync_execution_telemetry(std::size_t batch_size) const noexcept;
+
     CudaBackendOptions options_;
     mutable CudaTelemetry last_telemetry_;
     mutable cpu::CpuMulticoreBackend cpu_fallback_backend_;

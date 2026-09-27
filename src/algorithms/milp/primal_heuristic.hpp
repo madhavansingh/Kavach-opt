@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "backend/execution_backend.hpp"
 #include "core/tolerances.hpp"
 #include "model/model.hpp"
 
@@ -34,10 +35,12 @@ public:
      *
      * @param model Base canonical model.
      * @param x_lp Fractional solution vector from LP relaxation.
+     * @param backend Optional execution backend for batched candidate activity evaluation.
      * @return PrimalHeuristicResult containing candidate solution if certified feasible.
      */
-    [[nodiscard]] PrimalHeuristicResult search(const model::CanonicalModel& model,
-                                               const std::vector<double>& x_lp) const;
+    [[nodiscard]] PrimalHeuristicResult search(
+        const model::CanonicalModel& model, const std::vector<double>& x_lp,
+        backend::ExecutionBackend* backend = nullptr) const;
 
 private:
     core::SolverTolerances tols_;

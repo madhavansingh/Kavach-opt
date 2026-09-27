@@ -9,10 +9,32 @@
 namespace kavach::backend::cuda {
 
 CudaBackend::CudaBackend(int device_id)
-    : options_{device_id, false, false, 0}, cpu_fallback_backend_(0) {}
+    : options_{device_id, false, false, false, 0, ""}, cpu_fallback_backend_(0) {}
 
 CudaBackend::CudaBackend(CudaBackendOptions options)
-    : options_(options), cpu_fallback_backend_(options.cpu_fallback_workers) {}
+    : options_(std::move(options)), cpu_fallback_backend_(options_.cpu_fallback_workers) {}
+
+void CudaBackend::sync_execution_telemetry(std::size_t batch_size) const noexcept {
+    const bool fell_back = last_telemetry_.fallback_occurred;
+    const BackendType actual = fell_back ? cpu_fallback_backend_.type() : BackendType::CUDA_GPU;
+    const std::size_t workers = fell_back ? cpu_fallback_backend_.worker_count() : 1;
+    const double h2d_sec = fell_back ? 0.0 : last_telemetry_.h2d_time_seconds;
+    const double d2h_sec = fell_back ? 0.0 : last_telemetry_.d2h_time_seconds;
+    const double kernel_sec = fell_back ? last_telemetry_.cpu_reference_time_seconds
+                                        : last_telemetry_.kernel_time_seconds;
+    const double total_sec = fell_back ? last_telemetry_.cpu_reference_time_seconds
+                                       : last_telemetry_.total_gpu_time_seconds;
+    std::string reason = last_telemetry_.fallback_reason;
+    if (fell_back && !options_.injected_fallback_reason.empty()) {
+        reason = options_.injected_fallback_reason;
+    }
+    const std::string_view kname = (last_telemetry_.kernel_name == "None" ||
+                                    last_telemetry_.kernel_name.empty())
+                                       ? "cuda_batched_csr_spmv"
+                                       : std::string_view(last_telemetry_.kernel_name);
+    record_invocation(actual, kname, batch_size, workers, h2d_sec, kernel_sec, d2h_sec, total_sec,
+                      fell_back, reason);
+}
 
 bool CudaBackend::is_available() const noexcept {
     if (options_.force_cpu_fallback) {
@@ -65,9 +87,12 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.gpu_available = false;
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback
-                ? "Explicit CPU fallback requested (--no-gpu)"
-                : "CUDA runtime unavailable; automatically fell back to CPU";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback
+                       ? "Explicit CPU fallback requested (--no-gpu)"
+                       : "CUDA runtime unavailable; automatically fell back to CPU");
+        last_telemetry_.kernel_name = "cuda_batched_csr_spmv";
         last_telemetry_.rows = rows;
         last_telemetry_.cols = cols;
         last_telemetry_.nonzeros = nnz;
@@ -77,6 +102,7 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.transfer_inclusive_speedup = 1.0;
         last_telemetry_.kernel_only_speedup = 1.0;
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -87,6 +113,7 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.device_name = prop.name;
         last_telemetry_.compute_capability =
             std::to_string(prop.major) + "." + std::to_string(prop.minor);
+        last_telemetry_.kernel_name = "cuda_batched_csr_spmv";
 
         CudaSpmvExecutionTimes times;
         cuda_batched_csr_spmv_int(batch_size, rows, cols, nnz, values, row_ptr, col_indices,
@@ -105,33 +132,41 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.total_gpu_time_seconds = times.total_gpu_time_seconds;
         last_telemetry_.backend_used = BackendType::CUDA_GPU;
 
-        // Measure CPU reference for honest speedup comparison
-        std::vector<double> ref_y(batch_size * rows, 0.0);
-        const auto t0 = std::chrono::steady_clock::now();
-        cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
-                                           batch_x, ref_y.data());
-        const auto t1 = std::chrono::steady_clock::now();
-        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
+        if (options_.measure_cpu_reference) {
+            std::vector<double> ref_y(batch_size * rows, 0.0);
+            const auto t0 = std::chrono::steady_clock::now();
+            cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
+                                               batch_x, ref_y.data());
+            const auto t1 = std::chrono::steady_clock::now();
+            last_telemetry_.cpu_reference_time_seconds =
+                std::chrono::duration<double>(t1 - t0).count();
 
-        if (last_telemetry_.total_gpu_time_seconds > 0.0) {
-            last_telemetry_.transfer_inclusive_speedup =
-                last_telemetry_.cpu_reference_time_seconds / last_telemetry_.total_gpu_time_seconds;
-        }
-        if (last_telemetry_.kernel_time_seconds > 0.0) {
-            last_telemetry_.kernel_only_speedup =
-                last_telemetry_.cpu_reference_time_seconds / last_telemetry_.kernel_time_seconds;
+            if (last_telemetry_.total_gpu_time_seconds > 0.0) {
+                last_telemetry_.transfer_inclusive_speedup =
+                    last_telemetry_.cpu_reference_time_seconds /
+                    last_telemetry_.total_gpu_time_seconds;
+            }
+            if (last_telemetry_.kernel_time_seconds > 0.0) {
+                last_telemetry_.kernel_only_speedup =
+                    last_telemetry_.cpu_reference_time_seconds /
+                    last_telemetry_.kernel_time_seconds;
+            }
         }
     } catch (const std::exception& e) {
         if (options_.strict_gpu) {
             throw;
         }
         // Graceful fallback to CPU
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
                                            batch_x, batch_y);
+        const auto t1 = std::chrono::steady_clock::now();
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -172,9 +207,12 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.gpu_available = false;
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback
-                ? "Explicit CPU fallback requested (--no-gpu)"
-                : "CUDA runtime unavailable; automatically fell back to CPU";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback
+                       ? "Explicit CPU fallback requested (--no-gpu)"
+                       : "CUDA runtime unavailable; automatically fell back to CPU");
+        last_telemetry_.kernel_name = "cuda_batched_csr_spmv";
         last_telemetry_.rows = rows;
         last_telemetry_.cols = cols;
         last_telemetry_.nonzeros = nnz;
@@ -184,6 +222,7 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.transfer_inclusive_speedup = 1.0;
         last_telemetry_.kernel_only_speedup = 1.0;
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -194,6 +233,7 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.device_name = prop.name;
         last_telemetry_.compute_capability =
             std::to_string(prop.major) + "." + std::to_string(prop.minor);
+        last_telemetry_.kernel_name = "cuda_batched_csr_spmv";
 
         CudaSpmvExecutionTimes times;
         cuda_batched_csr_spmv(batch_size, rows, cols, nnz, values, row_ptr, col_indices, batch_x,
@@ -212,31 +252,40 @@ void CudaBackend::batched_spmv(std::size_t batch_size, std::size_t rows, std::si
         last_telemetry_.total_gpu_time_seconds = times.total_gpu_time_seconds;
         last_telemetry_.backend_used = BackendType::CUDA_GPU;
 
-        std::vector<double> ref_y(batch_size * rows, 0.0);
-        const auto t0 = std::chrono::steady_clock::now();
-        cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
-                                           batch_x, ref_y.data());
-        const auto t1 = std::chrono::steady_clock::now();
-        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
+        if (options_.measure_cpu_reference) {
+            std::vector<double> ref_y(batch_size * rows, 0.0);
+            const auto t0 = std::chrono::steady_clock::now();
+            cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
+                                               batch_x, ref_y.data());
+            const auto t1 = std::chrono::steady_clock::now();
+            last_telemetry_.cpu_reference_time_seconds =
+                std::chrono::duration<double>(t1 - t0).count();
 
-        if (last_telemetry_.total_gpu_time_seconds > 0.0) {
-            last_telemetry_.transfer_inclusive_speedup =
-                last_telemetry_.cpu_reference_time_seconds / last_telemetry_.total_gpu_time_seconds;
-        }
-        if (last_telemetry_.kernel_time_seconds > 0.0) {
-            last_telemetry_.kernel_only_speedup =
-                last_telemetry_.cpu_reference_time_seconds / last_telemetry_.kernel_time_seconds;
+            if (last_telemetry_.total_gpu_time_seconds > 0.0) {
+                last_telemetry_.transfer_inclusive_speedup =
+                    last_telemetry_.cpu_reference_time_seconds /
+                    last_telemetry_.total_gpu_time_seconds;
+            }
+            if (last_telemetry_.kernel_time_seconds > 0.0) {
+                last_telemetry_.kernel_only_speedup =
+                    last_telemetry_.cpu_reference_time_seconds /
+                    last_telemetry_.kernel_time_seconds;
+            }
         }
     } catch (const std::exception& e) {
         if (options_.strict_gpu) {
             throw;
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_spmv(batch_size, rows, cols, values, row_ptr, col_indices,
                                            batch_x, batch_y);
+        const auto t1 = std::chrono::steady_clock::now();
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -286,10 +335,13 @@ void CudaBackend::batched_spmv_transpose(const numerics::CsrMatrix& A, const dou
         last_telemetry_.gpu_available = false;
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback
-                ? "Explicit CPU fallback requested (--no-gpu)"
-                : (!is_cuda_available() ? "CUDA runtime unavailable; automatically fell back to CPU"
-                                        : "Insufficient GPU memory; fell back to CPU");
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback
+                       ? "Explicit CPU fallback requested (--no-gpu)"
+                       : (!is_cuda_available()
+                              ? "CUDA runtime unavailable; automatically fell back to CPU"
+                              : "Insufficient GPU memory; fell back to CPU"));
         last_telemetry_.kernel_name = "cuda_batched_csr_transpose_spmv";
         last_telemetry_.rows = cols;
         last_telemetry_.cols = rows;
@@ -304,6 +356,7 @@ void CudaBackend::batched_spmv_transpose(const numerics::CsrMatrix& A, const dou
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -341,7 +394,10 @@ void CudaBackend::batched_spmv_transpose(const numerics::CsrMatrix& A, const dou
         if (options_.strict_gpu) {
             throw;
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_spmv_transpose(A, batch_x, batch_y, batch_size);
+        const auto t1 = std::chrono::steady_clock::now();
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
@@ -349,6 +405,7 @@ void CudaBackend::batched_spmv_transpose(const numerics::CsrMatrix& A, const dou
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -392,10 +449,13 @@ void CudaBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* b
         last_telemetry_.gpu_available = false;
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback
-                ? "Explicit CPU fallback requested (--no-gpu)"
-                : (!is_cuda_available() ? "CUDA runtime unavailable; automatically fell back to CPU"
-                                        : "Insufficient GPU memory; fell back to CPU");
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback
+                       ? "Explicit CPU fallback requested (--no-gpu)"
+                       : (!is_cuda_available()
+                              ? "CUDA runtime unavailable; automatically fell back to CPU"
+                              : "Insufficient GPU memory; fell back to CPU"));
         last_telemetry_.kernel_name = "cuda_batched_csc_spmv";
         last_telemetry_.rows = rows;
         last_telemetry_.cols = cols;
@@ -410,6 +470,7 @@ void CudaBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* b
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -445,7 +506,10 @@ void CudaBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* b
         if (options_.strict_gpu) {
             throw;
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_csc_spmv(A, batch_x, batch_y, batch_size);
+        const auto t1 = std::chrono::steady_clock::now();
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
@@ -453,6 +517,7 @@ void CudaBackend::batched_csc_spmv(const numerics::CscMatrix& A, const double* b
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -472,17 +537,23 @@ void CudaBackend::batched_axpby(std::size_t batch_size, std::size_t n, double al
         if (options_.strict_gpu) {
             throw core::NumericalException("Strict GPU execution requested but unavailable");
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_axpby(batch_size, n, alpha, batch_x, beta, batch_y);
+        const auto t1 = std::chrono::steady_clock::now();
         last_telemetry_ = {};
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable");
         last_telemetry_.kernel_name = "cuda_batched_axpby";
         last_telemetry_.batch_size = batch_size;
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -511,6 +582,7 @@ void CudaBackend::batched_axpby(std::size_t batch_size, std::size_t n, double al
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -530,17 +602,23 @@ void CudaBackend::batched_dot(std::size_t batch_size, std::size_t n, const doubl
         if (options_.strict_gpu) {
             throw core::NumericalException("Strict GPU execution requested but unavailable");
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_dot(batch_size, n, batch_x, batch_y, results);
+        const auto t1 = std::chrono::steady_clock::now();
         last_telemetry_ = {};
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable");
         last_telemetry_.kernel_name = "cuda_batched_dot";
         last_telemetry_.batch_size = batch_size;
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -569,6 +647,7 @@ void CudaBackend::batched_dot(std::size_t batch_size, std::size_t n, const doubl
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -588,17 +667,23 @@ void CudaBackend::batched_l2_norm(std::size_t batch_size, std::size_t n, const d
         if (options_.strict_gpu) {
             throw core::NumericalException("Strict GPU execution requested but unavailable");
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_l2_norm(batch_size, n, batch_x, results);
+        const auto t1 = std::chrono::steady_clock::now();
         last_telemetry_ = {};
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable");
         last_telemetry_.kernel_name = "cuda_batched_l2_norm";
         last_telemetry_.batch_size = batch_size;
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -626,6 +711,7 @@ void CudaBackend::batched_l2_norm(std::size_t batch_size, std::size_t n, const d
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
@@ -645,17 +731,23 @@ void CudaBackend::batched_linf_norm(std::size_t batch_size, std::size_t n, const
         if (options_.strict_gpu) {
             throw core::NumericalException("Strict GPU execution requested but unavailable");
         }
+        const auto t0 = std::chrono::steady_clock::now();
         cpu_fallback_backend_.batched_linf_norm(batch_size, n, batch_x, results);
+        const auto t1 = std::chrono::steady_clock::now();
         last_telemetry_ = {};
         last_telemetry_.fallback_occurred = true;
         last_telemetry_.fallback_reason =
-            options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable";
+            !options_.injected_fallback_reason.empty()
+                ? options_.injected_fallback_reason
+                : (options_.force_cpu_fallback ? "Explicit CPU fallback" : "CUDA unavailable");
         last_telemetry_.kernel_name = "cuda_batched_linf_norm";
         last_telemetry_.batch_size = batch_size;
+        last_telemetry_.cpu_reference_time_seconds = std::chrono::duration<double>(t1 - t0).count();
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
         last_telemetry_.dispatch_decision = {BackendType::CUDA_GPU, cpu_fallback_backend_.type(),
                                              cpu_fallback_backend_.type(),
                                              last_telemetry_.fallback_reason};
+        sync_execution_telemetry(batch_size);
         return;
     }
 
@@ -683,7 +775,35 @@ void CudaBackend::batched_linf_norm(std::size_t batch_size, std::size_t n, const
         last_telemetry_.fallback_reason = "CUDA runtime failure: " + std::string(e.what());
         last_telemetry_.backend_used = cpu_fallback_backend_.type();
     }
+    sync_execution_telemetry(batch_size);
 #endif
 }
 
 }  // namespace kavach::backend::cuda
+
+namespace kavach::backend {
+
+std::unique_ptr<ExecutionBackend> create_execution_backend(BackendType requested_backend,
+                                                           BackendType selected_backend,
+                                                           std::size_t num_workers,
+                                                           bool force_cuda_fallback,
+                                                           std::string initial_fallback_reason) {
+    std::unique_ptr<ExecutionBackend> backend;
+    if (requested_backend == BackendType::CUDA_GPU || selected_backend == BackendType::CUDA_GPU) {
+        cuda::CudaBackendOptions cuda_opts;
+        cuda_opts.force_cpu_fallback =
+            force_cuda_fallback || (selected_backend != BackendType::CUDA_GPU);
+        cuda_opts.cpu_fallback_workers = num_workers;
+        cuda_opts.injected_fallback_reason = initial_fallback_reason;
+        backend = std::make_unique<cuda::CudaBackend>(std::move(cuda_opts));
+    } else if (selected_backend == BackendType::CPU_MULTICORE) {
+        backend = std::make_unique<cpu::CpuMulticoreBackend>(num_workers);
+    } else {
+        backend = std::make_unique<cpu::CpuSequentialBackend>();
+    }
+    backend->configure_dispatch_context(requested_backend, selected_backend,
+                                        std::move(initial_fallback_reason));
+    return backend;
+}
+
+}  // namespace kavach::backend

@@ -7,6 +7,7 @@
 #include "algorithms/milp/branch_and_bound.hpp"
 #include "algorithms/miqp/miqp_solver.hpp"
 #include "algorithms/qp/active_set.hpp"
+#include "numerics/model_converter.hpp"
 #include "verification/lp_verifier.hpp"
 #include "verification/milp_verifier.hpp"
 #include "verification/miqp_verifier.hpp"
@@ -23,7 +24,10 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model) {
 strategy::StrategyDecision KavachSolver::plan(const model::CanonicalModel& model,
                                               const SolverOptions& options) {
     auto config = options.strategy_config;
-    if (!options.use_gpu) {
+    const bool explicit_cuda_override =
+        config.override_backend.has_value() &&
+        *config.override_backend == backend::BackendType::CUDA_GPU;
+    if (!options.use_gpu && !explicit_cuda_override) {
         config.force_no_gpu = true;
     }
     if (!options.run_presolve) {
@@ -60,7 +64,28 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
     auto start_time = std::chrono::steady_clock::now();
     SolverResult result;
     result.strategy_decision = decision;
-    result.backend_used = decision.recommended_backend;
+
+    const backend::BackendType requested_backend =
+        options.strategy_config.override_backend.value_or(decision.recommended_backend);
+    backend::BackendType selected_backend = decision.recommended_backend;
+    std::string initial_fallback_reason;
+
+    if (requested_backend == backend::BackendType::CUDA_GPU &&
+        options.strategy_config.force_no_gpu) {
+        selected_backend = backend::BackendType::CPU_MULTICORE;
+        initial_fallback_reason = "GPU execution disabled via force_no_gpu / --no-gpu";
+    }
+
+    const std::size_t num_workers =
+        (selected_backend == backend::BackendType::CPU_MULTICORE ||
+         requested_backend == backend::BackendType::CPU_MULTICORE ||
+         requested_backend == backend::BackendType::CUDA_GPU)
+            ? std::max<std::size_t>(2, decision.recommended_cpu_threads)
+            : 1;
+
+    auto exec_backend = backend::create_execution_backend(
+        requested_backend, selected_backend, num_workers, options.force_cuda_fallback,
+        initial_fallback_reason);
 
     double time_limit_sec = 0.0;
     if (options.time_limit.has_value()) {
@@ -76,6 +101,14 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
 
         algorithms::qp::PrimalActiveSetQPSolver qp_solver(qp_opts);
         auto sol = qp_solver.solve(model);
+
+        if (exec_backend != nullptr && model.num_constraints() > 0 &&
+            sol.primal_solution.size() == model.num_variables()) {
+            const auto orig_csr = numerics::canonical_model_to_csr(model);
+            std::vector<double> activities(model.num_constraints(), 0.0);
+            exec_backend->batched_spmv(orig_csr, sol.primal_solution.data(),
+                                       activities.data(), 1);
+        }
 
         auto end_time = std::chrono::steady_clock::now();
         result.solve_time_seconds = std::chrono::duration<double>(end_time - start_time).count();
@@ -107,9 +140,15 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         milp_opts.enable_primal_heuristic = options.enable_primal_heuristic;
         milp_opts.time_limit_seconds = time_limit_sec;
         milp_opts.max_nodes = options.max_nodes;
+        milp_opts.execution_backend = exec_backend.get();
+        milp_opts.requested_backend = requested_backend;
+        milp_opts.selected_backend = selected_backend;
+        milp_opts.num_workers = num_workers;
+        milp_opts.force_cuda_fallback = options.force_cuda_fallback;
+        milp_opts.initial_fallback_reason = initial_fallback_reason;
 
         algorithms::milp::BranchAndBound milp_solver(milp_opts);
-        auto sol = milp_solver.solve(model);
+        auto sol = milp_solver.solve(model, milp_opts);
 
         auto end_time = std::chrono::steady_clock::now();
         result.solve_time_seconds = std::chrono::duration<double>(end_time - start_time).count();
@@ -149,6 +188,14 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         algorithms::miqp::ConvexMIQPSolver miqp_solver(miqp_opts);
         auto sol = miqp_solver.solve(model);
 
+        if (exec_backend != nullptr && model.num_constraints() > 0 &&
+            sol.incumbent_solution.size() == model.num_variables()) {
+            const auto orig_csr = numerics::canonical_model_to_csr(model);
+            std::vector<double> activities(model.num_constraints(), 0.0);
+            exec_backend->batched_spmv(orig_csr, sol.incumbent_solution.data(),
+                                       activities.data(), 1);
+        }
+
         auto end_time = std::chrono::steady_clock::now();
         result.solve_time_seconds = std::chrono::duration<double>(end_time - start_time).count();
         result.status = sol.status;
@@ -179,9 +226,15 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         lp_opts.force_bland_rule = decision.lp_force_bland_rule;
         lp_opts.time_limit_seconds = time_limit_sec;
         lp_opts.max_iterations = options.max_iterations;
+        lp_opts.execution_backend = exec_backend.get();
+        lp_opts.requested_backend = requested_backend;
+        lp_opts.selected_backend = selected_backend;
+        lp_opts.num_workers = num_workers;
+        lp_opts.force_cuda_fallback = options.force_cuda_fallback;
+        lp_opts.initial_fallback_reason = initial_fallback_reason;
 
         algorithms::lp::RevisedSimplex lp_solver(lp_opts);
-        auto sol = lp_solver.solve(model);
+        auto sol = lp_solver.solve(model, lp_opts);
 
         auto end_time = std::chrono::steady_clock::now();
         result.solve_time_seconds = std::chrono::duration<double>(end_time - start_time).count();
@@ -203,6 +256,15 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
                 result.status = lp_rep.certified_status;
             }
         }
+    }
+
+    if (exec_backend != nullptr) {
+        result.backend_telemetry = exec_backend->execution_telemetry();
+    }
+    if (result.backend_telemetry.invocations > 0) {
+        result.backend_used = result.backend_telemetry.executed_backend;
+    } else {
+        result.backend_used = backend::BackendType::CPU_SEQUENTIAL;
     }
 
     return result;
