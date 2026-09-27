@@ -134,6 +134,20 @@ LPSolution RevisedSimplex::solve(const model::CanonicalModel& model,
     }
 
     // 6. Execute Revised Simplex Core
+    if (effective_options.time_limit_seconds > 0.0) {
+        const double pre_core_elapsed =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count();
+        if (pre_core_elapsed >= effective_options.time_limit_seconds) {
+            solution.status = core::SolverStatus::LIMIT_REACHED;
+            solution.message = "Time limit reached before simplex iteration phase";
+            if (active_backend != nullptr) {
+                solution.telemetry.backend_telemetry = active_backend->execution_telemetry();
+            }
+            solution.telemetry.solve_time_seconds = pre_core_elapsed;
+            return solution;
+        }
+        effective_options.time_limit_seconds -= pre_core_elapsed;
+    }
     RevisedSimplexCore core(standard_lp, effective_options);
     auto exec_res = core.run(solution.telemetry);
 

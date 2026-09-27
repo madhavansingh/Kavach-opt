@@ -1,9 +1,12 @@
 #pragma once
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "algorithms/lp/lp_types.hpp"
@@ -25,6 +28,7 @@ struct SolverOptions {
     ProblemType problem_type{ProblemType::AUTO};
     core::SolverTolerances tolerances;
     std::optional<std::chrono::milliseconds> time_limit{std::nullopt};
+    std::optional<double> time_limit_seconds{std::nullopt};
     std::size_t max_iterations{100000};
     std::size_t max_nodes{50000};
     uint64_t seed{42};
@@ -39,6 +43,40 @@ struct SolverOptions {
     std::size_t pseudocost_reliability_threshold{4};
     bool enable_primal_heuristic{true};
     bool force_cuda_fallback{false};
+
+    [[nodiscard]] double effective_time_limit_seconds() const noexcept {
+        if (time_limit_seconds.has_value() && *time_limit_seconds > 0.0) {
+            return *time_limit_seconds;
+        }
+        if (time_limit.has_value() && time_limit->count() > 0) {
+            return static_cast<double>(time_limit->count()) / 1000.0;
+        }
+        return 0.0;
+    }
+
+    [[nodiscard]] static double parse_time_limit_seconds(std::string_view raw) {
+        if (raw.empty()) {
+            throw std::invalid_argument("Missing value for --time-limit");
+        }
+        std::string s(raw);
+        std::size_t pos = 0;
+        double val = 0.0;
+        try {
+            val = std::stod(s, &pos);
+        } catch (const std::exception&) {
+            throw std::invalid_argument("Malformed numeric value for --time-limit: '" + s + "'");
+        }
+        while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\t')) {
+            ++pos;
+        }
+        if (pos != s.size() || !std::isfinite(val)) {
+            throw std::invalid_argument("Invalid numeric value for --time-limit: '" + s + "'");
+        }
+        if (val < 0.0) {
+            throw std::invalid_argument("Negative value not allowed for --time-limit: '" + s + "'");
+        }
+        return val;
+    }
 };
 
 struct SolverResult {

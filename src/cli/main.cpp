@@ -465,8 +465,17 @@ int handle_solve(const std::vector<std::string_view>& args) {
             } else if (b_arg == "gpu" || b_arg == "cuda") {
                 config.override_backend = kavach::backend::BackendType::CUDA_GPU;
             }
-        } else if (args[i] == "--time-limit" && i + 1 < args.size()) {
-            time_limit_sec = std::stod(std::string(args[++i]));
+        } else if (args[i] == "--time-limit") {
+            if (i + 1 >= args.size()) {
+                std::cerr << "Error: Missing value for --time-limit\n";
+                return 1;
+            }
+            try {
+                time_limit_sec = kavach::api::SolverOptions::parse_time_limit_seconds(args[++i]);
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << "\n";
+                return 1;
+            }
         }
     }
 
@@ -498,8 +507,7 @@ int handle_solve(const std::vector<std::string_view>& args) {
             opts.use_gpu = true;
         }
         if (time_limit_sec > 0.0) {
-            opts.time_limit =
-                std::chrono::milliseconds(static_cast<int64_t>(time_limit_sec * 1000.0));
+            opts.time_limit_seconds = time_limit_sec;
         }
         if (cut_strategy_override.has_value()) {
             opts.cut_options.strategy = *cut_strategy_override;
@@ -531,6 +539,9 @@ int handle_solve(const std::vector<std::string_view>& args) {
             res["iterations"] = static_cast<double>(result.iterations);
             res["nodes"] = static_cast<double>(result.nodes);
             res["solve_time_seconds"] = result.solve_time_seconds;
+            if (opts.effective_time_limit_seconds() > 0.0) {
+                res["time_limit_seconds"] = opts.effective_time_limit_seconds();
+            }
             res["backend_used"] = kavach::backend::to_string(result.backend_used);
             res["verified"] = result.verification_report.passed;
             res["optimality_gap"] = result.optimality_gap;

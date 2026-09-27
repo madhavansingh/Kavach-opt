@@ -7,6 +7,7 @@
 #include "../test_framework.hpp"
 #include "algorithms/lp/basis.hpp"
 #include "algorithms/lp/simplex.hpp"
+#include "api/solver.hpp"
 #include "core/error.hpp"
 #include "core/status.hpp"
 #include "core/tolerances.hpp"
@@ -842,4 +843,136 @@ KAVACH_TEST(test_basis_update_degeneracy_and_dual_simplex) {
     KAVACH_ASSERT(ws_sol.telemetry.full_refactorizations <=
                   1 + ws_sol.telemetry.dual_simplex_iterations);
     KAVACH_ASSERT(ws_sol.telemetry.basis_residual_max < 1e-9);
+}
+
+KAVACH_TEST(test_basis_update_adversarial_fault_injection_and_determinism) {
+    const std::size_t m = 4;
+    const std::size_t n = 10;
+    auto A_csc = build_well_conditioned_test_csc(m, n);
+
+    SimplexBasis basis;
+    basis.initialize({0, 1, 2, 3}, n);
+    KAVACH_ASSERT(basis.factorize(A_csc, 1e-9, "INITIAL"));
+
+    // 1. Non-finite direction (NaN at pivot, NaN off-diagonal, Inf off-diagonal) must be rejected
+    // cleanly without corrupting basis memory
+    std::vector<double> nan_pivot_d = {1.0, std::numeric_limits<double>::quiet_NaN(), 0.5, -1.0};
+    KAVACH_ASSERT(!basis.apply_eta_update(1, 4, nan_pivot_d, 1e-9));
+    KAVACH_ASSERT_EQUAL(basis.update_failures_count(), std::size_t(1));
+    KAVACH_ASSERT(!basis.is_factorization_valid());
+    KAVACH_ASSERT_EQUAL(basis.last_refactor_reason(), std::string("UNSTABLE_ETA_PIVOT"));
+
+    KAVACH_ASSERT(basis.factorize(A_csc, 1e-9, "RECOVER_FROM_NAN_PIVOT"));
+    KAVACH_ASSERT(basis.is_factorization_valid());
+
+    std::vector<double> nan_off_d = {1.0, 2.0, std::numeric_limits<double>::quiet_NaN(), -1.0};
+    KAVACH_ASSERT(!basis.apply_eta_update(1, 4, nan_off_d, 1e-9));
+    KAVACH_ASSERT_EQUAL(basis.update_failures_count(), std::size_t(2));
+    KAVACH_ASSERT(!basis.is_factorization_valid());
+    KAVACH_ASSERT_EQUAL(basis.last_refactor_reason(), std::string("UNSTABLE_ETA_PIVOT"));
+
+    KAVACH_ASSERT(basis.factorize(A_csc, 1e-9, "RECOVER_FROM_NAN_OFF"));
+    KAVACH_ASSERT(basis.is_factorization_valid());
+
+    std::vector<double> inf_d = {1.0, 2.0, std::numeric_limits<double>::infinity(), -1.0};
+    KAVACH_ASSERT(!basis.apply_eta_update(1, 5, inf_d, 1e-9));
+    KAVACH_ASSERT_EQUAL(basis.update_failures_count(), std::size_t(3));
+    KAVACH_ASSERT(!basis.is_factorization_valid());
+    KAVACH_ASSERT_EQUAL(basis.last_refactor_reason(), std::string("UNSTABLE_ETA_PIVOT"));
+
+    KAVACH_ASSERT(basis.factorize(A_csc, 1e-9, "RECOVER_FROM_INF"));
+    KAVACH_ASSERT(basis.is_factorization_valid());
+
+    // 2. Chain byte threshold trigger and reset
+    auto d0 = basis.solve_direction(A_csc, 6);
+    KAVACH_ASSERT(basis.apply_eta_update(0, 6, d0, 1e-9));
+    KAVACH_ASSERT(basis.update_chain_bytes() > 0);
+    KAVACH_ASSERT(basis.needs_refactorization(1));  // Trigger via interval=1
+    KAVACH_ASSERT(basis.factorize(A_csc, 1e-9, "BYTE_LIMIT_RESET"));
+    KAVACH_ASSERT_EQUAL(basis.update_chain_bytes(), std::size_t(0));
+    KAVACH_ASSERT_EQUAL(basis.update_chain_length(), std::size_t(0));
+
+    // 3. Numerical determinism across repeated solves vs full-refactorization reference
+    const auto netlib_dir = find_netlib_dir();
+    io::MpsParser parser;
+    auto model = parser.parse_file(netlib_dir / "afiro.mps");
+
+    LPSolverOptions opts_inc;
+    opts_inc.refactorization_interval = 50;
+    RevisedSimplex solver(opts_inc);
+    auto run1 = solver.solve(*model, opts_inc);
+    auto run2 = solver.solve(*model, opts_inc);
+    auto run3 = solver.solve(*model, opts_inc);
+
+    KAVACH_ASSERT_EQUAL(run1.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT_EQUAL(run1.iterations, run2.iterations);
+    KAVACH_ASSERT_EQUAL(run2.iterations, run3.iterations);
+    KAVACH_ASSERT_EQUAL(run1.telemetry.basis_updates, run2.telemetry.basis_updates);
+    KAVACH_ASSERT_EQUAL(run1.telemetry.full_refactorizations, run2.telemetry.full_refactorizations);
+    KAVACH_ASSERT_NEAR(run1.objective_value, run2.objective_value, 0.0);
+    KAVACH_ASSERT_NEAR(run2.objective_value, run3.objective_value, 0.0);
+
+    LPSolverOptions opts_ref;
+    opts_ref.refactorization_interval = 1;  // Full SparseLU every pivot
+    auto ref_sol = solver.solve(*model, opts_ref);
+    KAVACH_ASSERT_EQUAL(ref_sol.status, core::SolverStatus::OPTIMAL);
+    KAVACH_ASSERT_NEAR(run1.objective_value, ref_sol.objective_value, 1e-10);
+}
+
+KAVACH_TEST(test_cli_sub_millisecond_time_limit_parsing_and_execution) {
+    // 1. Sub-millisecond and standard time-limit parsing preservation
+    struct Case {
+        const char* raw;
+        double expected;
+    };
+    const std::vector<Case> valid_cases = {
+        {"1", 1.0},         {"0.1", 0.1},       {"0.01", 0.01},     {"0.001", 0.001},
+        {"0.0009", 0.0009}, {"0.0005", 0.0005}, {"0.0001", 0.0001}, {"0", 0.0},
+    };
+
+    for (const auto& tc : valid_cases) {
+        double parsed = api::SolverOptions::parse_time_limit_seconds(tc.raw);
+        KAVACH_ASSERT_NEAR(parsed, tc.expected, 1e-15);
+
+        api::SolverOptions opts;
+        opts.time_limit_seconds = parsed;
+        KAVACH_ASSERT_NEAR(opts.effective_time_limit_seconds(), tc.expected, 1e-15);
+        if (tc.expected > 0.0) {
+            KAVACH_ASSERT(opts.effective_time_limit_seconds() > 0.0);
+        }
+    }
+
+    // Prove specifically that 0.0009, 0.0005, 0.0001 are never truncated to 0
+    KAVACH_ASSERT(api::SolverOptions::parse_time_limit_seconds("0.0009") != 0.0);
+    KAVACH_ASSERT(api::SolverOptions::parse_time_limit_seconds("0.0005") != 0.0);
+    KAVACH_ASSERT(api::SolverOptions::parse_time_limit_seconds("0.0001") != 0.0);
+
+    // 2. Reject invalid, negative, malformed, or non-finite time-limit strings
+    const std::vector<const char*> invalid_cases = {"",   "abc", "0.01ms", "-0.0009",
+                                                    "-1", "nan", "inf"};
+    for (const char* raw : invalid_cases) {
+        bool threw = false;
+        try {
+            (void)api::SolverOptions::parse_time_limit_seconds(raw);
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        KAVACH_ASSERT(threw);
+    }
+
+    // 3. Sub-millisecond execution enforcement via api::Solver
+    const auto netlib_dir = find_netlib_dir();
+    io::MpsParser parser;
+    auto model = parser.parse_file(netlib_dir / "boeing2.mps");
+
+    api::KavachSolver api_solver;
+    api::SolverOptions sub_ms_opts;
+    sub_ms_opts.time_limit_seconds = 0.0001;  // 100 microseconds
+    auto sub_ms_res = api_solver.solve(*model, sub_ms_opts);
+    KAVACH_ASSERT_EQUAL(sub_ms_res.status, core::SolverStatus::LIMIT_REACHED);
+
+    api::SolverOptions full_opts;
+    full_opts.time_limit_seconds = 10.0;
+    auto full_res = api_solver.solve(*model, full_opts);
+    KAVACH_ASSERT_EQUAL(full_res.status, core::SolverStatus::OPTIMAL);
 }

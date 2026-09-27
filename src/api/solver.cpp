@@ -85,10 +85,7 @@ SolverResult KavachSolver::solve(const model::CanonicalModel& model,
         backend::create_execution_backend(requested_backend, selected_backend, num_workers,
                                           options.force_cuda_fallback, initial_fallback_reason);
 
-    double time_limit_sec = 0.0;
-    if (options.time_limit.has_value()) {
-        time_limit_sec = static_cast<double>(options.time_limit->count()) / 1000.0;
-    }
+    const double time_limit_sec = options.effective_time_limit_seconds();
 
     if (decision.problem_class == strategy::ProblemClass::CONVEX_QP) {
         algorithms::qp::QPSolverOptions qp_opts;
