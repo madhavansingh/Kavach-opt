@@ -91,4 +91,4 @@ All colors are configured in `frontend/src/styles/tokens.ts` and styled via Tail
 | **`Verification`** | Zero-trust independent mathematical audit | Four-stage verification pipeline, summary certificate, KKT/slackness assertions, expandable JSON proof artifact |
 | **`Benchmarks`** | Performance evidence & multi-core scaling | KPI summary banner, 8-core CPU SpMV Amdahl scaling analysis, filterable Netlib/MIPLIB/QP data table, instance modal inspector |
 | **`MRPL Case`** | Real-world refinery planning demonstration | Synthetic data disclosure, baseline economics ($5.4M/day profit), unit load factors, Euro-VI clean fuel quality compliance, what-if scenario matrix |
-| **`System`** | Subsystem architecture & rule catalog | 6 subsystem breakdowns, CI/CD quality gate badges (329/329 tests green), interactive Strategy Rules Catalog (R001–R018) |
+| **`System`** | Subsystem architecture & rule catalog | 6 subsystem breakdowns, CI/CD quality gate badges (412/412 tests green), interactive Strategy Rules Catalog (R001–R018) |

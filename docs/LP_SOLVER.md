@@ -161,17 +161,40 @@ Using the feasible basis from Phase I, the solver minimizes the original objecti
 
 ---
 
-## 4. Basis Representation and Sparse LU Integration
+## 4. Basis Representation and Incremental Basis-Update Engine
 
-The basis matrix $B \in \mathbb{R}^{m \times m}$ is constructed directly from the column-oriented sparse matrix $A_{\text{CSC}}$ in $O(\text{nnz}(B) + m)$ time.
+Rather than refactorizing the full basis matrix $B \in \mathbb{R}^{m \times m}$ from scratch at every simplex pivot, Kavach-Opt utilizes an **Incremental Basis-Update Factorization Engine** based on sparse Product-Form-of-Inverse (PFI) elementary Eta matrices.
 
-### 4.1 Linear Solves via `SparseLU`
-At every pivot:
-1. **Primal Solve**: $B x_B = b$.
-2. **Dual Solve**: $B^T y = c_B$.
-3. **Direction Solve**: $B d = A_q$.
+### 4.1 Base Factorization & Elementary Eta Updates
+1. **Base Factorization**: An initial or refreshed basis $B_0$ is factored using native `SparseLU` with Markowitz ordering and threshold partial pivoting ($\tau = 0.1$).
+2. **Elementary Eta Matrix ($E_k$)**: When column $p$ (leaving row) of $B_k$ is replaced by the entering column $a_j$, the new basis is:
+   $$B_{k+1} = B_k E_k$$
+   where $E_k = I + (d - e_p) e_p^T$ and $d = B_k^{-1} a_j$.
+3. **Sparse Representation**: Only the diagonal pivot entry $d_p$ and non-zero off-diagonal entries $|d_i| > 10^{-15}$ ($i \ne p$) are stored in `SparseEtaFactor`, achieving minimal memory overhead.
 
-Partial pivoting with threshold $\tau = 0.1$ and Markowitz-style sparsity preservation ensures numerical stability. The reciprocal condition number is continuously monitored:
+### 4.2 Linear Solves via the Eta Chain
+- **Primal Solve ($B_k x_B = b$)**:
+  1. Solve base system $B_0 w = b$ via base `SparseLU`.
+  2. Apply forward Eta factors $k = 0, \dots, K-1$:
+     $$w_p \leftarrow \frac{w_p}{d_p}, \quad w_i \leftarrow w_i - d_i w_p \quad (\forall i \ne p)$$
+     yielding $x_B = w$.
+- **Dual Solve ($B_k^T y = c_B$)**:
+  1. Initialize $v = c_B$.
+  2. Apply reverse Eta factors $k = K-1, \dots, 0$:
+     $$v_p \leftarrow \frac{v_p - \sum_{i \ne p} d_i v_i}{d_p}$$
+  3. Solve base transpose system $B_0^T y = v$ via base `SparseLU`.
+- **Direction Solve ($B_k d = a_q$)**:
+  Solved identically to the primal system with right-hand side $a_q = A[:, q]$.
+
+### 4.3 Multi-Criteria Refactorization & Stability Policy
+To control numerical error propagation and memory growth, `SimplexBasis::needs_refactorization` triggers a full SparseLU refactorization under any of the following conditions:
+1. **Periodic Interval**: Update chain length reaches `refactorization_interval` (default 50 pivots).
+2. **Memory Footprint Bound**: Cumulative Eta chain bytes exceed $4 \times \text{base\_bytes} + 64\text{ KB}$.
+3. **Numerical Drift Safeguard**: True primal residual $\|B x_B - b\|_\infty$ exceeds $100 \times \epsilon_{\text{feas}}$.
+4. **Pivot Stability Guard**: Candidate pivot $|d_p| < \max(\epsilon_{\text{pivot}}, 10^{-11})$ or relative pivot drop $|d_p| < 10^{-7} \|d\|_\infty$.
+5. **Fault Isolation**: Candidate vector contains non-finite entries (NaN or $\pm\infty$), triggering safe fallback without basis memory corruption.
+
+The reciprocal condition number is continuously monitored:
 $$
 \hat{\kappa}_\infty(B) \approx \frac{\|B\|_\infty}{\min_i |U_{ii}|}
 $$
@@ -198,10 +221,11 @@ Kavach-Opt employs a **Watchdog-Triggered Bland Fallback**:
 
 Before simplex optimization:
 1. **Presolve Reduction**: Fixed variables substituted, empty rows pruned, bounds tightened, redundant constraints removed.
-2. **Geometric-Mean Scaling**: Matrix equilibrated via row scalers $R$ and column scalers $C$ ($A' = R A C$).
-3. **Simplex Optimization**: Standard-form problem solved on scaled system.
+2. **Equilibration Scaling**: Matrix equilibrated via Ruiz or geometric equilibration ($A' = R A C$).
+3. **Simplex Optimization**: Standard-form problem solved on scaled system using incremental basis updates.
 4. **Unscaling**: Primal variables unscaled via $x = C x'$, dual multipliers via $y = R y'$.
-5. **Presolve Reconstruction**: `ReconstructionMap` restores fixed variables and original objective value.
+5. **Full Sovereign Reconstruction**: `ReconstructionMap` reconstructs original primal variables $x_{\text{original}}$, dual multipliers $y_{\text{original}}$, reduced costs $r_{\text{original}}$, and original objective value. Solutions are delivered directly to the decoupled independent verifier on the **original** mathematical formulation.
+6. **Sub-Millisecond Time Limit Support**: The solver CLI and API support fractional second time limits down to 100 microseconds ($0.0001\text{ s}$) via `api::SolverOptions::parse_time_limit_seconds` without truncation to zero.
 
 ---
 

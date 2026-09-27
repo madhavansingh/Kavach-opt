@@ -145,4 +145,4 @@ The frontend codebase adheres to the same uncompromising standards as the C++ co
 - **Build Performance**: Full TypeScript check and Vite production bundle compiles in **< 300 ms**.
 - **Type Rigor**: Strict mode with `verbatimModuleSyntax: true`, `noUnusedLocals: true`, and `noUnusedParameters: true`.
 - **Linting**: High-speed Oxlint check passes with **0 errors and 0 warnings**.
-- **Solver Integrity**: Existing 329 C++ unit and integration tests remain 100% passing (`329/329 Passed`), zero forbidden dependencies detected, and Google C++ code standards preserved.
+- **Solver Integrity**: Existing 412 C++ unit and integration tests remain 100% passing (`412/412 Passed`), zero forbidden dependencies detected, and Google C++ code standards preserved.

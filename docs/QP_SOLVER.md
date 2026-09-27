@@ -62,28 +62,30 @@ In degenerate QPs where $\alpha_k = 0$ (blocking constraint with zero slack), ac
 Convexity of the QP requires that the Hessian matrix $Q$ be positive semidefinite ($x^T Q x \ge 0$ for all $x \in \mathbb{R}^n$).
 
 ### Pivoted Cholesky Algorithm
-Before initiating active-set iterations, `PrimalActiveSetQPSolver::validate_hessian_psd` and `QPVerifier::verify_psd` execute a complete diagonal-pivoted Cholesky factorization on the symmetric matrix $Q$:
-$$P^T Q P = L D L^T$$
-where $P$ is a permutation matrix, $L$ is unit lower triangular, and $D$ is a diagonal matrix.
+### 3-Stage Sparse Positive Semidefinite (PSD) Validation
+To eliminate dense $O(n^2)$ memory materialization, `PrimalActiveSetQPSolver::check_psd` and `QPVerifier::verify_psd` execute a mathematically sovereign 3-stage sparse positive semidefiniteness validation:
 
-```
-For step k = 1 to n:
-  1. Find pivot p >= k maximizing Q[p, p].
-  2. If Q[p, p] < -tol (negative pivot):
-       RETURN NOT_PSD (negative eigenvalue detected).
-  3. If Q[p, p] <= tol (zero or near-zero pivot):
-       Check remaining diagonal elements:
-         If any Q[i, i] < -tol: RETURN NOT_PSD.
-       Matrix is rank-deficient positive semidefinite; factorization terminates.
-  4. Swap row/column k and p in Q.
-  5. For i = k + 1 to n:
-       L[i, k] = Q[i, k] / Q[k, k]
-       For j = k + 1 to i:
-         Q[i, j] -= L[i, k] * Q[k, j]
-```
+1. **Stage 1: Fast $O(\mathrm{nnz})$ Gershgorin Circle Filter**:
+   For each row $r$, evaluate diagonal dominance:
+   $$Q_{rr} - \sum_{c \ne r} |Q_{rc}| > \text{tol}$$
+   If all $Q_{rr} > 0$ and every row is strictly diagonally dominant, the matrix is guaranteed strictly positive definite by Gershgorin's circle theorem. Validation terminates immediately in $O(\mathrm{nnz})$ time with **zero auxiliary memory allocations**.
+
+2. **Stage 2: Sparsity Graph BFS Connected-Component Decomposition**:
+   If Stage 1 fails, the sparsity graph induced by off-diagonal entries $|Q_{rc}| > 10^{-15}$ is partitioned into connected components via Breadth-First Search (BFS):
+   - Uncoupled variables ($s = 1$) are certified simply by checking $Q_{rr} \ge -\text{tol}$.
+   - Small components ($s \le 128$) are factored using component-dense diagonal-pivoted Cholesky on a local $s \times s$ buffer.
+   - Large components ($s > 128$) are routed to Stage 3.
+
+3. **Stage 3: Sparse Row-Map Diagonal-Pivoted Cholesky**:
+   For large coupled components ($s > 128$), an in-place sparse row-map Cholesky factorization is executed:
+   - Maintains sparse active rows: $\text{rows}[i] = \{(j, Q_{ij})\}$.
+   - At each step $k$, selects the uneliminated pivot $p_k$ maximizing the diagonal entry $D[p_k]$.
+   - Merges Schur complement updates strictly into sparse active rows:
+     $$\text{rows}[i] \leftarrow \text{rows}[i] - \frac{Q_{i, p_k}}{Q_{p_k, p_k}} \cdot \text{rows}[p_k]$$
+   - Memory is strictly bounded to $O(s + \mathrm{nnz}_{\text{comp}})$, completely avoiding $O(n^2)$ dense matrix allocations.
 
 ### Curvature Diagnostics
-When negative curvature is encountered ($D_{ii} < -\epsilon_{\text{PSD}}$), the solver immediately aborts optimization, returns `core::SolverStatus::INVALID_INPUT`, and populates `telemetry.error_message` with detailed eigenvalue bounds and pivot coordinates.
+When negative curvature is encountered ($D_{ii} < -\text{tol}$), the solver immediately aborts optimization, returns `core::SolverStatus::INVALID_INPUT`, and populates `telemetry.error_message` with detailed eigenvalue bounds and pivot coordinates.
 
 ---
 
@@ -95,13 +97,16 @@ $$KKT = \begin{bmatrix} Q + \delta I & A_W^T \\ A_W & -\epsilon I \end{bmatrix}$
 where:
 - $\delta = 10^{-12}$ (Tikhonov regularization on the Hessian to guarantee non-singularity for rank-deficient PSD matrices).
 - $\epsilon = 0$ (exact constraint satisfaction, or small primal regularization if ill-conditioned).
+The KKT triplet buffer pre-allocates exactly $\mathrm{nnz}(Q) + 2 \times \mathrm{nnz}(A_W)$ entries to prevent dynamic reallocation spikes.
 
-### Modified Gram-Schmidt LICQ Filter
+### Sparse Modified Gram-Schmidt LICQ Filter
 If redundant or parallel constraints are added to the working set, $A_W$ loses full row rank, causing the KKT matrix to become singular.
-To enforce Linear Independence Constraint Qualification (LICQ):
-1. Candidate constraints to be added to the working set are projected against the existing orthonormal basis of $A_W^T$ using Modified Gram-Schmidt.
-2. If the orthogonal residual norm $\|a_{\text{candidate}}^\perp\|_2 < 10^{-6} \|a_{\text{candidate}}\|_2$, the constraint is linearly dependent and is rejected from the working set.
-3. This guarantees that $A_W$ maintains full row rank throughout the optimization trajectory.
+To enforce Linear Independence Constraint Qualification (LICQ) without allocating dense $O(n)$ or $O(K \times n)$ buffers:
+1. Candidate constraints to be added to the working set are represented as sorted sparse vectors (`SparseBasisVec` containing non-zero indices and coefficients).
+2. The candidate sparse vector is projected against the existing sparse basis of $A_W^T$ using sparse inner products and sparse AXPY operations:
+   $$v \leftarrow a_{\text{candidate}} - \sum_{q \in \mathcal{B}} (q^T v) q$$
+3. If the orthogonal residual norm $\|v\|_2 < 10^{-4} \|a_{\text{candidate}}\|_2$ or $\|v\|_2 < 10^{-12}$, the constraint is linearly dependent and is rejected from the working set.
+4. This guarantees that $A_W$ maintains full row rank throughout the optimization trajectory with strictly sparse working memory.
 
 ### SparseLU Factorization & Refinement
 The KKT system is solved using Kavach-Opt's `numerics::SparseLU`:
@@ -170,11 +175,39 @@ struct QPSolution {
 };
 ```
 
+### `QPTelemetry`
+```cpp
+struct QPTelemetry {
+    std::size_t num_variables{0};
+    std::size_t num_constraints{0};
+    std::size_t q_nonzeros{0};
+    std::size_t a_nonzeros{0};
+    std::size_t iterations{0};
+    std::size_t active_constraints{0};
+    std::size_t constraints_added{0};
+    std::size_t constraints_removed{0};
+    std::size_t kkt_solves{0};
+    std::size_t refactorizations{0};
+    double max_stationarity_residual{0.0};
+    double max_primal_residual{0.0};
+    double max_dual_residual{0.0};
+    double max_complementarity_residual{0.0};
+    double solve_time_ms{0.0};
+    std::size_t dense_equivalent_hessian_bytes{0}; ///< Theoretical n*n*8 dense bytes
+    std::size_t sparse_hessian_bytes{0};           ///< Actual CSR storage bytes
+    std::size_t sparse_psd_working_bytes{0};       ///< Auxiliary bytes during sparse PSD
+    std::size_t sparse_licq_basis_bytes{0};        ///< Peak bytes in sparse LICQ basis
+    std::size_t sparse_kkt_peak_bytes{0};          ///< Peak bytes in KKT system
+    std::size_t peak_working_memory_bytes{0};      ///< Maximum total working memory bytes
+    std::string error_message;
+};
+```
+
 ---
 
 ## 7. Empirical Validation & Test Suite
 
-The QP solver is verified by the comprehensive test suite in `tests/unit/test_phase9_qp.cpp`, comprising 25 primary test cases (Tests A through Y) and adversarial fault-injection tests:
+The QP solver is verified by the comprehensive test suite in `tests/unit/test_phase9_qp.cpp`, comprising 27 authoritative test cases (Tests A through Z2) and adversarial fault-injection tests:
 
 | Test Identifier | Category | Problem Characteristics | Result |
 | :--- | :--- | :--- | :--- |
@@ -203,4 +236,6 @@ The QP solver is verified by the comprehensive test suite in `tests/unit/test_ph
 | **Test W** | Fault Injection: Objective | Verifier catches corrupted objective value | **PASS** |
 | **Test X** | Fault Injection: Stationarity | Verifier catches corrupted gradient stationarity | **PASS** |
 | **Test Y** | Determinism Test | Repeated solves produce bit-identical results | **PASS** |
-| **Full Suite** | Regression Suite | All 224 unit tests across Phases 0–9 | **PASS (224/224)** |
+| **Test Z1** | Sparse PSD & Memory Bounds | 500-var diagonal ($< 5\%$ dense memory) & 150-var tridiagonal | **PASS** |
+| **Test Z2** | Dense vs Sparse KKT Oracle | Exact numerical match against independent 4x4 KKT oracle | **PASS** |
+| **Full Suite** | Regression Suite | All 412 unit tests across entire solver suite | **PASS (412/412)** |

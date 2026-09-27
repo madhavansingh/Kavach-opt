@@ -716,13 +716,12 @@ flowchart TD
 ```
 
 ### 12.1 Positive Semidefinite Certification
-Before launching active-set iterations, the Hessian $Q$ is verified positive semidefinite ($Q \succeq 0$) via pivoted Cholesky factorization:
+Before launching active-set iterations, the Hessian $Q$ is verified positive semidefinite ($Q \succeq 0$) via a 3-stage sparse validation protocol:
+1. **$O(\mathrm{nnz})$ Gershgorin Circle Filter**: Fast diagonal dominance check with zero auxiliary memory.
+2. **BFS Sparsity Graph Decomposition**: Partitioning into uncoupled and coupled connected components.
+3. **Sparse Row-Map Cholesky**: In-place diagonal-pivoted factorization for large components ($s > 128$) with memory strictly bounded to $O(s + \mathrm{nnz}_{\text{comp}})$, eliminating dense $O(n^2)$ matrices.
 
-$$
-P Q P^T = L D L^T
-$$
-
-If any diagonal element $D_{ii} < -10^{-9}$, the problem is non-convex and strictly rejected.
+If negative curvature ($D_{ii} < -10^{-9}$) is detected, the problem is non-convex and strictly rejected with `INVALID_INPUT`.
 
 ---
 
@@ -1221,7 +1220,7 @@ Kavach-Opt is verified across major C++20 compilers and POSIX architectures:
 cmake -B build-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release -j
 
-# Execute Test Suite (395 Authoritative Unit Tests)
+# Execute Test Suite (412 Authoritative Unit Tests)
 ./build-release/tests/kavach_unit_tests
 
 # Verify Dependency Sovereignty

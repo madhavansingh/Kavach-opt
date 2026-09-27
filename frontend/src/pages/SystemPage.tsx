@@ -150,9 +150,10 @@ export const SystemPage: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-              Two-Phase Revised Simplex with Markowitz SparseLU basis factorization and steepest-edge pricing.
+              Two-Phase Revised Simplex with Markowitz SparseLU, incremental Eta basis updates (Product-Form-of-Inverse), and steepest-edge pricing.
             </p>
             <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
+              <div>· Incremental Eta basis updates &amp; refactorization policy</div>
               <div>· Bland's anti-cycling rule</div>
               <div>· Ruiz equilibration scaling</div>
               <div>· Zero-trust independent verification</div>
@@ -184,11 +185,12 @@ export const SystemPage: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-neutral-400 font-sans leading-relaxed">
-              Primal Active-Set solver for strictly convex and positive semi-definite objective matrices Q.
+              Sparse Primal Active-Set solver with 3-stage sparse PSD verification and sparse LICQ enforcement.
             </p>
             <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
               <div>· Exact KKT stationarity solve</div>
-              <div>· Cholesky curvature PSD verification</div>
+              <div>· 3-Stage Sparse PSD (Gershgorin + BFS + Cholesky)</div>
+              <div>· Sparse LICQ via Modified Gram-Schmidt</div>
               <div>· Dual multiplier complementarity</div>
             </div>
           </div>
@@ -320,7 +322,7 @@ export const SystemPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-sans">
           <div className="p-3.5 rounded-lg bg-[#141926] border border-[#1f283a]">
             <span className="text-neutral-400 block text-[11px]">Core Test Suite</span>
-            <span className="text-white font-semibold font-mono text-sm">CERTIFIED GREEN</span>
+            <span className="text-white font-semibold font-mono text-sm">412 / 412 PASS</span>
             <span className="text-emerald-400 text-[10px] block mt-0.5 font-sans">100% test pass rate</span>
           </div>
 

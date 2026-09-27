@@ -518,7 +518,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                   </button>
 
                   {showAdvanced && (
-                    <div className="mt-3 p-4 rounded-lg bg-[#141926] border border-[#1f283a] grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="mt-3 p-4 rounded-lg bg-[#141926] border border-[#1f283a] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
                         <label className="block text-[11px] font-medium text-neutral-400 mb-1 font-sans">
                           Primal Feasibility Tol
@@ -574,6 +574,25 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                           className="w-full bg-[#11151f] border border-[#232c3f] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
                         />
                         <span className="text-[10px] text-neutral-400 font-sans">Default: 10,000</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-400 mb-1 font-sans">
+                          Time Limit (seconds)
+                        </label>
+                        <input
+                          type="text"
+                          disabled={isSolving}
+                          value={config.time_limit_seconds}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              time_limit_seconds: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full bg-[#11151f] border border-[#232c3f] rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <span className="text-[10px] text-neutral-400 font-sans">Sub-ms supported (e.g. 0.001)</span>
                       </div>
                     </div>
                   )}

@@ -427,7 +427,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 Linear Programming
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Two-Phase Revised Simplex with Bland anti-cycling, Ruiz equilibration scaling, and presolve reductions.
+                Two-Phase Revised Simplex with incremental Eta basis updates (PFI), Bland anti-cycling, and Ruiz equilibration.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
@@ -473,12 +473,12 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 Quadratic Programming
               </h3>
               <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed font-sans">
-                Primal active-set method with positive semi-definite (PSD) Hessian validation and KKT convergence.
+                Sparse primal active-set solver with 3-stage sparse PSD Hessian validation and sparse LICQ enforcement.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-[#1d2332] flex items-center justify-between text-[11px] font-mono text-neutral-400">
               <span>Hessian Check</span>
-              <span className="text-indigo-400 font-medium">PSD Enforced</span>
+              <span className="text-indigo-400 font-medium">3-Stage Sparse PSD</span>
             </div>
           </div>
 
