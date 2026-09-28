@@ -23,12 +23,23 @@ export const Metric: React.FC<MetricProps> = ({
   if (highlight === 'danger') valColor = 'text-rose-400';
   if (highlight === 'info') valColor = 'text-sky-400';
 
+  const valStr = String(value);
+  const textSize =
+    valStr.length >= 13
+      ? 'text-base sm:text-lg lg:text-base xl:text-lg 2xl:text-xl'
+      : valStr.length >= 11
+      ? 'text-lg sm:text-xl xl:text-2xl'
+      : 'text-xl sm:text-2xl';
+
   return (
-    <div className={`flex flex-col gap-1 p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] shadow-xs ${className}`}>
-      <span className="text-[11px] font-sans font-medium text-neutral-400">
+    <div className={`flex flex-col gap-1 p-3.5 rounded-lg bg-[#141926] border border-[#1f283a] shadow-xs min-w-0 ${className}`}>
+      <span className="text-[11px] font-sans font-medium text-neutral-400 truncate" title={label}>
         {label}
       </span>
-      <span className={`text-xl sm:text-2xl font-semibold tracking-tight ${valColor} ${isMono ? 'font-mono' : 'font-sans'}`}>
+      <span
+        className={`font-semibold tracking-tight truncate ${textSize} ${valColor} ${isMono ? 'font-mono' : 'font-sans'}`}
+        title={valStr}
+      >
         {value}
       </span>
       {subtext && (
@@ -46,12 +57,16 @@ export const MetricGroup: React.FC<{ children: React.ReactNode; columns?: number
   className = '',
 }) => {
   const gridCols =
-    columns === 2
+    columns === 1
+      ? 'grid-cols-1'
+      : columns === 2
       ? 'grid-cols-1 md:grid-cols-2'
       : columns === 3
       ? 'grid-cols-1 md:grid-cols-3'
       : columns === 4
       ? 'grid-cols-2 lg:grid-cols-4'
+      : columns === 5
+      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
       : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6';
 
   return (

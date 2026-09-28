@@ -223,27 +223,27 @@ export const MRPLPage: React.FC = () => {
           <MetricGroup columns={5}>
             <Metric
               label="Gross Product Revenue"
-              value={`$${baseline.economics.gross_revenue_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`}
+              value={`$${baseline.economics.gross_revenue_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`}
               subtext="Finished fuels sale"
             />
             <Metric
               label="Crude Purchase Cost"
-              value={`-$${baseline.economics.crude_purchase_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`}
+              value={`-$${baseline.economics.crude_purchase_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`}
               subtext="Crude slate intake"
             />
             <Metric
               label="Operating Variable Costs"
-              value={`-$${baseline.economics.unit_variable_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`}
+              value={`-$${baseline.economics.unit_variable_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`}
               subtext="Catalyst, steam, power"
             />
             <Metric
               label="Fixed Plant Costs"
-              value={`-$${baseline.economics.unit_fixed_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`}
+              value={`-$${baseline.economics.unit_fixed_cost_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`}
               subtext="Base maintenance & staffing"
             />
             <Metric
               label="Optimal Net Daily Profit"
-              value={`$${baseline.economics.net_profit_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`}
+              value={`$${baseline.economics.net_profit_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`}
               highlight="success"
               subtext="Certified global optimum"
             />
@@ -534,7 +534,7 @@ export const MRPLPage: React.FC = () => {
                       }`}
                     >
                       {sc.net_profit_k_usd
-                        ? `$${sc.net_profit_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}k`
+                        ? `$${sc.net_profit_k_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}k`
                         : 'INFEASIBLE'}
                     </span>
                   </div>
