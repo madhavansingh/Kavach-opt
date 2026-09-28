@@ -2,7 +2,7 @@
 """Expand CUDA_BACKEND.md to ≥ 1,200 lines."""
 import pathlib
 
-TARGET = pathlib.Path("/Users/maddy/SIH26119/docs/CUDA_BACKEND.md")
+TARGET = pathlib.Path("/Users/maddy/kavach-opt/docs/CUDA_BACKEND.md")
 
 ADDITION = r"""
 ---

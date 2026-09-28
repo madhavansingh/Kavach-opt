@@ -2,7 +2,7 @@
 """Expand SPARSE_NUMERICS.md to ≥ 1,200 lines."""
 import pathlib
 
-TARGET = pathlib.Path("/Users/maddy/SIH26119/docs/SPARSE_NUMERICS.md")
+TARGET = pathlib.Path("/Users/maddy/kavach-opt/docs/SPARSE_NUMERICS.md")
 
 ADDITION = r"""
 ---

@@ -2,7 +2,7 @@
 """Expand MRPL_CASE_STUDY.md to ≥ 1,200 lines."""
 import pathlib
 
-TARGET = pathlib.Path("/Users/maddy/SIH26119/docs/MRPL_CASE_STUDY.md")
+TARGET = pathlib.Path("/Users/maddy/kavach-opt/docs/MRPL_CASE_STUDY.md")
 
 ADDITION = r"""
 ---

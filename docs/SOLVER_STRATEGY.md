@@ -31,11 +31,11 @@ flowchart TD
 ```
 
 ### End-to-End Control Flow
-1. **Model Parsing**: Input `.mps` or `.lp` files are parsed into an unscaled [`CanonicalModel`](file:///Users/maddy/SIH26119/src/model/model.hpp).
-2. **Characterization Scan**: [`StrategyEngine::characterize`](file:///Users/maddy/SIH26119/src/strategy/strategy.hpp) performs a linear-time $O(m + n + \text{nnz})$ inspection of variables, constraints, coefficients, and bounds.
+1. **Model Parsing**: Input `.mps` or `.lp` files are parsed into an unscaled [`CanonicalModel`](file:///Users/maddy/kavach-opt/src/model/model.hpp).
+2. **Characterization Scan**: [`StrategyEngine::characterize`](file:///Users/maddy/kavach-opt/src/strategy/strategy.hpp) performs a linear-time $O(m + n + \text{nnz})$ inspection of variables, constraints, coefficients, and bounds.
 3. **Hardware Probing**: CPU concurrency and CUDA runtime availability are inspected non-destructively.
 4. **Rule Evaluation**: Machine-readable rules `R001` through `R018` are evaluated in strict order of precedence.
-5. **Decision Synthesis**: Output [`StrategyDecision`](file:///Users/maddy/SIH26119/src/strategy/strategy.hpp) specifies target algorithm, presolve policy, scaling regime, refactorization interval, numerical safeguards, thread count, and backend routing.
+5. **Decision Synthesis**: Output [`StrategyDecision`](file:///Users/maddy/kavach-opt/src/strategy/strategy.hpp) specifies target algorithm, presolve policy, scaling regime, refactorization interval, numerical safeguards, thread count, and backend routing.
 6. **Execution & Verification**: Solvers execute with strategy-selected parameters. All solutions undergo independent verification.
 
 ---
@@ -59,7 +59,7 @@ Every strategy decision in Kavach-Opt is derived solely from mathematical proper
 
 ## 3. Model Characterization Subsystem
 
-The model characterization step extracts a structured [`ProblemCharacteristics`](file:///Users/maddy/SIH26119/src/strategy/strategy.hpp) snapshot from the [`CanonicalModel`](file:///Users/maddy/SIH26119/src/model/model.hpp) in a single cache-friendly pass.
+The model characterization step extracts a structured [`ProblemCharacteristics`](file:///Users/maddy/kavach-opt/src/strategy/strategy.hpp) snapshot from the [`CanonicalModel`](file:///Users/maddy/kavach-opt/src/model/model.hpp) in a single cache-friendly pass.
 
 ### Metrics Extracted
 
@@ -86,7 +86,7 @@ The model characterization step extracts a structured [`ProblemCharacteristics`]
 
 4. **Hardware & Execution Environment**:
    - Host logical CPU cores (`std::thread::hardware_concurrency()`)
-   - CUDA device presence and count via [`cuda::is_cuda_available()`](file:///Users/maddy/SIH26119/src/backend/cuda/cuda_device.hpp)
+   - CUDA device presence and count via [`cuda::is_cuda_available()`](file:///Users/maddy/kavach-opt/src/backend/cuda/cuda_device.hpp)
    - Empirical crossover availability for batched SpMV
 
 ---
@@ -126,15 +126,15 @@ Each rule has a permanent identification code, evaluation condition, determinist
 
 - **`R001` (QP Detection & Routing)**:
   - *Condition*: `model.is_qp() == true`
-  - *Action*: Route to [`PrimalActiveSetQPSolver`](file:///Users/maddy/SIH26119/src/algorithms/qp/active_set.hpp). Set `problem_class = CONVEX_QP`.
+  - *Action*: Route to [`PrimalActiveSetQPSolver`](file:///Users/maddy/kavach-opt/src/algorithms/qp/active_set.hpp). Set `problem_class = CONVEX_QP`.
 
 - **`R002` (MILP Detection & Branching Selection)**:
   - *Condition*: `model.is_milp() == true`
-  - *Action*: Route to [`BranchAndBound`](file:///Users/maddy/SIH26119/src/algorithms/milp/branch_and_bound.hpp). Select `MOST_FRACTIONAL` branching, `BEST_BOUND` node exploration, and enable dual-simplex warm starts. Explicitly assert `pseudocost_available = false`.
+  - *Action*: Route to [`BranchAndBound`](file:///Users/maddy/kavach-opt/src/algorithms/milp/branch_and_bound.hpp). Select `MOST_FRACTIONAL` branching, `BEST_BOUND` node exploration, and enable dual-simplex warm starts. Explicitly assert `pseudocost_available = false`.
 
 - **`R003` (Continuous LP Simplex Routing)**:
   - *Condition*: Continuous variables only, zero quadratic objective terms.
-  - *Action*: Route to [`RevisedSimplex`](file:///Users/maddy/SIH26119/src/algorithms/lp/simplex.hpp). Set `lp_algorithm = REVISED_SIMPLEX`.
+  - *Action*: Route to [`RevisedSimplex`](file:///Users/maddy/kavach-opt/src/algorithms/lp/simplex.hpp). Set `lp_algorithm = REVISED_SIMPLEX`.
 
 - **`R004` (Standard Presolve Selection)**:
   - *Condition*: Problem class is `LP` or `MILP`.
@@ -271,20 +271,20 @@ Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical err
 
 ## 9. LP Algorithm Routing
 
-- Target Engine: Two-Phase Revised Simplex [`RevisedSimplex`](file:///Users/maddy/SIH26119/src/algorithms/lp/simplex.hpp).
+- Target Engine: Two-Phase Revised Simplex [`RevisedSimplex`](file:///Users/maddy/kavach-opt/src/algorithms/lp/simplex.hpp).
 - Phase I: Artificial variable minimization for initial basic feasible solution.
 - Phase II: Primal cost minimization over the feasible polyhedral cone.
-- Basis Inversion: In-house [`SparseLU`](file:///Users/maddy/SIH26119/src/numerics/lu_factorization.hpp) with Markowitz partial pivoting.
+- Basis Inversion: In-house [`SparseLU`](file:///Users/maddy/kavach-opt/src/numerics/lu_factorization.hpp) with Markowitz partial pivoting.
 - Anti-Cycling: Bland watchdog fallback with deterministic variable index tie-breaking.
 
 ---
 
 ## 10. MILP Strategy Selection
 
-- Target Engine: Branch-and-Bound [`BranchAndBound`](file:///Users/maddy/SIH26119/src/algorithms/milp/branch_and_bound.hpp).
+- Target Engine: Branch-and-Bound [`BranchAndBound`](file:///Users/maddy/kavach-opt/src/algorithms/milp/branch_and_bound.hpp).
 - Variable Selection: Most-fractional branching ($\arg\max_j |x_j - \lfloor x_j \rceil|$).
 - Node Selection: Best-bound priority queue ($\min \text{bound}$).
-- Warm-Start Acceleration: Dual-simplex warm starts enabled on child nodes using [`solve_warm_start`](file:///Users/maddy/SIH26119/src/algorithms/lp/simplex.hpp).
+- Warm-Start Acceleration: Dual-simplex warm starts enabled on child nodes using [`solve_warm_start`](file:///Users/maddy/kavach-opt/src/algorithms/lp/simplex.hpp).
 - Heuristics: Incumbent rounding heuristic activated at every node when $\alpha_{\text{int}} \ge 0.50$ (Rule `R014`).
 - Unsupported Capabilities: Pseudocost branching and parallel branch-and-bound are explicitly declared unavailable (`pseudocost_available = false`).
 
@@ -292,7 +292,7 @@ Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical err
 
 ## 11. QP Strategy Selection
 
-- Target Engine: Primal Active-Set Solver [`PrimalActiveSetQPSolver`](file:///Users/maddy/SIH26119/src/algorithms/qp/active_set.hpp).
+- Target Engine: Primal Active-Set Solver [`PrimalActiveSetQPSolver`](file:///Users/maddy/kavach-opt/src/algorithms/qp/active_set.hpp).
 - Hessian Validation: In-house positive semidefiniteness (PSD) certification. Non-convex QPs are rejected with `NUMERICAL_FAILURE`.
 - Active-Set Evolution: Solves equality-constrained subproblems via symmetric KKT systems.
 - Convergence: Karush-Kuhn-Tucker (KKT) stationarity, primal feasibility, dual feasibility, and complementary slackness residuals checked against named tolerances.
@@ -302,7 +302,7 @@ Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical err
 
 ## 12. CPU Execution & Thread Allocation
 
-- Engine: In-house POSIX thread pool [`ThreadPool`](file:///Users/maddy/SIH26119/src/backend/cpu/thread_pool.hpp).
+- Engine: In-house POSIX thread pool [`ThreadPool`](file:///Users/maddy/kavach-opt/src/backend/cpu/thread_pool.hpp).
 - Workload Scoping: Multicore parallelism is scoped strictly to **batched SpMV** workloads.
 - Small Workloads ($\text{nnz} < 1000$ and $n < 100$): Rule `R010` allocates `CPU_SEQUENTIAL` with 1 worker to eliminate synchronization latency.
 - Large Workloads ($\text{nnz} \ge 1000$ or $n \ge 100$): Rule `R012` allocates `CPU_MULTICORE` utilizing all logical hardware threads.
@@ -311,7 +311,7 @@ Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical err
 
 ## 13. GPU Eligibility & Fallback Policy
 
-- Engine: Scoped CUDA CSR Batched SpMV Kernel [`cuda_spmv.cu`](file:///Users/maddy/SIH26119/src/backend/cuda/cuda_spmv.cu).
+- Engine: Scoped CUDA CSR Batched SpMV Kernel [`cuda_spmv.cu`](file:///Users/maddy/kavach-opt/src/backend/cuda/cuda_spmv.cu).
 - GPU Scope: Batched SpMV operations only. Kavach-Opt does not claim or run interior-point or simplex basis inversions on the GPU.
 - Crossover Guardrail (Rule `R013`): GPU execution is only eligible when:
   1. CUDA driver and device runtime are present.
@@ -323,7 +323,7 @@ Under `HIGH` risk, basis updates via sparse eta-updates accumulate numerical err
 
 ## 14. Strategy Configuration & Centralized Thresholds
 
-All thresholds are centralized in [`StrategyConfig`](file:///Users/maddy/SIH26119/src/strategy/strategy.hpp) and fully validated:
+All thresholds are centralized in [`StrategyConfig`](file:///Users/maddy/kavach-opt/src/strategy/strategy.hpp) and fully validated:
 
 ```cpp
 struct StrategyConfig {
@@ -395,7 +395,7 @@ Classified as continuous LP. Routed to Revised Simplex. Recommended backend: CPU
 
 ## 16. Strategy Decision Artifact Specification
 
-The canonical machine-readable strategy decision file is [`benchmark_results/strategy/strategy_decisions.json`](file:///Users/maddy/SIH26119/benchmark_results/strategy/strategy_decisions.json).
+The canonical machine-readable strategy decision file is [`benchmark_results/strategy/strategy_decisions.json`](file:///Users/maddy/kavach-opt/benchmark_results/strategy/strategy_decisions.json).
 
 ### JSON Schema Structure
 ```json
@@ -519,7 +519,7 @@ Across all benchmarks, strategy decision latency remains below **0.02 millisecon
 
 ## 20. Validation, Testing & Verification Matrix
 
-The strategy layer is verified through automated test suites in [`tests/unit/test_phase14_strategy.cpp`](file:///Users/maddy/SIH26119/tests/unit/test_phase14_strategy.cpp):
+The strategy layer is verified through automated test suites in [`tests/unit/test_phase14_strategy.cpp`](file:///Users/maddy/kavach-opt/tests/unit/test_phase14_strategy.cpp):
 
 | Test Suite Item | Verification Target | Status |
 | :--- | :--- | :--- |

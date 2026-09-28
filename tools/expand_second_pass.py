@@ -3,10 +3,10 @@
 import pathlib
 
 files = {
-    "SPARSE_NUMERICS": pathlib.Path("/Users/maddy/SIH26119/docs/SPARSE_NUMERICS.md"),
-    "CPU_PARALLELISM": pathlib.Path("/Users/maddy/SIH26119/docs/CPU_PARALLELISM.md"),
-    "CUDA_BACKEND":    pathlib.Path("/Users/maddy/SIH26119/docs/CUDA_BACKEND.md"),
-    "MRPL_CASE_STUDY": pathlib.Path("/Users/maddy/SIH26119/docs/MRPL_CASE_STUDY.md"),
+    "SPARSE_NUMERICS": pathlib.Path("/Users/maddy/kavach-opt/docs/SPARSE_NUMERICS.md"),
+    "CPU_PARALLELISM": pathlib.Path("/Users/maddy/kavach-opt/docs/CPU_PARALLELISM.md"),
+    "CUDA_BACKEND":    pathlib.Path("/Users/maddy/kavach-opt/docs/CUDA_BACKEND.md"),
+    "MRPL_CASE_STUDY": pathlib.Path("/Users/maddy/kavach-opt/docs/MRPL_CASE_STUDY.md"),
 }
 
 SPARSE_ADD = r"""

@@ -2,10 +2,10 @@
 """Fourth (final) pass — push SPARSE_NUMERICS (944→1200+), CPU_PARALLELISM (856→1200+) to target."""
 import pathlib
 
-SPARSE = pathlib.Path("/Users/maddy/SIH26119/docs/SPARSE_NUMERICS.md")
-CPU    = pathlib.Path("/Users/maddy/SIH26119/docs/CPU_PARALLELISM.md")
-CUDA   = pathlib.Path("/Users/maddy/SIH26119/docs/CUDA_BACKEND.md")
-MRPL   = pathlib.Path("/Users/maddy/SIH26119/docs/MRPL_CASE_STUDY.md")
+SPARSE = pathlib.Path("/Users/maddy/kavach-opt/docs/SPARSE_NUMERICS.md")
+CPU    = pathlib.Path("/Users/maddy/kavach-opt/docs/CPU_PARALLELISM.md")
+CUDA   = pathlib.Path("/Users/maddy/kavach-opt/docs/CUDA_BACKEND.md")
+MRPL   = pathlib.Path("/Users/maddy/kavach-opt/docs/MRPL_CASE_STUDY.md")
 
 SPARSE_ADD = r"""
 ---

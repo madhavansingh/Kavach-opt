@@ -2,7 +2,7 @@
 """Expand SOLVER_STRATEGY.md to ≥ 1,200 lines."""
 import pathlib, textwrap
 
-TARGET = pathlib.Path("/Users/maddy/SIH26119/docs/SOLVER_STRATEGY.md")
+TARGET = pathlib.Path("/Users/maddy/kavach-opt/docs/SOLVER_STRATEGY.md")
 
 ADDITION = r"""
 ---

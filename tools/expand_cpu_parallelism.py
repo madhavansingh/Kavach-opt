@@ -2,7 +2,7 @@
 """Expand CPU_PARALLELISM.md to ≥ 1,200 lines."""
 import pathlib
 
-TARGET = pathlib.Path("/Users/maddy/SIH26119/docs/CPU_PARALLELISM.md")
+TARGET = pathlib.Path("/Users/maddy/kavach-opt/docs/CPU_PARALLELISM.md")
 
 ADDITION = r"""
 ---
