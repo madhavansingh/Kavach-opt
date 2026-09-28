@@ -20,12 +20,14 @@ interface OnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToSolve?: () => void;
+  onNavigateToOverview?: () => void;
 }
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   isOpen,
   onClose,
   onNavigateToSolve,
+  onNavigateToOverview,
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -41,6 +43,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const handleFinish = () => {
     localStorage.setItem('kavach_onboarding_completed', 'true');
     onClose();
+  };
+
+  const handleFinishToOverview = () => {
+    handleFinish();
+    if (onNavigateToOverview) {
+      onNavigateToOverview();
+    }
   };
 
   const handleEnterWorkbench = () => {
@@ -447,7 +456,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <span>Open Workbench</span>
                 </button>
                 <button
-                  onClick={handleFinish}
+                  onClick={handleFinishToOverview}
                   className="px-4 py-2.5 rounded-lg bg-[#161d2b] hover:bg-[#20293d] border border-[#263247] text-neutral-200 font-medium text-xs transition-colors"
                 >
                   Close Tour
@@ -470,7 +479,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleFinish}
+              onClick={handleFinishToOverview}
               className="px-3 py-1.5 text-neutral-400 hover:text-neutral-200 transition-colors"
             >
               Skip Tour
@@ -485,7 +494,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </button>
             ) : (
               <button
-                onClick={handleEnterWorkbench}
+                onClick={handleFinishToOverview}
                 className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center gap-1.5 transition-colors"
               >
                 <span>Finish</span>

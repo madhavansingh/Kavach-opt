@@ -267,6 +267,10 @@ function AppInner() {
       <OnboardingModal
         isOpen={showOnboarding}
         onClose={() => setShowOnboarding(false)}
+        onNavigateToOverview={() => {
+          setShowOnboarding(false);
+          handleSelectTab('overview');
+        }}
         onNavigateToSolve={() => {
           setShowOnboarding(false);
           handleSelectTab('solve');
