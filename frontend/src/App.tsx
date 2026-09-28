@@ -112,7 +112,7 @@ function AppInner() {
 
     try {
       const targetPath = activeModel.path || activeModel.name;
-      const result = await solverBridge.solveModel(targetPath, {
+      const solvePromise = solverBridge.solveModel(targetPath, {
         algorithm: config.problem_class,
         backend: config.backend,
         presolve: config.presolve_policy !== 'NONE',
@@ -122,6 +122,12 @@ function AppInner() {
         time_limit_seconds: config.time_limit_seconds,
         cpu_threads: config.cpu_threads,
       });
+
+      // Ensure minimum 500ms smooth loading animation for visual UI feedback
+      const [result] = await Promise.all([
+        solvePromise,
+        new Promise((resolve) => setTimeout(resolve, 500)),
+      ]);
 
       // RACE CONDITION CHECK: Drop response if a newer solve was dispatched or model was changed
       if (thisRequestId !== solveRequestIdRef.current) {

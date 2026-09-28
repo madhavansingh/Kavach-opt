@@ -4,6 +4,7 @@ import {
   Shield,
   Cpu,
   CheckCircle2,
+  Check,
   ChevronDown,
   ChevronRight,
   Info,
@@ -720,7 +721,7 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       <Metric
                         label="Simplex Iterations"
                         value={currentResult.iterations}
-                        subtext="Phase I & Phase II basis pivots"
+                        subtext="Phase I & II basis pivots"
                       />
                       <Metric
                         label="Max Primal Residual"
@@ -851,16 +852,30 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs font-mono">
+                    <div
+                      className={`grid grid-cols-1 sm:grid-cols-2 ${
+                        activeModel.problem_class === 'LP' || activeModel.problem_class === 'CONVEX_MIQP'
+                          ? 'lg:grid-cols-4'
+                          : 'lg:grid-cols-3'
+                      } gap-2.5 text-xs`}
+                    >
                       {/* Primal Residual */}
-                      <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                        <span className="text-[10px] text-neutral-400 font-sans">Primal Feasibility ||Ax - b||_inf</span>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="font-semibold text-white">
+                      <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                            Primal Feasibility
+                          </span>
+                          <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                            ||Ax - b||∞
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                          <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                             {(currentResult.verification_report?.recomputed_primal_residual ?? 0).toExponential(2)}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                            within tolerance (1e-6)
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                            <Check className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>≤ 1e-6</span>
                           </span>
                         </div>
                       </div>
@@ -868,26 +883,42 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       {/* Dual / Integrality / KKT depending on class */}
                       {activeModel.problem_class === 'LP' && (
                         <>
-                          <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                            <span className="text-[10px] text-neutral-400 font-sans">Dual Multipliers ||A^T y + s - c||</span>
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="font-semibold text-white">
+                          <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                                Dual Multipliers
+                              </span>
+                              <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                                ||Aᵀy + s - c||∞
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                              <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                                 {(currentResult.verification_report?.recomputed_dual_residual ?? 0).toExponential(2)}
                               </span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                                within tolerance (1e-6)
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                                <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                <span>≤ 1e-6</span>
                               </span>
                             </div>
                           </div>
 
-                          <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                            <span className="text-[10px] text-neutral-400 font-sans">Complementary Slackness max|x*s|</span>
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="font-semibold text-white">
+                          <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                                Complementary Slackness
+                              </span>
+                              <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                                max |xⱼ·sⱼ|
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                              <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                                 {(currentResult.verification_report?.recomputed_complementary_slackness ?? 0).toExponential(2)}
                               </span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                                within tolerance (1e-6)
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                                <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                <span>≤ 1e-6</span>
                               </span>
                             </div>
                           </div>
@@ -895,45 +926,69 @@ export const SolvePage: React.FC<SolvePageProps> = ({
                       )}
 
                       {(activeModel.problem_class === 'MILP' || activeModel.problem_class === 'CONVEX_MIQP') && (
-                        <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                          <span className="text-[10px] text-neutral-400 font-sans">Discrete Integrality max|x - round(x)|</span>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="font-semibold text-white">
+                        <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                              Discrete Integrality
+                            </span>
+                            <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                              max |xⱼ - ⌊xⱼ⌉|
+                            </span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                            <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                               {(currentResult.verification_report?.recomputed_integrality_violation ?? 0).toExponential(2)}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                              within tolerance (1e-5)
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                              <Check className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>≤ 1e-5</span>
                             </span>
                           </div>
                         </div>
                       )}
 
                       {(activeModel.problem_class === 'CONVEX_QP' || activeModel.problem_class === 'CONVEX_MIQP') && (
-                        <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                          <span className="text-[10px] text-neutral-400 font-sans">KKT Stationarity ||Qx + c - A^Ty||</span>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="font-semibold text-white">
+                        <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                              KKT Stationarity
+                            </span>
+                            <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                              ||Qx + c - Aᵀy||∞
+                            </span>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                            <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                               {(currentResult.verification_report?.recomputed_kkt_residual ?? 0).toExponential(2)}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                              within tolerance (1e-6)
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                              <Check className="w-2.5 h-2.5 text-emerald-400" />
+                              <span>≤ 1e-6</span>
                             </span>
                           </div>
                         </div>
                       )}
 
                       {/* Objective Consistency */}
-                      <div className="p-2.5 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between">
-                        <span className="text-[10px] text-neutral-400 font-sans">Objective Consistency |c^Tx - z*|</span>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="font-semibold text-white">
+                      <div className="p-3 rounded-lg bg-[#141926] border border-[#20283a] flex flex-col justify-between gap-2 transition-colors hover:border-[#2a364e]">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-[11px] font-sans font-medium text-neutral-300 truncate">
+                            Objective Consistency
+                          </span>
+                          <span className="text-[10px] font-mono text-neutral-400 shrink-0 px-1.5 py-0.5 rounded bg-[#10141e] border border-[#1c2433]">
+                            |cᵀx - z*|
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-[#1c2433]">
+                          <span className="text-sm sm:text-base font-mono font-semibold text-white tracking-tight whitespace-nowrap">
                             {Math.abs(
                               (currentResult.objective_value ?? 0) -
                                 (currentResult.verification_report?.recomputed_objective ?? currentResult.objective_value ?? 0)
                             ).toExponential(2)}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400">
-                            exact match
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50 text-emerald-400 shrink-0 whitespace-nowrap">
+                            <Check className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>Exact match</span>
                           </span>
                         </div>
                       </div>
