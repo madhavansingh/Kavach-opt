@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: kavach-opt
+    runtime: docker
+    dockerfilePath: Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0

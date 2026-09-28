@@ -25,10 +25,15 @@ export const REPO_ROOT = path.resolve(__dirname, '../..');
 
 // Locate Kavach-Opt binary
 export function getSolverBinaryPath() {
+  if (process.env.KAVACH_BIN_PATH && fs.existsSync(process.env.KAVACH_BIN_PATH)) {
+    return path.resolve(process.env.KAVACH_BIN_PATH);
+  }
   const candidates = [
     path.join(REPO_ROOT, 'build-release', 'kavach-opt'),
     path.join(REPO_ROOT, 'build', 'kavach-opt'),
     path.join(REPO_ROOT, 'build-debug', 'kavach-opt'),
+    '/app/build-release/kavach-opt',
+    '/app/build/kavach-opt',
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) {

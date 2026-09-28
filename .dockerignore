@@ -1,0 +1,16 @@
+.git
+.github
+.gitignore
+.env
+.env.*
+.DS_Store
+*.log
+Testing/
+*.swp
+*~
+build/
+build-*/
+cmake-build-*/
+frontend/node_modules/
+frontend/dist/
+benchmark_results/.live_runs/

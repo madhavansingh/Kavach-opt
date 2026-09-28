@@ -189,7 +189,7 @@ export const SystemPage: React.FC = () => {
             </p>
             <div className="text-[10px] font-mono text-neutral-300 pt-1.5 border-t border-[#1f283a] space-y-0.5">
               <div>· Exact KKT stationarity solve</div>
-              <div>· 3-Stage Sparse PSD (Gershgorin + BFS + Cholesky)</div>
+              <div>· 3-Stage Sparse Cholesky curvature PSD verification (Gershgorin + BFS + Cholesky)</div>
               <div>· Sparse LICQ via Modified Gram-Schmidt</div>
               <div>· Dual multiplier complementarity</div>
             </div>
