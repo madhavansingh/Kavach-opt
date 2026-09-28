@@ -132,7 +132,7 @@ function buildVerificationChecks(
       passed: kktRes <= 1e-6,
       residual: kktRes,
       tolerance: 1e-8,
-      description: 'Gradient of Lagrangian stationarity ||Qx + c - A^T y||_inf',
+      description: 'Gradient of Lagrangian stationarity ||Qx + c − Aᵀy||∞',
     });
   }
 
@@ -142,7 +142,7 @@ function buildVerificationChecks(
     passed: objDiff <= 1e-6,
     residual: objDiff,
     tolerance: 1e-8,
-    description: 'Direct scalar product evaluation c^T x* vs solver-reported objective',
+    description: 'Direct scalar product evaluation cᵀx* vs solver-reported objective',
   });
 
   return checks;

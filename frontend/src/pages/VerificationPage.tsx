@@ -329,7 +329,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
               The solver is not trusted by itself. Solvers can report &ldquo;OPTIMAL&rdquo; based on internal
               convergence flags that may be masked by ill-conditioned refactorizations. Kavach-Opt enforces an
               air-gapped verification subsystem that completely discards internal solver flags and independently
-              re-multiplies primal feasibility \(\|Ax - b\|_\infty\), dual multipliers, complementary slackness,
+              re-multiplies primal feasibility (||Ax − b||∞), dual multipliers, complementary slackness,
               and discrete integrality using 64-bit IEEE-754 precision directly against original raw inputs.
             </p>
           </div>
@@ -345,7 +345,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
             badge={
               <span className="text-xs font-mono text-blue-400 flex items-center gap-1.5">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Computing ||Ax - b||
+                Computing ||Ax − b||∞
               </span>
             }
           >
