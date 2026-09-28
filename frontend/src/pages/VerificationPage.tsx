@@ -79,7 +79,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     signatureChecks.push({
       id: 'primal',
       name: 'Primal Row Feasibility',
-      formula: `||Ax - b||_inf <= ${DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY.toExponential(0)}`,
+      formula: `||Ax - b||∞ ≤ ${DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY.toExponential(0)}`,
       category: 'Linear Feasibility',
       source: 'Independent Verifier (Recomputed SpMV)',
       status: pRes <= DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY ? 'PASS' : 'FAIL',
@@ -92,7 +92,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     signatureChecks.push({
       id: 'bounds',
       name: 'Variable Box Bounds',
-      formula: 'l_j <= x_j <= u_j',
+      formula: 'ℓⱼ ≤ xⱼ ≤ uⱼ',
       category: 'Boundary Constraints',
       source: 'Independent Verifier (Raw Bounds Test)',
       status: 'PASS',
@@ -106,7 +106,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'integrality',
         name: 'Discrete Variable Integrality',
-        formula: `max |x_j - round(x_j)| <= ${DEFAULT_TOLERANCES.INTEGRALITY.toExponential(0)}`,
+        formula: `max |xⱼ - ⌊xⱼ⌉| ≤ ${DEFAULT_TOLERANCES.INTEGRALITY.toExponential(0)}`,
         category: 'Discrete Feasibility',
         source: 'Independent Verifier (Integrality Scan)',
         status: intRes <= DEFAULT_TOLERANCES.INTEGRALITY ? 'PASS' : 'FAIL',
@@ -118,7 +118,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'integrality',
         name: 'Discrete Variable Integrality',
-        formula: 'Not Applicable for continuous models',
+        formula: 'Not Applicable (Continuous LP)',
         category: 'Discrete Feasibility',
         source: 'Independent Verifier',
         status: 'NOT_APPLICABLE',
@@ -132,7 +132,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     signatureChecks.push({
       id: 'objective',
       name: 'Objective Consistency',
-      formula: `|c^T x* - z*| <= ${DEFAULT_TOLERANCES.OPTIMALITY.toExponential(0)}`,
+      formula: `|cᵀx* − z*| ≤ ${DEFAULT_TOLERANCES.OPTIMALITY.toExponential(0)}`,
       category: 'Scalar Product Verification',
       source: 'Independent Verifier (Scalar Dot Product)',
       status: objDiff <= DEFAULT_TOLERANCES.OPTIMALITY ? 'PASS' : 'FAIL',
@@ -146,7 +146,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'gap',
         name: 'Optimality Gap Verification',
-        formula: '|BestBound - Incumbent| / (|Incumbent| + 1e-10) <= 1.0e-06',
+        formula: '|BestBound − Incumbent| / (|Incumbent| + ε) ≤ 1e-6',
         category: 'Global Optimality',
         source: 'Independent Verifier (Tree Bound Audit)',
         status: gap <= 1e-6 ? 'PASS' : 'FAIL',
@@ -160,8 +160,8 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         name: 'Optimality Criterion',
         formula:
           problemClass === 'LP'
-            ? `c_j - c_B^T B^{-1} a_j >= -${DEFAULT_TOLERANCES.DUAL_FEASIBILITY.toExponential(0)}`
-            : `||Qx + c - A^Ty|| <= ${DEFAULT_TOLERANCES.KKT_STATIONARITY.toExponential(0)}`,
+            ? `cⱼ − c_Bᵀ B⁻¹ aⱼ ≥ −${DEFAULT_TOLERANCES.DUAL_FEASIBILITY.toExponential(0)}`
+            : `||Qx + c − Aᵀy||∞ ≤ ${DEFAULT_TOLERANCES.KKT_STATIONARITY.toExponential(0)}`,
         category: 'Optimality Certificate',
         source: 'Independent Verifier (Optimality Test)',
         status:
@@ -187,7 +187,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'kkt',
         name: 'KKT Stationarity Residual',
-        formula: `||Q x* + c - A^T y*||_inf <= ${DEFAULT_TOLERANCES.KKT_STATIONARITY.toExponential(0)}`,
+        formula: `||Qx* + c − Aᵀy*||∞ ≤ ${DEFAULT_TOLERANCES.KKT_STATIONARITY.toExponential(0)}`,
         category: 'First-Order Optimality',
         source: 'Independent Verifier (Lagrangian Residual)',
         status: kktRes <= DEFAULT_TOLERANCES.KKT_STATIONARITY ? 'PASS' : 'FAIL',
@@ -199,7 +199,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'kkt',
         name: 'KKT Stationarity Residual',
-        formula: 'Not Applicable for non-QP formulations',
+        formula: 'Not Applicable (Non-QP)',
         category: 'First-Order Optimality',
         source: 'Independent Verifier',
         status: 'NOT_APPLICABLE',
@@ -214,7 +214,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'psd',
         name: 'Hessian Positive Semi-Definiteness (PSD)',
-        formula: 'x^T Q x >= 0 for all x in R^n',
+        formula: 'xᵀQx ≥ 0, ∀x ∈ ℝⁿ',
         category: 'Convexity Certification',
         source: 'Independent Verifier (Cholesky / Gershgorin Curvature)',
         status: 'PASS',
@@ -226,7 +226,7 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
       signatureChecks.push({
         id: 'psd',
         name: 'Hessian Positive Semi-Definiteness (PSD)',
-        formula: 'Not Applicable for linear objectives (Q = 0)',
+        formula: 'Not Applicable (Linear Q = 0)',
         category: 'Convexity Certification',
         source: 'Independent Verifier',
         status: 'NOT_APPLICABLE',
@@ -409,8 +409,16 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                         <div className="font-semibold text-white">{chk.name}</div>
                         <div className="text-[11px] text-neutral-400 mt-0.5">{chk.description}</div>
                       </td>
-                      <td className="py-3 px-3 font-mono text-[11px] text-neutral-300">
-                        {chk.formula}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {chk.status === 'NOT_APPLICABLE' ? (
+                          <span className="text-[11px] font-sans italic text-neutral-400">
+                            {chk.formula}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-[11px] text-neutral-200">
+                            {chk.formula}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 font-mono text-[10px] text-blue-300">
                         {chk.source}
@@ -465,12 +473,12 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                   label="Independent Verifier Primal Residual"
                   value={report.recomputed_primal_residual.toExponential(3)}
                   highlight={report.recomputed_primal_residual <= DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY ? 'success' : 'danger'}
-                  subtext={`Tolerance: ${DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY.toExponential(0)} (zero solver re-use)`}
+                  subtext={`Tolerance: ≤ ${DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY.toExponential(0)} (unscaled)`}
                 />
                 <Metric
                   label="Recomputed Objective"
                   value={typeof report.recomputed_objective === 'number' ? report.recomputed_objective.toFixed(4) : '—'}
-                  subtext="Direct c^T x* evaluation"
+                  subtext="Direct cᵀx* evaluation"
                 />
                 {problemClass === 'LP' ? (
                   <>
@@ -478,13 +486,13 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
                       label="Independent Verifier Dual Residual"
                       value={report.recomputed_dual_residual.toExponential(3)}
                       highlight={report.recomputed_dual_residual <= DEFAULT_TOLERANCES.DUAL_FEASIBILITY ? 'success' : 'danger'}
-                      subtext={`Tolerance: ${DEFAULT_TOLERANCES.DUAL_FEASIBILITY.toExponential(0)}`}
+                      subtext={`Tolerance: ≤ ${DEFAULT_TOLERANCES.DUAL_FEASIBILITY.toExponential(0)}`}
                     />
                     <Metric
                       label="Complementary Slackness"
                       value={report.recomputed_complementary_slackness.toExponential(3)}
                       highlight={report.recomputed_complementary_slackness <= DEFAULT_TOLERANCES.PRIMAL_FEASIBILITY ? 'success' : 'danger'}
-                      subtext="Condition: x_j * s_j == 0"
+                      subtext="Condition: max |xⱼ · sⱼ| = 0"
                     />
                   </>
                 ) : problemClass === 'MILP' ? (
