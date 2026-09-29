@@ -24,6 +24,10 @@ const server = http.createServer(async (req, res) => {
     if (handled) return;
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
     res.end(JSON.stringify({ error: 'API route not found' }));
     return;
   }

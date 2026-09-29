@@ -16,6 +16,7 @@ import {
   getSystemHealth,
   sanitizeModelPath,
 } from '../server/solverAdapter.mjs';
+import { handleApiRequest } from '../server/apiRouter.mjs';
 
 describe('Kavach-Opt Frontend Live Integration Suite', () => {
   describe('System Health & Binary Verification', () => {
@@ -28,6 +29,44 @@ describe('Kavach-Opt Frontend Live Integration Suite', () => {
         health.version_info.toLowerCase().includes('kavach'),
         `Expected version info to contain 'kavach', got '${health.version_info}'`
       );
+    });
+
+    it('handles GET /api/health returning HTTP 200 and valid JSON', async () => {
+      let statusCode = null;
+      const headers = {};
+      let body = '';
+      const req = { method: 'GET', url: '/api/health' };
+      const res = {
+        set statusCode(code) { statusCode = code; },
+        get statusCode() { return statusCode; },
+        setHeader(name, val) { headers[name.toLowerCase()] = val; },
+        end(data) { if (data) body += data; },
+      };
+      const handled = await handleApiRequest(req, res);
+      assert.equal(handled, true);
+      assert.equal(statusCode, 200);
+      assert.equal(headers['content-type'], 'application/json');
+      const parsed = JSON.parse(body);
+      assert.equal(parsed.status, 'ok');
+      assert.equal(parsed.binary_present, true);
+    });
+
+    it('handles HEAD /api/health returning HTTP 200 with headers but no body', async () => {
+      let statusCode = null;
+      const headers = {};
+      let body = '';
+      const req = { method: 'HEAD', url: '/api/health' };
+      const res = {
+        set statusCode(code) { statusCode = code; },
+        get statusCode() { return statusCode; },
+        setHeader(name, val) { headers[name.toLowerCase()] = val; },
+        end(data) { if (data) body += data; },
+      };
+      const handled = await handleApiRequest(req, res);
+      assert.equal(handled, true);
+      assert.equal(statusCode, 200);
+      assert.equal(headers['content-type'], 'application/json');
+      assert.equal(body, '', 'HEAD request must return an empty body');
     });
   });
 

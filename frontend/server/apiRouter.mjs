@@ -18,7 +18,7 @@ function sendJson(res, statusCode, data) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.end(JSON.stringify(data));
 }
@@ -55,19 +55,34 @@ export async function handleApiRequest(req, res) {
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.end();
     return true;
   }
 
-  // Health & System status
-  if (req.method === 'GET' && (pathname === '/api/health' || pathname === '/api/system')) {
+  // Health & System status (supports both GET and HEAD for monitoring services like UptimeRobot and Render)
+  if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/api/health' || pathname === '/api/system')) {
     try {
       const health = await getSystemHealth();
-      sendJson(res, 200, health);
+      if (req.method === 'HEAD') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.end();
+      } else {
+        sendJson(res, 200, health);
+      }
     } catch (err) {
-      sendJson(res, 500, { error: err.message });
+      if (req.method === 'HEAD') {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end();
+      } else {
+        sendJson(res, 500, { error: err.message });
+      }
     }
     return true;
   }
