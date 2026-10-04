@@ -46,6 +46,7 @@ describe('Kavach-Opt Frontend Live Integration Suite', () => {
       assert.equal(handled, true);
       assert.equal(statusCode, 200);
       assert.equal(headers['content-type'], 'application/json');
+      assert.equal(headers['cache-control'], 'no-cache, no-store, must-revalidate');
       const parsed = JSON.parse(body);
       assert.equal(parsed.status, 'ok');
       assert.equal(parsed.binary_present, true);
@@ -66,6 +67,7 @@ describe('Kavach-Opt Frontend Live Integration Suite', () => {
       assert.equal(handled, true);
       assert.equal(statusCode, 200);
       assert.equal(headers['content-type'], 'application/json');
+      assert.equal(headers['cache-control'], 'no-cache, no-store, must-revalidate');
       assert.equal(body, '', 'HEAD request must return an empty body');
     });
   });

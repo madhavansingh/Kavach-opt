@@ -65,6 +65,7 @@ export async function handleApiRequest(req, res) {
   if ((req.method === 'GET' || req.method === 'HEAD') && (pathname === '/api/health' || pathname === '/api/system')) {
     try {
       const health = await getSystemHealth();
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       if (req.method === 'HEAD') {
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
@@ -76,6 +77,7 @@ export async function handleApiRequest(req, res) {
         sendJson(res, 200, health);
       }
     } catch (err) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       if (req.method === 'HEAD') {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
